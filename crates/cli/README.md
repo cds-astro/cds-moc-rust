@@ -7,7 +7,7 @@ Executable to read/write/create/manipulate HEALPix **M**ulti-**O**rder **C**over
 
 ## About
 
-This **C**ommand *Line** **I**nterface (CLI) is made from the [Rust MOC library](TODO: TBD).
+This **C**ommand *Line** **I**nterface (CLI) is made from the [Rust MOC library](https://github.com/cds-astro/cds-moc-rust).
 It implements the v2.0 of the [MOC standard](https://ivoa.net/documents/MOC/),
 including (S-)MOCs, T-MOCs and ST-MOCs.
 

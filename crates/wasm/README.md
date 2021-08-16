@@ -6,7 +6,7 @@ WebAssembly Library to read/write/create/manipulate HEALPix **M**ulti-**O**rder 
 
 ## About
 
-This [wasm](https://webassembly.org/) library is made from the [Rust MOC library](TODO: TBD).
+This [wasm](https://webassembly.org/) library is made from the [Rust MOC library](https://github.com/cds-astro/cds-moc-rust).
 It implements the v2.0 of the [MOC standard](https://ivoa.net/documents/MOC/),
 including (S-)MOCs, T-MOCs and ST-MOCs.
 

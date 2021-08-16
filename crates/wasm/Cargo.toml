@@ -2,6 +2,17 @@
 name = "moc-wasm"
 version = "0.1.0"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
+description = """
+WASM library to create and manipulate HEALPix
+Multi-Order Coverages maps (MOCs), see https://ivoa.net/documents/MOC/
+"""
+license = "Apache-2.0 OR MIT"
+readme = "README.md"
+categories = ["science", "data-structures", "algorithms"]
+keywords = ["healpix", "moc"]
+documentation = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm"
+homepage = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm"
+repository = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -1,7 +1,33 @@
+<meta charset="utf-8"/>
 
-TBW
+# `moc`
+
+MOC library, in Rust, used to read/write/create/manipulate HEALPix **M**ulti-**O**rder **C**overage maps (**MOC**s).
+
+## About
+
+This Rust library implements the v2.0 of the [MOC standard](https://ivoa.net/documents/MOC/),
+including (S-)MOCs, T-MOCs and ST-MOCs.
+
+It is used in:
+* [MOCPy](https://github.com/cds-astro/mocpy), a Python wrapper to manipulate MOCs;
+* a standalone [command line tool](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli)
+* a [WASM library](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm) to be used in web browsers 
+
+For tools able to display MOCs, see:
+* the [Aladin Desktop](https://aladin.u-strasbg.fr/) sky atlas in Java (also supports MOC operations)
+* the [Aladin Lite](https://aladin.u-strasbg.fr/AladinLite/), "a lightweight version of the Aladin Sky Atlas running in the browser".
+* [MOCPy](https://cds-astro.github.io/mocpy/) scripts, a python wrapper using the very same Rust MOC library.
+
 
 ## Install/test
+
+[Install rust](https://www.rust-lang.org/tools/install)
+(and check that `~/.cargo/bin/` is in your path),
+or update the Rust compiler with:
+```bash
+rustup update
+``` 
 
 Run tests (with or without seeing `stdout`):
 ```bash

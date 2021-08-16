@@ -5,7 +5,19 @@ authors = [
   "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>",
   "Matthieu Baumann <baumannmatthieu0@gmail.com>"
 ]
+description = """
+Liibrary made to create and manipulate HEALPix
+Multi-Order Coverages maps (MOCs), see https://ivoa.net/documents/MOC/
+"""
+license = "Apache-2.0 OR MIT"
+readme = "README.md"
+categories = ["science", "data-structures", "algorithms"]
+keywords = ["healpix", "moc"]
+documentation = "https://docs.rs/moc"
+homepage = "https://github.com/cds-astro/cds-moc-rust/"
+repository = "https://github.com/cds-astro/cds-moc-rust/"
 edition = "2018"
+
 
 [lib]
 name = "moc"
