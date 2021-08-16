@@ -1,3 +1,13 @@
+//! The MOC library contains the core functionalities to create and maniuplates MOCs.
+//!
+//! it is used in [MOCPy](https://github.com/cds-astro/mocpy),
+//! [moc-cli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli) and
+//! [moc-wasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm).
+//!
+//! The library is not (yet?) properly documented.
+//! To use it, we so far recommend to look at the source code of the tools using it
+//! (moc-wasm for example).
+//!
 
 use rayon::ThreadPoolBuildError;
 
@@ -22,7 +32,7 @@ pub mod utils;
 
 /// Init the number of threads for parallel tasks.
 /// Must be called only once!
-/// If not called, the default number of threads is the nmber of physical core.
+/// If not called, the default number of threads is the number of physical core.
 /// See [rayon doc](https://docs.rs/rayon/1.5.1/rayon/struct.ThreadPoolBuilder.html)
 pub fn init_par(num_threads: usize) -> Result<(), ThreadPoolBuildError> {
   rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global()
