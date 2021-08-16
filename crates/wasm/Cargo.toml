@@ -1,0 +1,49 @@
+[package]
+name = "moc-wasm"
+version = "0.1.0"
+authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+moclib = { package = "moc", path = "../.." }
+healpix = { package = "cdshealpix", version = "0.5.5" }
+serde = { version = "1.0.80", features = ["derive"] }
+wasm-bindgen = { version = "0.2.75", features = ["serde-serialize"]  }
+wasm-bindgen-futures = "0.4.25"
+js-sys = "0.3.52"
+unreachable = "0.1" # Added for wasm size optimization, see  https://rustwasm.github.io/book/reference/code-size.html
+
+[dependencies.web-sys]
+version = "0.3.52"
+features = [
+  'console',
+  'Blob',
+  'BlobPropertyBag',
+  'Document',
+  'Element',
+  'Event',
+  'File',
+  'FileList',
+  'FileReader',
+  'Headers',
+  'HtmlAnchorElement',
+  'HtmlElement',
+  'HtmlInputElement',
+  'HtmlUListElement',
+  'Node',
+  'Request',
+  'RequestInit',
+  'RequestMode',
+  'Response',
+  'Url',
+  'Window',
+]
+
+# To reduce WASM size, see https://rustwasm.github.io/book/reference/code-size.html
+#[profile.release]
+#lto = true

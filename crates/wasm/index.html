@@ -1,0 +1,67 @@
+<html>
+  <head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
+  </head>
+  <body>
+    <script type="module">
+      import init, * as moc from './pkg/moc.js';
+      async function run() {
+        const wasm = await init().catch(console.error);
+	    window.moc = moc;
+      }
+      run();
+    </script>
+    <p>
+      For security reasons, we cannot fire the select file dialog without a user action.</br>
+      Hence the buttons to load local MOCs.</br>
+      Perform all others actions (load from url/create/manipulate/save) from the console.
+      <label>MOCs from local FITS:</label>
+      <button onclick="moc.fromLocalFile();">Load FITS</button>
+      </br>
+      <label>S-MOCs from local FITS/JSON/ASCII:</label>
+      <button onclick="moc.fromLocalFile('space');">Load S-MOC</button>
+      </br>
+      <label>T-MOCs from local FITS/JSON/ASCII:</label>
+      <button onclick="moc.fromLocalFile('time');">Load T-MOC</button>
+      </br>
+      <label>ST-MOCs from local FITS/JSON/ASCII:</label>
+      <button onclick="moc.fromLocalFile('space-time');">Load ST-MOC</button>
+    </p>
+    <p>
+      Try copy/paste and exec the following lines of javascript from your web-browser console:
+      <pre>
+// Load 2MASS and SDSS DR12 MOCs from CDS      
+await moc.fromFitsUrl('2mass', 'http://alasky.u-strasbg.fr/footprints/tables/vizier/II_246_out/MOC');
+await moc.fromFitsUrl('sdss12', 'http://alasky.u-strasbg.fr/footprints/tables/vizier/V_147_sdss12/MOC');
+
+// List MOCs loaded in the page
+console.log(moc.list());
+      
+// Init a timer
+console.time('timer');
+// Performs MOC intersection
+moc.and('2mass', 'sdss12', '2mass_inter_sdss12');
+// Log time
+console.timeLog('timer', 'Intersection');
+// Performs MOC union
+moc.or('2mass', 'sdss12', '2mass_union_sdss12');
+// Log time
+console.timeLog('timer', 'Union');
+// Degrade to order 2 the result of the intersection      
+moc.degrade('2mass_inter_sdss12', 2, '2mass_inter_sdss12_d2')
+// Remove timer
+console.timeEnd('timer');
+      
+// List MOCs loaded in the page
+console.log(moc.list());
+      
+// Print the ASCII and JSON serializations of '2mass_inter_sdss12_d2'
+console.log(moc.toAscii('2mass_inter_sdss12_d2'));
+console.log(moc.toJson('2mass_inter_sdss12_d2'));
+
+// Save the result of the intersection in a FITS file
+moc.toFitsFile('2mass_inter_sdss12');
+      </pre>
+    </p>
+  </body>
+</html>

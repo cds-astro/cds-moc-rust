@@ -1,0 +1,57 @@
+[package]
+name = "moc-cli"
+version = "0.1.0"
+authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
+description = """
+moc is a command-line to create and manipulate HEALPix
+Multi-Order Coverages maps (MOCs), see https://ivoa.net/documents/MOC/ 
+"""
+license = "Apache-2.0 OR MIT"
+readme = "README.md"
+categories = ["command-line-utilities", "science", "data-structures", "algorithms"]
+keywords = ["healpix", "moc"]
+documentation = "https://github.com/cds-astro/mocpy"
+homepage = "https://github.com/cds-astro/mocpy"
+repository = "https://github.com/cds-astro/mocpy"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+path = "src/main.rs"
+name = "moc"
+bench = false
+test = false
+
+[dependencies]
+moclib = { package = "moc", path = "../.." }
+num = "0.4"
+structopt = "0.3"
+healpix = { package = "cdshealpix", version = "0.5.5" }
+# healpix = { package = "cdshealpix", path = "../../rust-healpix" }
+rayon = "1.5.1"
+
+[package.metadata.deb]
+maintainer = "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/moc", "usr/bin/", "755"],
+    ["COPYING", "usr/share/doc/moc/", "644"],
+    ["LICENSE-MIT", "usr/share/doc/moc/", "644"],
+    ["LICENSE-APACHE", "usr/share/doc/moc/", "644"],
+    ["CHANGELOG.md", "usr/share/doc/moc/CHANGELOG", "644"],
+    ["README.md", "usr/share/doc/moc/README", "644"],
+    #["FAQ.md", "usr/share/doc/moc/FAQ", "644"],
+    #["deployment/deb/moc.1", "usr/share/man/man1/moc.1", "644"],
+    # Similarly for shell completions.
+    #["deployment/deb/moc.bash", "usr/share/bash-completion/completions/moc", "644"],
+    #["deployment/deb/moc.fish", "usr/share/fish/vendor_completions.d/moc.fish", "644"],
+    #["deployment/deb/_moc", "usr/share/zsh/vendor-completions/", "644"],
+]
+extended-description = """\
+moc (moc) is a command-line to create and manipulate HEALPix
+Multi-Order Coverages maps (MOCs), see https://ivoa.net/documents/MOC/.
+"""
+
