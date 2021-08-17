@@ -387,7 +387,7 @@ impl<'a, T: Idx, S: Idx> SNORanges2D<'a, T, S> for Ranges2D<T, S> {
               .collect::<Vec<_>>();
 
             (&mut sorted_time_bound_ranges).par_sort_unstable_by(|l, r| {
-                l.cmp(&r)
+                l.cmp(r)
             });
 
             let mut time_ranges = vec![];

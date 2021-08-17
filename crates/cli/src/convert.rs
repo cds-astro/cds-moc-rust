@@ -1,18 +1,17 @@
 
 use std::fs::File;
-use std::io::{Read, BufRead, BufReader, BufWriter};
+use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::path::PathBuf;
 use std::error::Error;
 
 use structopt::StructOpt;
 
-use moclib::idx::Idx;
 use moclib::qty::{Hpx, Time};
 use moclib::deser::json::{from_json_aladin, cellmoc2d_from_json_aladin};
 use moclib::deser::ascii::{from_ascii_ivoa, from_ascii_stream, moc2d_from_ascii_ivoa};
 use moclib::deser::fits::{
-  from_fits_ivoa, ranges_to_fits_ivoa, ranges2d_to_fits_ivoa,
+  from_fits_ivoa,
   MocIdxType, MocQtyType, MocType as RMocType, STMocType
 };
 
@@ -22,12 +21,10 @@ use moclib::moc::{
 };
 use moclib::moc2d::{
   RangeMOC2IntoIterator, CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator,
-  cellcellrange::CellOrCellRangeMOC2,
-  adapters::CellCellRangeMOC2ToRangeMOC2
 };
 
 use super::output::OutputFormat;
-use super::input::{InputFormat, DataType, fmt_from_extension};
+use super::input::{InputFormat, fmt_from_extension};
 
 #[derive(Debug)]
 pub enum MocType {

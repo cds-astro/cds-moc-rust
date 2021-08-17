@@ -9,7 +9,7 @@ use std::ops::Range;
 
 use structopt::StructOpt;
 
-use moclib::qty::{MocQty, Hpx, Time};
+use moclib::qty::{Hpx, Time};
 use moclib::moc::RangeMOCIntoIterator;
 use moclib::moc::range::RangeMOC;
 
@@ -33,7 +33,7 @@ impl FromStr for Vertices {
     let list: Vec<f64> = s
       .replace("(", "")
       .replace(")", "")
-      .split(",")
+      .split(',')
       .map(|t| str::parse::<f64>(t.trim()))
       .collect::<Result<Vec<f64>, _>>()?;
     Ok(
@@ -358,10 +358,10 @@ impl From {
           let (tmin, tmax) = line.trim()
             .split_once(&separator)
             .ok_or_else(|| String::from("split on space failed."))?;
-          let tmin = time.parse(&tmin)?;
-          let tmax = time.parse(&tmax)?;
+          let tmin = time.parse(tmin)?;
+          let tmax = time.parse(tmax)?;
           Ok(tmin..tmax)
-        };
+        }
         let line2trange = move |line: std::io::Result<String>| {
           match line2tr(&separator, &time, line) {
             Ok(trange) => Some(trange),

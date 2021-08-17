@@ -23,11 +23,21 @@ For tools able to display MOCs, see:
 * [MOCPy](https://cds-astro.github.io/mocpy/), a python wrapper using the very same Rust MOC library.
 
 
-## Use it in your Web page
 
-TODO: need the URL to retrieve the files
+## Use it
 
-AND/OR put on npm.
+### Try it
+
+From this [demo page](http://cdsxmatch.u-strasbg.fr/lab/moc/).
+
+### Put it in your own Web page
+
+TBW
+
+### Use it in you project with NPM
+
+TBW
+
 
 ## Available JavaScript methods  
 
@@ -200,7 +210,11 @@ And load the web page [http://0.0.0.0:8000/](http://0.0.0.0:8000/) in our favori
 ## Publish on NPM (self reminder)
 
 See [here](https://rustwasm.github.io/docs/book/game-of-life/publishing-to-npm.html)
-
+```bash
+wasm-pack build --out-name moc --release
+wasm-pack login
+wasm-pack publish
+```
 
 ## ToDo list
 

@@ -333,9 +333,9 @@ pub fn moc2d_to_ascii_ivoa<T, Q, I, U, R, J, K, L, W>(
   for e in moc2_it {
     writer.write_u8(Q::PREFIX as u8)?;
     let (moc1_it, moc2_it) = e.cellcellrange_mocs_it();
-    to_ascii_ivoa(moc1_it, &fold, use_range_len, &mut writer)?;
+    to_ascii_ivoa(moc1_it, fold, use_range_len, &mut writer)?;
     writer.write_u8(R::PREFIX as u8)?;
-    to_ascii_ivoa(moc2_it, &fold, use_range_len, &mut writer)?;
+    to_ascii_ivoa(moc2_it, fold, use_range_len, &mut writer)?;
   }
   Ok(())
 }

@@ -1,6 +1,7 @@
 //! Builder in which we add cells at a given depth.
 
 use std::slice;
+use std::cmp::Ordering;
 use std::ops::Range;
 use std::marker::PhantomData;
 
@@ -125,14 +126,14 @@ impl<T: Idx, Q: MocQty<T>> FixedDepthMocBuilder<T, Q> {
       let mut from = *from;
       let mut to = from + T::one();
       for curr in it {
-        if *curr == to {
-          to += T::one();
-        } else if *curr > to {
-          ranges.push(from.unsigned_shl(shift)..to.unsigned_shl(shift));
-          from = *curr;
-          to = *curr + T::one();
-        } else {
-          debug_assert_eq!(*curr, to - T::one());
+        match to.cmp(curr) {
+          Ordering::Equal => to += T::one(),
+          Ordering::Less => {
+            ranges.push(from.unsigned_shl(shift)..to.unsigned_shl(shift));
+            from = *curr;
+            to = *curr + T::one();
+          },
+          Ordering::Greater =>  debug_assert_eq!(*curr, to - T::one()),
         }
       }
       ranges.push(from.unsigned_shl(shift)..to.unsigned_shl(shift));
@@ -189,16 +190,16 @@ impl<'a, T: Idx, Q: MocQty<T>> Iterator for OrderedFixedDepthCellsToRanges<'a, T
   type Item = Range<T>;
 
   fn next(&mut self) -> Option<Self::Item> {
-    while let Some(curr) = self.iter.next() {
-      if *curr == self.to {
-        self.to += T::one();
-      } else if *curr > self.to {
-        let range = self.from.unsigned_shl(self.shift)..self.to.unsigned_shl(self.shift);
-        self.from = *curr;
-        self.to = *curr + T::one();
-        return Some(range)
-      } else {
-        debug_assert_eq!(*curr, self.to - T::one());
+    for curr in &mut self.iter {
+      match self.to.cmp(curr) {
+        Ordering::Equal => self.to += T::one(),
+        Ordering::Less => {
+          let range = self.from.unsigned_shl(self.shift)..self.to.unsigned_shl(self.shift);
+          self.from = *curr;
+          self.to = *curr + T::one();
+          return Some(range);
+        },
+        Ordering::Greater => debug_assert_eq!(*curr, self.to - T::one()),
       }
     }
     if !self.depleted {
@@ -270,16 +271,16 @@ impl<T: Idx, Q: MocQty<T>, I: Iterator<Item=T>> Iterator for OwnedOrderedFixedDe
   type Item = Range<T>;
 
   fn next(&mut self) -> Option<Self::Item> {
-    while let Some(curr) = self.iter.next() {
-      if curr == self.to {
-        self.to += T::one();
-      } else if curr > self.to {
-        let range = self.from.unsigned_shl(self.shift)..self.to.unsigned_shl(self.shift);
-        self.from = curr;
-        self.to = curr + T::one();
-        return Some(range)
-      } else {
-        debug_assert_eq!(curr, self.to - T::one());
+    for curr in &mut self.iter {
+      match self.to.cmp(&curr) {
+        Ordering::Equal => self.to += T::one(),
+        Ordering::Less => {
+          let range = self.from.unsigned_shl(self.shift)..self.to.unsigned_shl(self.shift);
+          self.from = curr;
+          self.to = curr + T::one();
+          return Some(range);
+        }
+        Ordering::Greater => debug_assert_eq!(curr, self.to - T::one()),
       }
     }
     if !self.depleted {
@@ -357,17 +358,17 @@ impl<T: Idx, Q: MocQty<T>, I: Iterator<Item=u64>> Iterator for OwnedOrderedFixed
   type Item = Range<T>;
 
   fn next(&mut self) -> Option<Self::Item> {
-    while let Some(curr) = self.iter.next() {
+    for curr in &mut self.iter {
       let curr = T::from_u64(curr); // from_u64_idx??
-      if curr == self.to {
-        self.to += T::one();
-      } else if curr > self.to {
-        let range = self.from.unsigned_shl(self.shift)..self.to.unsigned_shl(self.shift);
-        self.from = curr;
-        self.to = curr + T::one();
-        return Some(range)
-      } else {
-        debug_assert_eq!(curr, self.to - T::one());
+      match self.to.cmp(&curr) {
+        Ordering::Equal =>  self.to += T::one(),
+        Ordering::Less => {
+          let range = self.from.unsigned_shl(self.shift)..self.to.unsigned_shl(self.shift);
+          self.from = curr;
+          self.to = curr + T::one();
+          return Some(range);
+        },
+        Ordering::Greater => debug_assert_eq!(curr, self.to - T::one()),
       }
     }
     if !self.depleted {

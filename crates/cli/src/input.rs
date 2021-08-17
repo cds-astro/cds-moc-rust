@@ -2,10 +2,8 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::str::{self, FromStr};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::error::Error;
-
-use structopt::StructOpt;
 
 use moclib::deser::fits::{MocIdxType, from_fits_ivoa};
 
@@ -48,7 +46,7 @@ impl FromStr for InputFormat {
 }
 
 /// Guess the file format from the extension.
-pub fn fmt_from_extension(path: &PathBuf) -> Result<InputFormat, String> {
+pub fn fmt_from_extension(path: &Path) -> Result<InputFormat, String> {
   match path.extension().and_then(|e| e.to_str()) {
     Some("fits") => Ok(InputFormat::Fits),
     Some("json") => Ok(InputFormat::Json),

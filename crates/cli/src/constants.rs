@@ -3,7 +3,6 @@ use std::error::Error;
 
 use structopt::StructOpt;
 
-use moclib::idx::Idx;
 use moclib::qty::{MocQty, Hpx, Time};
 
 #[derive(StructOpt, Debug)]

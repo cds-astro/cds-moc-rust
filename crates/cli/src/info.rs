@@ -87,8 +87,8 @@ fn print_moc2_info<T: Idx, R>(idx_type: &str, qty_type: &str, moc2: R) -> Result
        RangeMOC2Elem<T, Time::<T>, T, Hpx::<T>>
     >
 {
-  let mut max_depth_hpx = moc2.depth_max_1();
-  let mut max_depth_time = moc2.depth_max_2();
+  let max_depth_hpx = moc2.depth_max_1();
+  let max_depth_time = moc2.depth_max_2();
   println!("MOC type: {}", qty_type);
   println!("MOC index type: {}", idx_type);
   println!("MOC hpx  depth: {}", max_depth_hpx);

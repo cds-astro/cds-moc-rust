@@ -143,7 +143,7 @@ pub(super) fn check_for_value_indicator(keyword_record: &[u8]) -> Result<(), Fit
   if get_value_indicator(keyword_record) == VALUE_INDICATOR {
     Ok(())
   } else {
-    let keyword_record = String::from_utf8_lossy(&keyword_record).trim_end().to_string();
+    let keyword_record = String::from_utf8_lossy(keyword_record).trim_end().to_string();
     Err(FitsError::ValueIndicatorNotFound(keyword_record))
   }
 }
@@ -206,7 +206,7 @@ pub(super) fn get_str_val_no_quote(
       return Ok(trim_right(subslice));
     }
   }
-  let keyword_record = String::from_utf8_lossy(&keyword_record).trim_end().to_string();
+  let keyword_record = String::from_utf8_lossy(keyword_record).trim_end().to_string();
   Err(FitsError::StringValueNotFound(keyword_record))
 }
 
@@ -220,7 +220,7 @@ pub(super) fn parse_uint_val<T>(
   let src = get_left_trimmed_value(keyword_record);
   let to = index_of_last_digit(src);
   if to == 0 {
-    let keyword_record = String::from_utf8_lossy(&keyword_record).trim_end().to_string();
+    let keyword_record = String::from_utf8_lossy(keyword_record).trim_end().to_string();
     Err(FitsError::UintValueNotFound(keyword_record))
   } else {
     // we go unsafe and unwrap because we already tested for regular digits

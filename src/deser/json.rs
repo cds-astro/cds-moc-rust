@@ -97,12 +97,12 @@ pub fn cellmoc2d_to_json_aladin<T, Q, I, U, R, J, K, L, W>(
     }
     writer.write_u8(Q::PREFIX as u8)?;
     writer.write_all(b"\": ")?;
-    to_json_aladin(moc1_it, &fold, "  ", &mut writer)?;
+    to_json_aladin(moc1_it, fold, "  ", &mut writer)?;
 
     writer.write_all(b",\n  \"")?;
     writer.write_u8(R::PREFIX as u8)?;
     writer.write_all(b"\": ")?;
-    to_json_aladin(moc2_it, &fold, "  ",&mut writer)?;
+    to_json_aladin(moc2_it, fold, "  ",&mut writer)?;
     writer.write_all(b"\n}")?;
   }
   writer.write_all(b"\n]\n")?;
@@ -189,7 +189,7 @@ fn from_json_aladin_internal<T, Q>(value: &Value) -> Result<CellMOC<T, Q>, Box<d
               Value::Number(idx) => idx.as_u64().and_then(|v| T::from_u64(v).into() /*v.into()*/ /*T::try_from(v).ok()*/),
               _ => None,
             }) {
-            cells.push(Cell::new(depth, v.into()));
+            cells.push(Cell::new(depth, v));
           }
           depth_max = depth_max.max(depth);
         }

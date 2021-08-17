@@ -150,13 +150,13 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
 
   pub fn xor(&self, rhs: &RangeMOC<T, Q>) -> RangeMOC<T, Q> {
     let depth_max = self.depth_max.max(rhs.depth_max);
-    let ranges = xor((&self).into_range_moc_iter(), (&rhs).into_range_moc_iter()).collect();
+    let ranges = xor(self.into_range_moc_iter(), rhs.into_range_moc_iter()).collect();
     RangeMOC::new(depth_max, ranges)
   }
 
   pub fn minus(&self, rhs: &RangeMOC<T, Q>) -> RangeMOC<T, Q> {
     let depth_max = self.depth_max.max(rhs.depth_max);
-    let ranges = minus((&self).into_range_moc_iter(), (&rhs).into_range_moc_iter()).collect();
+    let ranges = minus(self.into_range_moc_iter(), rhs.into_range_moc_iter()).collect();
     RangeMOC::new(depth_max, ranges)
   }
 
@@ -215,6 +215,30 @@ impl From<BMOC> for RangeMOC<u64, Hpx<u64>> {
 }
 
 
+
+/// Complex type returned by the `expanded_iter` method.
+pub type ExpandedIter<'a, T> = OrRangeIter<
+  T, Hpx<T>, RangeRefMocIter<'a, T, Hpx<T>>,
+  OwnedOrderedFixedDepthCellsToRangesFromU64<T, Hpx<T>, IntoIter<u64>>
+>;
+
+/// Complex type returned by the `contracted_iter` method.
+pub type ContractedIter<'a, T> = MinusRangeIter<
+  T, Hpx<T>, RangeRefMocIter<'a, T, Hpx<T>>,
+  OwnedOrderedFixedDepthCellsToRangesFromU64<T, Hpx<T>, IntoIter<u64>>
+>;
+
+/// Complex type returned by the `external_border_iter` method.
+pub type ExtBorderIter<'a, T> = MinusRangeIter<
+  T, Hpx<T>, ExpandedIter<'a, T>, RangeRefMocIter<'a, T, Hpx<T>>
+>;
+
+/// Complex type returned by the `internal_border_iter` method.
+pub type IntBorderIter<'a, T> = AndRangeIter<
+  T, Hpx<T>, RangeMocIter<T, Hpx<T>>,
+  RangeRefMocIter<'a, T, Hpx<T>>
+>;
+
 impl<T: Idx> RangeMOC<T, Hpx<T>> {
   
   /// Add the MOC external border of depth `self.depth_max`.
@@ -222,39 +246,29 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     self.expanded_iter().into_range_moc()
   }
 
-  pub fn expanded_iter(&self) -> OrRangeIter<
-    T, 
-    Hpx<T>,
-    RangeRefMocIter<'_, T, Hpx<T>>, 
-    OwnedOrderedFixedDepthCellsToRangesFromU64<T, Hpx<T>, IntoIter<u64>>
-  > {
+  pub fn expanded_iter(&self) -> ExpandedIter<'_, T> {
     let mut ext: Vec<u64> = Vec::with_capacity(10 * self.ranges.ranges().0.len()); // constant to be adjusted
-    for Cell { depth, idx } in (&self).into_range_moc_iter().cells() {
+    for Cell { depth, idx } in self.into_range_moc_iter().cells() {
       append_external_edge(depth, idx.to_u64(), self.depth_max - depth, &mut ext);
     }
     ext.sort_unstable(); // parallelize with rayon? It is the slowest part!!
     let ext_range_iter = OwnedOrderedFixedDepthCellsToRangesFromU64::new(self.depth_max, ext.into_iter());
-    or((&self).into_range_moc_iter(), ext_range_iter)
+    or(self.into_range_moc_iter(), ext_range_iter)
   }
 
   pub fn contracted(&self) -> Self {
     self.contracted_iter().into_range_moc()
   }
   
-  pub fn contracted_iter(&self) -> MinusRangeIter<
-    T,
-    Hpx<T>,
-    RangeRefMocIter<'_, T, Hpx<T>>,
-    OwnedOrderedFixedDepthCellsToRangesFromU64<T, Hpx<T>, IntoIter<u64>>
-  > {
+  pub fn contracted_iter(&self) -> ContractedIter<'_, T> {
     let mut ext_of_complement: Vec<u64> = Vec::with_capacity(10 * self.ranges.ranges().0.len()); // constant to be adjusted
-    for Cell { depth, idx } in (&self).into_range_moc_iter().not().cells() {
+    for Cell { depth, idx } in self.into_range_moc_iter().not().cells() {
       append_external_edge(depth, idx.to_u64(), self.depth_max - depth, &mut ext_of_complement);
     }
     // _by(|a, b| a.flat_cmp::<Hpx<u64>>(&b))
     ext_of_complement.sort_unstable(); // parallelize with rayon? It is the slowest part!!
     let ext_range_iter = OwnedOrderedFixedDepthCellsToRangesFromU64::new(self.depth_max, ext_of_complement.into_iter());
-    minus((&self).into_range_moc_iter(), ext_range_iter)
+    minus(self.into_range_moc_iter(), ext_range_iter)
   }
   
   /// Returns this MOC external border
@@ -267,31 +281,22 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   }
 
   /// Returns this MOC external border
-  pub fn external_border_iter(&self) -> MinusRangeIter<
-    T,
-    Hpx<T>,
-    OrRangeIter<T, Hpx<T>, RangeRefMocIter<'_, T, Hpx<T>>, OwnedOrderedFixedDepthCellsToRangesFromU64<T, Hpx<T>, IntoIter<u64>>>,
-    RangeRefMocIter<'_, T, Hpx<T>>
-  > {
+  pub fn external_border_iter(&self) -> ExtBorderIter<'_, T> {
     minus(
       self.expanded_iter(),
-      (&self).into_range_moc_iter()
+      self.into_range_moc_iter()
     )
   }
 
   /// Returns this MOC internal border
   pub fn internal_border(&self) -> Self {
     let not = self.not();
-    and(not.expanded_iter(), (&self).into_range_moc_iter()).into_range_moc()
+    and(not.expanded_iter(), self.into_range_moc_iter()).into_range_moc()
   }
 
-  pub fn internal_border_iter(&self) -> AndRangeIter<
-    T, Hpx<T>,
-    RangeMocIter<T, Hpx<T>>,
-    RangeRefMocIter<'_, T, Hpx<T>>
-  > {
+  pub fn internal_border_iter(&self) -> IntBorderIter<'_, T> {
     let left = self.not().expanded();
-    and(left.into_range_moc_iter(), (&self).into_range_moc_iter())
+    and(left.into_range_moc_iter(), self.into_range_moc_iter())
   }
   
 }

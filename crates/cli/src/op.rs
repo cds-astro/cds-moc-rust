@@ -18,14 +18,12 @@ use moclib::deser::fits::{
   MocIdxType, MocQtyType, MocType,
   STMocType,
   from_fits_ivoa,
-  RangeMoc2DIterFromFits,
-  RangeMoc2DPreV2IterFromFits
 };
 use moclib::moc2d::{
   RangeMOC2Iterator,
-  range::{RangeMOC2Elem, RangeMOC2}
+  range::RangeMOC2Elem
 };
-use moclib::hpxranges2d::{HpxRanges2D, TimeSpaceMoc};
+use moclib::hpxranges2d::TimeSpaceMoc;
 
 use crate::input::ReducedInputFormat;
 use crate::output::OutputFormat;
@@ -237,8 +235,8 @@ impl Op1 {
   
   pub fn perform_op_on_strangemoc_iter<T, R>(
     self,
-    /*moc2: HpxRanges2D<T, Time<T>, T>*/moc_it: R,
-    out: OutputFormat
+    /*moc2: HpxRanges2D<T, Time<T>, T>*/_moc_it: R,
+    _out: OutputFormat
   ) -> Result<(), Box<dyn Error>>
     where
       T: Idx,
@@ -251,7 +249,7 @@ impl Op1 {
     //let moc2:  HpxRanges2D<T, Time<T>, T> = HpxRanges2D::from_ranges_it(moc_it);
     match self {
       Op1::Complement => todo!(), // Not yet implemented on ST-MOC!! Do we add time ranges with full space S-MOCs?
-      Op1::Degrade  { new_depth } => todo!(), // Not yet implemented on ST-MOC!! Degrade on T, on S, on both (take two paramaeters)?
+      Op1::Degrade  { .. } => todo!(), // Not yet implemented on ST-MOC!! Degrade on T, on S, on both (take two paramaeters)?
       Op1::Extend => Err(String::from("No 'extend' operation on ST-MOCs.").into()),
       Op1::Contract => Err(String::from("No 'contract' operation on ST-MOCs.").into()),
       Op1::ExtBorder => Err(String::from("No 'extborder' operation on ST-MOCs.").into()),
@@ -343,9 +341,9 @@ fn op2_exec_on_fits_qty<T: Idx>(
     (MocQtyType::Time(left_moc), MocQtyType::Time(right_moc)) => op2_exec_on_fits_moc(op2, left_moc, right_moc, output),
     (MocQtyType::TimeHpx(left_moc), MocQtyType::TimeHpx(right_moc)) => op2_exec_on_fits_moc2(op2, left_moc, right_moc, output),
     (MocQtyType::Hpx(left_moc), MocQtyType::TimeHpx(right_moc)) => op2_exec_on_fits_smoc_stmoc(op2, left_moc, right_moc, output),
-    (MocQtyType::TimeHpx(right_moc), MocQtyType::Hpx(left_moc)) => Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into()),
+    (MocQtyType::TimeHpx(_), MocQtyType::Hpx(_)) => Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into()),
     (MocQtyType::Time(left_moc), MocQtyType::TimeHpx(right_moc)) => op2_exec_on_fits_tmoc_stmoc(op2, left_moc, right_moc, output),
-    (MocQtyType::TimeHpx(right_moc), MocQtyType::Time(left_moc)) => Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into()),
+    (MocQtyType::TimeHpx(_), MocQtyType::Time(_)) => Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into()),
     (MocQtyType::Hpx(_), MocQtyType::Time(_)) => Err(String::from("Incompatible MOCs. Left: S-MOC. Right: T-MOC.").into()),
     (MocQtyType::Time(_), MocQtyType::Hpx(_)) => Err(String::from("Incompatible MOCs. Left: T-MOC. Right: S-MOC.").into()),
   }
@@ -394,24 +392,16 @@ fn op2_exec_on_fits_qty_with_lconv<TL: Idx, TR: Idx + From<TL>>(
   match (left_moc, right_moc) {
     (MocQtyType::Hpx(left_moc),  MocQtyType::Hpx(right_moc)) => op2_exec_on_fits_moc_lconv(op2, left_moc, right_moc, output),
     (MocQtyType::Time(left_moc), MocQtyType::Time(right_moc)) => op2_exec_on_fits_moc_lconv(op2, left_moc, right_moc, output),
-    (MocQtyType::TimeHpx(left_moc), MocQtyType::TimeHpx(right_moc)) => Err(String::from("Unable to convert a ST-MOCs datatype so far.").into()),
+    (MocQtyType::TimeHpx(_), MocQtyType::TimeHpx(_)) => Err(String::from("Unable to convert a ST-MOCs datatype so far.").into()),
     (MocQtyType::Hpx(left_moc), MocQtyType::TimeHpx(right_moc)) => op2_exec_on_fits_smoc_stmoc_lconv(op2, left_moc, right_moc, output),
-    (MocQtyType::TimeHpx(right_moc), MocQtyType::Hpx(left_moc)) =>  Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into()),
+    (MocQtyType::TimeHpx(_), MocQtyType::Hpx(_)) =>  Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into()),
     (MocQtyType::Time(left_moc), MocQtyType::TimeHpx(right_moc)) => op2_exec_on_fits_tmoc_stmoc_lconv(op2, left_moc, right_moc, output),
-    (MocQtyType::TimeHpx(right_moc), MocQtyType::Time(left_moc)) =>  Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into()),
+    (MocQtyType::TimeHpx(_), MocQtyType::Time(_)) =>  Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into()),
     (MocQtyType::Hpx(_), MocQtyType::Time(_)) => Err(String::from("Incompatible MOCs. Left: S-MOC. Right: T-MOC.").into()),
     (MocQtyType::Time(_), MocQtyType::Hpx(_)) => Err(String::from("Incompatible MOCs. Left: T-MOC. Right: S-MOC.").into()),
-    // fusion SMOC + TMOC => STMOC ?
-    // tfold => union of all SMOCs => smoc
-    // sfold => remove SMOCs => tmoc
-    // SMOC vs ST-MOC operations:
-    // - inter => assume SMOC covers the same time ranges/or all (same result) (intersect SMOC with each ST-MOC SMOC elem)
-    // - union => assume SMOC covers the same time (union with each ST-MOC elem)
-    // TMOC vs ST-MOC operations:
-    // - inter OK (remove elems)
-    // - union does not make sense
   }
 }
+
 fn op2_exec_on_fits_moc_lconv<TL: Idx, QL: MocQty<TL>, TR: Idx + From<TL>, QR: MocQty<TR>>(
   op2: Op2,
   left_moc: MocType<TL, QL, BufReader<File>>,
@@ -456,11 +446,11 @@ fn op2_exec_on_fits_qty_with_rconv<TL: Idx + From<TR>, TR: Idx>(
   match (left_moc, right_moc) {
     (MocQtyType::Hpx(left_moc),  MocQtyType::Hpx(right_moc)) => op2_exec_on_fits_moc_rconv(op2, left_moc, right_moc, output),
     (MocQtyType::Time(left_moc), MocQtyType::Time(right_moc)) => op2_exec_on_fits_moc_rconv(op2, left_moc, right_moc, output),
-    (MocQtyType::TimeHpx(left_moc), MocQtyType::TimeHpx(right_moc)) =>  Err(String::from("Unable to convert a ST-MOCs datatype so far.").into()),
-    (MocQtyType::Hpx(left_moc), MocQtyType::TimeHpx(right_moc)) => Err(String::from("Unable to convert a ST-MOCs datatype so far.").into()),
-    (MocQtyType::TimeHpx(right_moc), MocQtyType::Hpx(left_moc)) =>  Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into()),
-    (MocQtyType::Time(left_moc), MocQtyType::TimeHpx(right_moc)) => Err(String::from("Unable to convert a ST-MOCs datatype so far.").into()),
-    (MocQtyType::TimeHpx(right_moc), MocQtyType::Time(left_moc)) =>Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into()),
+    (MocQtyType::TimeHpx(_), MocQtyType::TimeHpx(_)) =>  Err(String::from("Unable to convert a ST-MOCs datatype so far.").into()),
+    (MocQtyType::Hpx(_), MocQtyType::TimeHpx(_)) => Err(String::from("Unable to convert a ST-MOCs datatype so far.").into()),
+    (MocQtyType::TimeHpx(_), MocQtyType::Hpx(_)) =>  Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into()),
+    (MocQtyType::Time(_), MocQtyType::TimeHpx(_)) => Err(String::from("Unable to convert a ST-MOCs datatype so far.").into()),
+    (MocQtyType::TimeHpx(_), MocQtyType::Time(_)) =>Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into()),
     (MocQtyType::Hpx(_), MocQtyType::Time(_)) => Err(String::from("Incompatible MOCs. Left: S-MOC. Right: T-MOC.").into()),
     (MocQtyType::Time(_), MocQtyType::Hpx(_)) => Err(String::from("Incompatible MOCs. Left: T-MOC. Right: S-MOC.").into()),
   }

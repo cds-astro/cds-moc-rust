@@ -1,6 +1,5 @@
 use std::fs::File;
-use std::io::{Read, BufRead, BufReader, BufWriter};
-use std::str::FromStr;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::error::Error;
 use std::marker::Send;
@@ -12,10 +11,10 @@ use structopt::StructOpt;
 use moclib::idx::Idx;
 use moclib::qty::{MocQty, Hpx, Time};
 use moclib::moc::range::RangeMOC;
-use moclib::deser::fits::{MocIdxType, MocQtyType, from_fits_ivoa};
+use moclib::deser::fits::{MocIdxType, MocQtyType};
 
 use super::InputTime;
-use super::input::{from_fits_file, InputFormat, DataType};
+use super::input::from_fits_file;
 
 #[derive(StructOpt, Debug)]
 pub struct CsvArgs {
@@ -310,7 +309,7 @@ impl TimeFilter {
       }
     }
     // Deal with header line (if any) and pos column indices
-    let (itime) = if self.csv_args.has_header {
+    let itime = if self.csv_args.has_header {
       if let Some(line) = it.next().transpose()? {
         println!("{}", line);
         let col_names: Vec<&str> = line.split(sep).collect();

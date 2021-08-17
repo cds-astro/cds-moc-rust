@@ -505,7 +505,7 @@ pub fn from_fits_ivoa<R: BufRead>(mut reader: R) -> Result<MocIdxType<R>, FitsEr
   // Read MOC keywords
   let mut moc_kws = MocKeywordsMap::new();
   'hr: loop {
-    while let Some(kw_record) = it80.next() {
+    for kw_record in &mut it80 {
       // Parse only MOC related keywords and ignore others
       if let Some(mkw) = MocKeywords::is_moc_kw(kw_record) {
         if let Some(previous_mkw) = moc_kws.insert(mkw?) {

@@ -11,20 +11,16 @@ use moclib::qty::{MocQty, Hpx, Time};
 use moclib::deser::fits;
 use moclib::moc::{
   RangeMOCIterator, CellMOCIterator,
-  range::{
-    RangeMocIter,
-    op::convert::{convert_to_u64, convert_from_u64}
-  }
+  range::op::convert::{convert_to_u64, convert_from_u64}
 };
 use moclib::moc2d::{
   RangeMOC2Iterator,
   RangeMOC2ElemIt,
   CellMOC2IntoIterator,
   CellOrCellRangeMOC2IntoIterator,
-  range::{RangeMOC2, RangeMOC2Elem}
 };
 use moclib::deser::{
-  fits::{ranges_to_fits_ivoa, ranges2d_to_fits_ivoa, rangemoc2d_to_fits_ivoa},
+  fits::{ranges_to_fits_ivoa, ranges2d_to_fits_ivoa},
   json::{to_json_aladin, cellmoc2d_to_json_aladin},
   ascii::{to_ascii_ivoa, to_ascii_stream, moc2d_to_ascii_ivoa},
 };
@@ -79,17 +75,12 @@ impl OutputFormat {
   }
 
   pub fn is_fits_forced_to_u64(&self) -> bool {
-    match &self {
-      OutputFormat::Fits { force_u64: true, .. } => true,
-      _ => false,
-    }
+    matches!(self, OutputFormat::Fits { force_u64: true, .. })
   }
 
   pub fn is_fits_not_forced_to_u64(&self) -> bool {
-    match &self {
-      OutputFormat::Fits { force_u64: false, .. } => true,
-      _ => false,
-    }
+    matches!(self, OutputFormat::Fits { force_u64: false, .. })
+
   }
 
   pub fn write_smoc_possibly_auto_converting_from_u64<I>(self, it: I) -> Result<(), Box<dyn Error>>
@@ -225,7 +216,7 @@ impl OutputFormat {
         ranges2d_to_fits_ivoa(stmoc, moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
       },
       OutputFormat::Stream => {
-        let stdout = io::stdout();
+        // let stdout = io::stdout();
         Err(String::from("No stream format for ST-MOCs yet.").into())
       },
     }
