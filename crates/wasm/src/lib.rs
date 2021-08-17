@@ -807,7 +807,7 @@ pub fn filter_time(name: &str, jds: Box<[f64]>) ->  Result<Box<[u8]>, JsValue> {
 
 // Called when the wasm module is instantiated
 #[wasm_bindgen(start)]
-pub fn main() -> Result<(), JsValue> {
+pub fn main_js() -> Result<(), JsValue> {
   // Do nothing, be here commented example that build a web page (add download buttons, ...)
   /*
   // Use `web_sys`'s global `window` function to get a handle on the global

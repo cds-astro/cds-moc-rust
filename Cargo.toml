@@ -1,3 +1,6 @@
+
+cargo-features = ["strip"]
+
 [package]
 name = "moc"
 version = "0.4.0"
@@ -33,7 +36,7 @@ exclude = ["crates/wasm"]
 # - cargo deb --target x86_64-unknown-linux-musl
 # It tries to compile crates/wasm but failed because of
 # crate-type = ["cdylib"] in wasm Cargo.toml
-# members = [
+#members = [
 #  "crates/cli",
 #  "crates/wasm",
 #]
@@ -78,4 +81,13 @@ harness = false
 # But bench can be run with the cpu-native option: RUSTFLAGS='-C target-cpu=native' cargo bench
 [profile.bench]
 opt-level = 3
+
+
+
+# See opti here: https://github.com/johnthagen/min-sized-rust
+[profile.release]
+strip = true  # Automatically strip symbols from the binary.
+lto = true    # Optimize at the link stage (may remove dead code)
+codegen-units = 1
+panic = "abort"
 

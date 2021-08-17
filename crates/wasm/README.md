@@ -188,6 +188,11 @@ or using (automatic download of sources and local compilation):
 cargo install wasm-pack
 ```
 
+Run tests:
+```bash
+wasm-pack test --node
+```
+
 Build the project, see wasm-bindgen [doc](https://rustwasm.github.io/docs/wasm-bindgen/reference/deployment.html)
 ```bash
 wasm-pack build --out-name moc --target web --no-typescript 
