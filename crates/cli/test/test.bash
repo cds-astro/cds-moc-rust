@@ -4,7 +4,7 @@ moc="moc"
 resources="resources"
 
 ${moc} -V
-[[ "$?" != 0 ]] {{ echo "'moc' command line not found!"; exit 1; }}
+[[ "$?" != 0 ]] && {{ echo "'moc' command line not found!"; exit 1; }}
 
 # 1: cmd, 2: expected
 test(){

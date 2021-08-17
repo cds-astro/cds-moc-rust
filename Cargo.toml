@@ -1,5 +1,5 @@
-
-cargo-features = ["strip"]
+# Nightly feature :o/
+#cargo-features = ["strip"]
 
 [package]
 name = "moc"
@@ -86,7 +86,7 @@ opt-level = 3
 
 # See opti here: https://github.com/johnthagen/min-sized-rust
 [profile.release]
-strip = true  # Automatically strip symbols from the binary.
+# strip = true  # Automatically strip symbols from the binary (nightly feature :o/ ).
 lto = true    # Optimize at the link stage (may remove dead code)
 codegen-units = 1
 panic = "abort"
