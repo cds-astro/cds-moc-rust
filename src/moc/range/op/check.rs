@@ -85,7 +85,9 @@ impl<T, Q, I> Iterator for CheckedIterator<T, Q, I>
   fn next(&mut self) -> Option<Self::Item> {
     let prev = std::mem::replace(&mut self.curr, self.it.next());
     if let (Some(l), Some(r)) = (&prev, &self.curr) {
-      assert!(l.end < r.start) // not equals, else ranges should have been merged!
+      assert!(l.start < l.end); // not equals, else ranges should have been merged!
+      assert!(l.end < r.start); // not equals, else ranges should have been merged!
+      assert!(r.start < r.end); // not equals, else ranges should have been merged!
     }
     prev
   }

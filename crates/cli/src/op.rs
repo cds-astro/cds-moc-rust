@@ -789,12 +789,12 @@ impl Op2 {
   {
     // Operations on iterator to be written!!
     // In the meantime, use hpxranges2d (via TimeSpaceMoc)
-    let (time_depth_1, hpx_depth_1) = (left_stmoc.depth_max_1(), left_stmoc.depth_max_2());
+   /* let (time_depth_1, hpx_depth_1) = (left_stmoc.depth_max_1(), left_stmoc.depth_max_2());
     let (time_depth_2, hpx_depth_2) = (right_stmoc.depth_max_1(), right_stmoc.depth_max_2());
     let left_stmoc = TimeSpaceMoc::from_ranges_it(left_stmoc);
     let right_stmoc = TimeSpaceMoc::from_ranges_it(right_stmoc);
     let result = match self {
-      Op2::Intersection =>left_stmoc.intersection(&right_stmoc),
+      Op2::Intersection => left_stmoc.intersection(&right_stmoc),
       Op2::Union => left_stmoc.union(&right_stmoc),
       Op2::Difference => return Err(String::from("Difference (or xor) not implemented yet for ST-MOCs.").into()), // todo!()
       Op2::Minus => left_stmoc.difference(&right_stmoc), // warning method name is misleading
@@ -802,7 +802,30 @@ impl Op2 {
     };
     output.write_stmoc(
       result.time_space_iter(time_depth_1.max(time_depth_2), hpx_depth_1.max(hpx_depth_2))
-    )
+    )*/
+    match self {
+      Op2::Intersection => {
+        let (time_depth_1, hpx_depth_1) = (left_stmoc.depth_max_1(), left_stmoc.depth_max_2());
+        let (time_depth_2, hpx_depth_2) = (right_stmoc.depth_max_1(), right_stmoc.depth_max_2());
+        let left_stmoc = TimeSpaceMoc::from_ranges_it(left_stmoc);
+        let right_stmoc = TimeSpaceMoc::from_ranges_it(right_stmoc);
+        output.write_stmoc(
+          left_stmoc.intersection(&right_stmoc).time_space_iter(time_depth_1.max(time_depth_2), hpx_depth_1.max(hpx_depth_2))
+        )
+      },
+      Op2::Union => output.write_stmoc(left_stmoc.or(right_stmoc)),
+      Op2::Difference => return Err(String::from("Difference (or xor) not implemented yet for ST-MOCs.").into()), // todo!()
+      Op2::Minus => {
+        let (time_depth_1, hpx_depth_1) = (left_stmoc.depth_max_1(), left_stmoc.depth_max_2());
+        let (time_depth_2, hpx_depth_2) = (right_stmoc.depth_max_1(), right_stmoc.depth_max_2());
+        let left_stmoc = TimeSpaceMoc::from_ranges_it(left_stmoc);
+        let right_stmoc = TimeSpaceMoc::from_ranges_it(right_stmoc);
+        output.write_stmoc(
+          left_stmoc.difference(&right_stmoc).time_space_iter(time_depth_1.max(time_depth_2), hpx_depth_1.max(hpx_depth_2))
+        )
+      }, // warning method name is misleading
+      Op2::TimeFold | Op2::SpaceFold => return Err(String::from("Operation must involve either a S-MOC or a T-MOC").into()),
+    }
   }
 
 }

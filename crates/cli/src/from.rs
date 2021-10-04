@@ -9,9 +9,15 @@ use std::ops::Range;
 
 use structopt::StructOpt;
 
+use healpix::nested::Layer;
+
 use moclib::qty::{Hpx, Time};
 use moclib::moc::RangeMOCIntoIterator;
 use moclib::moc::range::RangeMOC;
+use moclib::moc2d::{
+  RangeMOC2IntoIterator,
+  range::RangeMOC2
+};
 
 use super::InputTime;
 use super::output::OutputFormat;
@@ -171,10 +177,32 @@ pub enum From {
     separator: String,
     #[structopt(subcommand)]
     out: OutputFormat
-  }
+  },
+  #[structopt(name = "timestamppos")]
+  /// Create a Space-Time MOC from a list of timestamp and positions in decimal degrees 
+  /// (timestamp first, then longitude, then latitude)..
+  TimestampPos {
+    /// Depth on the time, in `[0, 61]`.
+    tdepth: u8,
+    /// Depth on the position, in `[0, 29]`.
+    sdepth: u8,
+    #[structopt(long = "time-type", default_value = "jd")]
+    /// Time type: 'jd' (julian date), 'mjd' (modified julian date) or 'usec' (microsec since JD=0)
+    time: InputTime,
+    #[structopt(parse(from_os_str))]
+    /// The input file, use '-' for stdin
+    input: PathBuf,
+    #[structopt(short = "s", long = "separator", default_value = " ")]
+    /// Separator between time lower and upper bounds (default = ' ')
+    separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat
+  },
+  
   // ST-MOC  todo!()
-  // moc from time_pos                    (TIME,RA,DEC)
-  // moc from trange_pos                  (TMIN,TMAX,RA,DEC)
+  // moc from time_pos                    (TIME,RA,DEC)    
+  //                      Builder: Map of SMOC builders. First sort by time, then make SMOC (then union of ST-MOCs)
+  // moc from trange_pos                  (TMIN,TMAX,RA,DEC) Plus complexe...
 }
 
 impl From {
@@ -387,6 +415,57 @@ impl From {
             ).into_range_moc_iter()
           )
         }
+      },
+      // ST-MOC from t-moc + s-moc (we can then create a complex ST-MOC by union of elementary ST-MOCs)
+      // - e.g. multiple observation of the same area of the sky
+      // - XMM ST-MOC (from list of observations)?
+      From::TimestampPos {
+        tdepth,
+        sdepth,
+        time,
+        input,
+        separator,
+        out
+      } => {
+        let layer = healpix::nested::get(sdepth);
+        fn line2tscoos(
+          separator: &str,
+          time: &InputTime, 
+          layer: &Layer,
+          line: std::io::Result<String>
+        ) -> Result<(u64, u64), Box<dyn Error>> {
+          let line = line?;
+          let (time_str, line) = line.trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("split to separate time from space failed."))?;
+          let (lon_deg, lat_deg) = line.split_once(separator)
+            .ok_or_else(|| String::from("split on space failed."))?;
+          let time_us = time.parse(&time_str)?;
+          let lon_deg = lon_deg.parse::<f64>()?;
+          let lat_deg = lat_deg.parse::<f64>()?;
+          let lon = lon_deg2rad(lon_deg)?;
+          let lat = lat_deg2rad(lat_deg)?;
+          let hpx = layer.hash(lon, lat);
+          Ok((time_us, hpx))
+        }
+        let line2tpos = move |line: std::io::Result<String>| {
+          match line2tscoos(&separator, &time, &layer, line) {
+            Ok(lonlat) => Some(lonlat),
+            Err(e) => {
+              eprintln!("Error reading or parsing line: {:?}", e);
+              None
+            }
+          }
+        };
+        let moc2: RangeMOC2<u64, Time<u64>, u64, Hpx<u64>> = if input == PathBuf::from(r"-") {
+          let stdin = std::io::stdin();
+          RangeMOC2::from_fixed_depth_cells(tdepth, sdepth, stdin.lock().lines().filter_map(line2tpos), None)
+        } else {
+          let f = File::open(input)?;
+          let reader = BufReader::new(f);
+          RangeMOC2::from_fixed_depth_cells(tdepth, sdepth, reader.lines().filter_map(line2tpos), None)
+        };
+        out.write_stmoc(moc2.into_range_moc2_iter())
       }
     }
   }

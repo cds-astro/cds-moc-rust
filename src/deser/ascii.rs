@@ -309,7 +309,7 @@ pub fn moc2d_from_ascii_ivoa<T, Q, U, R>(input: &str)
       return Err(AsciiError::ElemNotFound(R::PREFIX.to_string(), elem.to_string()));
     }
   }
-  // TODO: check that the elements are sorted and non overalpping
+  // TODO: check that the elements are sorted and non overlapping
   Ok(CellOrCellRangeMOC2::new(depth_max_l, depth_max_r, elems))
 }
 

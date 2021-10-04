@@ -89,10 +89,13 @@ fn print_moc2_info<T: Idx, R>(idx_type: &str, qty_type: &str, moc2: R) -> Result
 {
   let max_depth_hpx = moc2.depth_max_1();
   let max_depth_time = moc2.depth_max_2();
+  let (n_elems, n_1, n_2) = moc2.stats();
   println!("MOC type: {}", qty_type);
   println!("MOC index type: {}", idx_type);
   println!("MOC hpx  depth: {}", max_depth_hpx);
   println!("MOC time depth: {}", max_depth_time);
-  // println!("MOC number of (T-MOC, S-MOC) tuples: {}", ??);
+  println!("MOC number of (T-MOC, S-MOC) tuples: {}", n_elems);
+  println!("Tot number of T-MOC ranges: {}", n_1);
+  println!("Tot Number of T-MOC ranges: {}", n_2);
   Ok(())
 }

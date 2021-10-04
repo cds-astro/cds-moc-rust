@@ -511,7 +511,8 @@ pub fn from_fits_ivoa<R: BufRead>(mut reader: R) -> Result<MocIdxType<R>, FitsEr
         if let Some(previous_mkw) = moc_kws.insert(mkw?) {
           // A FITS keyword MUST BE uniq (I may be more relax here, taking the last one and not complaining)
           // return Err(FitsError::MultipleKeyword(previous_mkw.keyword_str().to_string()))
-          eprintln!("WARNING: Keyword '{}' found more than once in a same HDU!", previous_mkw.keyword_str());
+          eprintln!("WARNING: Keyword '{}' found more than once in a same HDU! We use the first occurrence.", previous_mkw.keyword_str());
+          moc_kws.insert(previous_mkw);
         }
         // else keyword added without error
       } else if &kw_record[0..4] == b"END " {

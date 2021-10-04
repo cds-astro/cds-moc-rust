@@ -2,6 +2,7 @@
 
 use std::io::Write;
 use std::ops::Range;
+use std::marker::PhantomData;
 
 use crate::deser;
 use crate::idx::Idx;
@@ -279,6 +280,33 @@ pub trait RangeMOCIntoIterator<T: Idx>: Sized {
   type IntoRangeMOCIter: RangeMOCIterator<T, Qty=Self::Qty>;
 
   fn into_range_moc_iter(self) -> Self::IntoRangeMOCIter;
+}
+
+/// Defines an empty `RangeMOCIterator<`
+pub struct EmptyRangeMOCIterator<T: Idx, Q: MocQty<T>>(u8, PhantomData<T>, PhantomData<Q>);
+impl<T: Idx, Q: MocQty<T>> EmptyRangeMOCIterator<T, Q> {
+  pub fn new(depth: u8) -> Self {
+    EmptyRangeMOCIterator(depth, PhantomData, PhantomData)
+  }
+}
+
+impl<T: Idx, Q: MocQty<T>> HasMaxDepth for EmptyRangeMOCIterator<T, Q> {
+  fn depth_max(&self) -> u8 {
+    self.0
+  }
+}
+impl<T: Idx, Q: MocQty<T>> ZSorted for EmptyRangeMOCIterator<T, Q> { }
+impl<T: Idx, Q: MocQty<T>> NonOverlapping for EmptyRangeMOCIterator<T, Q> { }
+impl<T: Idx, Q: MocQty<T>> MOCProperties for EmptyRangeMOCIterator<T, Q> { }
+impl<T: Idx, Q: MocQty<T>> Iterator for EmptyRangeMOCIterator<T, Q> {
+  type Item = Range<T>;
+  fn next(&mut self) -> Option<Self::Item> {
+    None
+  }
+}
+impl<T: Idx, Q: MocQty<T>> RangeMOCIterator<T> for EmptyRangeMOCIterator<T, Q> {
+  type Qty = Q;
+  fn peek_last(&self) -> Option<&Range<T>> { None }
 }
 
 

@@ -41,7 +41,7 @@ impl<T, Q, R> CellMOCIteratorFromRanges<T, Q, R>
     let last = it.peek_last().and_then(|r| {
       let moc_range: MocRange<T, Q> = r.into();
       // TODO: Make a method retrieving directly the last elem instead of iterating
-      moc_range.last().map(|mc| mc.into())
+      moc_range.last().map(|range| range.into())
     });
     let curr = it.next().map(|range| range.into());
     let shift_dd = Q::shift_from_depth_max (it.depth_max()) as usize;
@@ -84,16 +84,17 @@ impl<T, Q, R> Iterator for CellMOCIteratorFromRanges<T, Q, R>
   type Item = Cell<T>;
 
   fn next(&mut self) -> Option<Self::Item> {
-    if let Some(c) = &mut self.curr {
-      let res = c.next_cell_with_knowledge(self.it.depth_max(), self.shift_dd, self.range_len_min, self.mask);
-      if res.is_none() {
-        self.curr = self.it.next().map(|range| range.into());
-        self.next()
-      } else {
-        res.map(|mc| mc.into())
-      }
-    } else {
-      None
+    match self.curr.as_mut() {
+      Some(c) => {
+        let res = c.next_cell_with_knowledge(self.it.depth_max(), self.shift_dd, self.range_len_min, self.mask);
+        if res.is_some() {
+          res.map(|range| range.into())
+        } else {
+          self.curr = self.it.next().map(|range| range.into());
+          self.next()
+        }
+      },
+      None => None,
     }
   }
 }

@@ -66,6 +66,10 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     self.ranges
   }
 
+  pub fn eq_without_depth(&self, rhs: &Self) -> bool {
+    self.ranges.eq(&rhs.ranges)
+  }
+  
   pub fn range_sum(&self) -> T {
     let mut sum = T::zero();
     for Range { start, end } in self.ranges.0.iter() {
@@ -95,7 +99,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   ) -> Self {
     let mut builder = FixedDepthMocBuilder::new(depth, buf_capacity);
     for cell in cells_it {
-      builder.push(cell)
+      builder.push(cell);
     }
     builder.into_moc()
   }
@@ -505,6 +509,15 @@ impl<T: Idx> RangeMOC<T, Time<T>> {
   }
 
 }
+
+
+impl<T: Idx, Q: MocQty<T>> PartialEq for RangeMOC<T, Q> {
+  fn eq(&self, other: &Self) -> bool {
+    self.depth_max == other.depth_max
+    && self.ranges.eq(&other.ranges)
+  }
+}
+
 
 
 

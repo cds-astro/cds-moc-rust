@@ -10,12 +10,17 @@ use crate::moc::{
 
 use crate::deser::ascii::{AsciiError, moc2d_to_ascii_ivoa};
 use crate::deser::json::cellmoc2d_to_json_aladin;
-use crate::moc2d::range::{RangeMOC2, RangeMOC2Elem};
 
 pub mod cell;
 pub mod range;
 pub mod cellcellrange;
 pub mod adapters;
+pub mod builder;
+
+use self::range::{
+  RangeMOC2, RangeMOC2Elem,
+  op::or::{or, OrRange2Iter}
+};
 
 /// Returns the maximum depth of an item the implementor contains.
 pub trait HasTwoMaxDepth {
@@ -123,6 +128,28 @@ pub trait RangeMOC2Iterator<
       .collect();
     RangeMOC2::new(depth_max_l, depth_max_r, elems)
   }
+
+  /// Returns a tuple containing:
+  /// * `.0`: the number of `(moc_1, moc_2)` pairs
+  /// * `.1`: the total number of ranges in all `moc_1`
+  /// * `.2`: the total number of ranges in all `moc_2`  
+  fn stats(self) -> (u64, u64, u64) {
+    self.fold((0, 0, 0), |(n, n1, n2), e| {
+      let (it1, it2) = e.range_mocs_it();
+      (n + 1, n1 + it1.count() as u64, n2 + it2.count() as u64)
+    })
+  }
+  
+  fn or<I2, J2, K2, L2>(self, rhs: L2) -> OrRange2Iter<T, Q, U, R, I, J, K, Self, I2, J2, K2, L2>
+  where
+    I2: RangeMOCIterator<T, Qty=Q>,
+    J2: RangeMOCIterator<U, Qty=R>,
+    K2: RangeMOC2ElemIt<T, Q, U, R, It1=I2, It2=J2>,
+    L2: RangeMOC2Iterator<T, Q, I2, U, R, J2, K2>,
+  {
+    or(self, rhs)
+  }
+  
   /*
   fn to_fits_ivoa<W: Write>(
     self,
