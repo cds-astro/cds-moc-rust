@@ -82,10 +82,10 @@ jobs:
           args: --release --target ${{ matrix.config.target }} -p moc-cli
       - name: Create tar (Not Windows)
         if: matrix.config.os != 'windows-latest'     
-        run: tar czfv moc-${{ needs.create-github-release.outputs.version }}-${{ matrix.config.target }}.tar.gz target/${{ matrix.config.target }}/release/moc 
+        run: tar -C target/${{ matrix.config.target }}/release/ -czfv moc-${{ needs.create-github-release.outputs.version }}-${{ matrix.config.target }}.tar.gz moc
       - name: Create ZIP (Windows)
         if: matrix.config.os == 'windows-latest'
-        run: compress-archive target\${{ matrix.config.target }}\release\moc moc-${{ needs.create-github-release.outputs.version }}-${{ matrix.config.target }}.zip
+        run: compress-archive .\target\${{ matrix.config.target }}\release\moc moc-${{ needs.create-github-release.outputs.version }}-${{ matrix.config.target }}.zip
       - name: Upload compressed binary asset
         if: matrix.config.os != 'windows-latest'
         uses: actions/upload-release-asset@v1

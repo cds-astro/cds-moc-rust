@@ -32,7 +32,25 @@ From this [demo page](http://cdsxmatch.u-strasbg.fr/lab/moc/).
 
 ### Put it in your own Web page
 
-TBW
+Download the last `moc-wasm-vxx.tar.gz` from the[github release page](https://github.com/cds-astro/cds-moc-rust/releases).
+Put it in the same directory of you web page and decompress it:
+```bash
+tar xvzf moc-wasm-vxx.tar.gz
+```
+And add this in your HTML body:
+```html
+<script type="module">
+    import init, * as moc from './pkg/moc.js';
+    async function run() {
+        const wasm = await init().catch(console.error);
+	window.moc = moc;
+    }
+    run();
+</script>
+```
+This [the example page](https://github.com/cds-astro/cds-moc-rust/blob/main/crates/wasm/index.html).
+
+
 
 ### Use it in you project with NPM
 
@@ -226,8 +244,8 @@ wasm-pack publish
 * [ ] Implement `difference (xor)` for `ST-MOCs`
 * [ ] Implement `complement (not)` for `ST-MOCs` (complement on Space only or also on Time with allsky S-MOCs?)
 * [ ] Implement `degradeSpace` (?), `degradeTime` (?), `degradeSpaceAndTime` (?) for `ST-MOCs`
-* [ ] Build a `ST-MOCs` from an array of `(lon, lat, jd)`
-* [ ] Add possibility to filter an array of `(lon, lat, jd)` with a `ST-MOCs`
+* [ ] Build a `ST-MOCs` from an array of `(jd, lon, lat)`
+* [ ] Add possibility to filter an array of `(jd, lon, lat)` with a `ST-MOCs`
 * [ ] Add `overlap/contains(MOC, MOC)` methods? (use cases?)
 * [ ] (Internal change for performances) add native operations on `RangeMOC2` instead of transforming in `TimeSpaceMoc`
 

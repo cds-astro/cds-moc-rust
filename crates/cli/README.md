@@ -7,7 +7,7 @@ Executable to read/write/create/manipulate HEALPix **M**ulti-**O**rder **C**over
 
 ## About
 
-This **C**ommand *Line** **I**nterface (CLI) is made from the [Rust MOC library](https://github.com/cds-astro/cds-moc-rust).
+This **C**ommand **Line** **I**nterface (CLI) is made from the [Rust MOC library](https://github.com/cds-astro/cds-moc-rust).
 It implements the v2.0 of the [MOC standard](https://ivoa.net/documents/MOC/),
 including (S-)MOCs, T-MOCs and ST-MOCs.
 
@@ -16,9 +16,50 @@ For tools able to display MOCs, see:
 * the [Aladin Lite](https://aladin.u-strasbg.fr/AladinLite/), "a lightweight version of the Aladin Sky Atlas running in the browser".
 * [MOCPy](https://cds-astro.github.io/mocpy/), a python wrapper using the very same Rust MOC library.
 
-## Install/test
+## Install
 
-### From the source code
+### Debian package
+
+Download the last `moc-cli_vxx_yyy.deb` corresponding to your architecture 
+(`x86_64_musl` has the most chances to fit your needs)
+from the [github release page](https://github.com/cds-astro/cds-moc-rust/releases).
+
+Install the `.deb` by clicking on it or using the command line:
+```bash
+sudo dpkg -i moc-cli_vxx_yyy.deb
+sudo apt-get install -f
+```
+
+Then you can use the tool:
+```bash
+moc-cli
+man moc-cli
+```
+
+You can uninstall using, e.g.:
+```bash
+sudo dpkg -r $(dpkg -f moc-cli_vxx_yyy.deb Package)
+```
+
+WARNING: using this method, the command line name is `moc-cli` instead of `moc` due to a conflict with an existing debian `moc` package.
+
+
+### Pre-compile binaries for MacOS, Linux and Windows
+
+Download the last `moc-vxx_yyy.tar.gz` corresponding to your architecture 
+from the [github release page](https://github.com/cds-astro/cds-moc-rust/releases).
+You probably want ot use:
+* Linux: `moc-vxx-x86_64-unknown-linux-gnu.tar.gz`
+* MacOS: `moc-vxx-x86_64-apple-darwin.tar.gz`
+* Windows: `moc-vxx-.zip`
+
+The tar contains a single executable binary file.
+```bash
+tar xzvf moc-vxx-yyy.tar.gz
+./moc
+```
+
+### Compile from source code
 
 [Install rust](https://www.rust-lang.org/tools/install)
 (and check that `~/.cargo/bin/` is in your path),
@@ -31,13 +72,9 @@ Install from [crates.io] using `cargo`:
 ```bash
 cargo install moc-cli
 ```
-(due to a heavy use of [monomorphization](https://en.wikipedia.org/wiki/Monomorphization), 
+(due to a heavy use of [monomorphization](https://en.wikipedia.org/wiki/Monomorphization),
 the compilation time may be very long, i.e. more than a minute).
 
-
-### From pre-compile binaries
-
-TBD/TBW
 
 ## Command line help
 
@@ -133,7 +170,7 @@ egrep "^ *[0-9]" hip.psv | cut -d '|' -f 2-3 | tr -d ' ' | moc from pos 5 - --se
 
 ### Build MOC from positions
 
-On a regular desktop, it took **3.7s** to build the MOC at **order 7** of the **16,622,442** positions of the
+On a regular desktop, it takes **3.7s** to build the MOC at **order 7** of the **16,622,442** positions of the
 [KIDS DR2](https://vizier.u-strasbg.fr/viz-bin/VizieR-3?-source=II/344&-out.max=50&-out.form=HTML%20Table&-out.add=_r&-out.add=_RAJ,_DEJ&-sort=_r&-oc.form=sexa)
 table:
 ```bash
@@ -144,7 +181,7 @@ time moc from pos 7 kids_dr2.csv -s , ascii --fold 80 > kids_dr2.moc.ascii
 ### Filter file using a MOC
 
 On a classical HDD (~130 MB/s), the disk is the limiting factor when filtering a file.
-Test perform on a 25 GB file containing 16_622_443 rows (KIDS DR2):
+Tests performed on a 25 GB file containing 16_622_443 rows (KIDS DR2):
 
 |              |       HDD        |       SSD       |
 |--------------|------------------|-----------------|

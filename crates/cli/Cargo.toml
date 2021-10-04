@@ -37,21 +37,21 @@ depends = "$auto"
 section = "utility"
 priority = "optional"
 assets = [
-    ["target/release/moc", "usr/bin/", "755"],
-    ["COPYING", "usr/share/doc/moc/", "644"],
-    ["LICENSE-MIT", "usr/share/doc/moc/", "644"],
-    ["LICENSE-APACHE", "usr/share/doc/moc/", "644"],
-    ["CHANGELOG.md", "usr/share/doc/moc/CHANGELOG", "644"],
-    ["README.md", "usr/share/doc/moc/README", "644"],
+    ["target/release/moc", "usr/bin/moc-cli", "755"],
+    ["COPYING", "usr/share/doc/moc-cli/", "644"],
+    ["LICENSE-MIT", "usr/share/doc/moc-cli/", "644"],
+    ["LICENSE-APACHE", "usr/share/doc/moc-cli/", "644"],
+    ["CHANGELOG.md", "usr/share/doc/moc-cli/CHANGELOG", "644"],
+    ["README.md", "usr/share/doc/moc-cli/README", "644"],
     #["FAQ.md", "usr/share/doc/moc/FAQ", "644"],
-    #["deployment/deb/moc.1", "usr/share/man/man1/moc.1", "644"],
+    ["doc/moc.1", "usr/share/man/man1/moc-cli.1", "644"],
     # Similarly for shell completions.
     #["deployment/deb/moc.bash", "usr/share/bash-completion/completions/moc", "644"],
     #["deployment/deb/moc.fish", "usr/share/fish/vendor_completions.d/moc.fish", "644"],
     #["deployment/deb/_moc", "usr/share/zsh/vendor-completions/", "644"],
 ]
 extended-description = """\
-moc (moc) is a command-line to create and manipulate HEALPix
+moc-cli is a command-line to create and manipulate HEALPix
 Multi-Order Coverages maps (MOCs), see https://ivoa.net/documents/MOC/.
 """
 
