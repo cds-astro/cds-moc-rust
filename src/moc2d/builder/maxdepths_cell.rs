@@ -19,18 +19,12 @@ pub struct FixedDepthSTMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
   moc: Option<RangeMOC2<T, Q, U, R>>,
 }
 
-// sort buff on T.
-// Build MOC on each T
-// Merge consecutive T (with possible holes) IF same U-MOC (=> (T-RANGE, U-MOC))
-
-// SUccessice UNION
-
 impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U, R> {
   pub fn new(depth_1: u8, depth_2: u8, buf_capacity: Option<usize>) -> Self {
     FixedDepthSTMocBuilder {
       depth_1,
       depth_2,
-      buff: Vec::with_capacity(buf_capacity.unwrap_or(10_000)),
+      buff: Vec::with_capacity(buf_capacity.unwrap_or(100_000)),
       sorted: true,
       moc: None
     }
@@ -40,7 +34,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
     if let Some((h1, h2)) = self.buff.last() {
       if *h1 == idx_1 && *h2 == idx_2  {
         return;
-      } else if self.sorted && *h1 >= idx_1 && *h2 > idx_2 {
+      } else if self.sorted && *h1 > idx_1 {
         self.sorted = false;
       }
     }
@@ -80,48 +74,74 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
     
     // We assume here that the buffer is ordered, but may contains duplicates
     let mut it = self.buff.iter();
-    if let Some((from, from_2)) = it.next() {
-      let mut from = *from;
-      let from_2 = *from_2;
+    if let Some((from_1, from_2)) = it.next() {
+      let mut from_1 = *from_1;
+      let     from_2 = *from_2;
       let mut moc_builder_1 = FixedDepthMocBuilder::<T, Q>::new(self.depth_1, Some(64));
-      // moc_builder_1.push(from);
+      moc_builder_1.push(from_1);
       let mut moc_builder_2 = FixedDepthMocBuilder::<U, R>::new(self.depth_2, Some(1000));
       moc_builder_2.push(from_2);
       let mut prev_moc_2: Option<RangeMOC<U, R>> = None;
-      for (curr, curr_2) in it {
-        match from.cmp(curr) {
-          Ordering::Equal => moc_builder_2.push(*curr_2),
+      for (curr_1, curr_2) in it {
+        match from_1.cmp(curr_1) {
+          Ordering::Equal => moc_builder_2.push(*curr_2), //  No change in time => update space
           Ordering::Less => {
-            // Push the previous T value in the builder
-            moc_builder_1.push(from);
-            // Retrieve the MOC associated to the previous T value
+            // There is a change in time, build moc_2
             let moc_2 = moc_builder_2.into_moc();
-            // Check whether or not the MOC is the same as the one associated to the previous T value
+            debug_assert!(moc_2.len() > 0);
+            // Check whether or not the moc_2 is the same as the on in the current moc_1_builder 
             if let Some(p_moc_2) = prev_moc_2.as_ref() {
-              // - if not create a new entry
-              if !moc_2.eq(p_moc_2) {
-                let moc_1 = moc_builder_1.into_moc();
-                range_mocs.push(RangeMOC2Elem::new(moc_1, moc_2.clone()));
-                prev_moc_2 = Some(moc_2);
+              if !moc_2.eq(p_moc_2) { // if not create a new entry
+                let p_moc_1 = moc_builder_1.into_moc();
+                let p_moc_2 = prev_moc_2.replace(moc_2).unwrap();
+                debug_assert!(p_moc_1.len() > 0);
+                debug_assert!(p_moc_2.len() > 0);
+                range_mocs.push(RangeMOC2Elem::new(p_moc_1, p_moc_2));
                 moc_builder_1 = FixedDepthMocBuilder::<T, Q>::new(self.depth_1, Some(64));
-                moc_builder_1.push(from);
+                moc_builder_1.push(from_1);
+              } else {
+                moc_builder_1.push(from_1);
               }
             } else {
               // First loop iteration, simply set prev_moc_2
+              // in such a case, the current moc_2 equals the prev_moc_2
+              // current moc_builder_1 contains the current moc_1 associated to prev_moc_2
               prev_moc_2 = Some(moc_2);
+              // No need to push from_1, it is already in the builder
             }
             // Update tmp variables
             moc_builder_2 = FixedDepthMocBuilder::<U, R>::new(self.depth_2, Some(1000));
             moc_builder_2.push(*curr_2);
-            from = *curr;
+            from_1 = *curr_1;
           },
           Ordering::Greater => unreachable!(), // self.buff supposed to be sorted!
         }
       }
-      moc_builder_1.push(from);
-      let moc_1 = moc_builder_1.into_moc();
       let moc_2 = moc_builder_2.into_moc();
-      range_mocs.push(RangeMOC2Elem::new(moc_1, moc_2));
+      if let Some(p_moc_2) = prev_moc_2.as_ref() {
+        if !moc_2.eq(p_moc_2) { // if not create a new entry
+          let p_moc_1 = moc_builder_1.into_moc();
+          let p_moc_2 = prev_moc_2.replace(moc_2).unwrap();
+          debug_assert!(p_moc_1.len() > 0);
+          debug_assert!(p_moc_2.len() > 0);
+          range_mocs.push(RangeMOC2Elem::new(p_moc_1, p_moc_2));
+          moc_builder_1 = FixedDepthMocBuilder::<T, Q>::new(self.depth_1, Some(64));
+          moc_builder_1.push(from_1);
+          let moc_1 = moc_builder_1.into_moc();
+          range_mocs.push(RangeMOC2Elem::new(moc_1, prev_moc_2.unwrap()));
+        } else {
+          moc_builder_1.push(from_1);
+          let moc_1 = moc_builder_1.into_moc();
+          debug_assert!(moc_1.len() > 0);
+          debug_assert!(moc_2.len() > 0);
+          range_mocs.push(RangeMOC2Elem::new(moc_1, moc_2));
+        }
+      } else {
+        let moc_1 = moc_builder_1.into_moc();
+        debug_assert!(moc_1.len() > 0);
+        debug_assert!(moc_2.len() > 0);
+        range_mocs.push(RangeMOC2Elem::new(moc_1, moc_2));
+      }
     }
     RangeMOC2::new(self.depth_1, self.depth_2, range_mocs)
   }

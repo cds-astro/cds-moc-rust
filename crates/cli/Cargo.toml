@@ -30,6 +30,8 @@ structopt = "0.3"
 healpix = { package = "cdshealpix", version = "0.5.5" }
 # healpix = { package = "cdshealpix", path = "../../rust-healpix" }
 rayon = "1.5.1"
+# chrono = "0.4" # To parse ISO date-time
+time = { version = "0.3.3", features = ["parsing"] }
 
 [package.metadata.deb]
 maintainer = "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"

@@ -1,5 +1,6 @@
 
 use std::slice;
+use std::ops::Range;
 use std::vec::{IntoIter};
 
 use crate::idx::Idx;
@@ -14,7 +15,10 @@ use crate::moc2d::{
   HasTwoMaxDepth, MOC2Properties, 
   RangeMOC2ElemIt, RangeMOC2Iterator, RangeMOC2IntoIterator,
   CellMOC2ElemIt, CellMOC2Iterator, CellMOC2IntoIterator,
-  builder::maxdepths_cell::FixedDepthSTMocBuilder
+  builder::{
+    maxdepths_cell::FixedDepthSTMocBuilder,
+    maxdepths_ranges_cells::RangesAndFixedDepthCellsSTMocBuilder
+  }
 };
 
 pub mod op;
@@ -152,7 +156,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
   }
 
   
-  /// <=> from HEALPix map, i.e. from a list of HEALPic cell indices at the same depth
+  /// From a list of cells in both dim 1 and dim 2.
   pub fn from_fixed_depth_cells<I: Iterator<Item=(T, U)>>(
     depth_1: u8,
     depth_2: u8,
@@ -162,6 +166,20 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
     let mut builder = FixedDepthSTMocBuilder::new(depth_1, depth_2, buf_capacity);
     for (cell_1, cell_2) in cells_it {
       builder.push(cell_1, cell_2);
+    }
+    builder.into_moc()
+  }
+
+  /// From al list of tuple containing both a range in dim 1 and a cell in dim 2.
+  pub fn from_ranges_and_fixed_depth_cells<I: Iterator<Item=(Range<T>, U)>>(
+    depth_1: u8,
+    depth_2: u8,
+    cells_it: I,
+    buf_capacity: Option<usize>
+  ) -> Self {
+    let mut builder = RangesAndFixedDepthCellsSTMocBuilder::new(depth_1, depth_2, buf_capacity);
+    for (range_1, cell_2) in cells_it {
+      builder.push(range_1, cell_2);
     }
     builder.into_moc()
   }

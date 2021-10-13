@@ -87,6 +87,8 @@ pub fn or<T, Q, U, R, I1, J1, K1, I2, J2, K2>(
 * [ ] Add operations on `RangeMOC2`
     + [X] `or`
     + [ ] `and`, `complement`, `fold`, ...
+* [ ] Implement a function dividing a disjoint MOCs into a list of joint MOCs
+      (use the order and the flag of a BMOC).
 * [ ] Implement the compact notation (bits coding quad-tree traversal) for S-MOCs (binary + ASCII Base 64)
 * [ ] Implement compact S-MOC: single z-order curve sorted array of indices with a 2 bits flag telling
       whether the index is a single index, a range lower bound or a range upper bound

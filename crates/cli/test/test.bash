@@ -4,7 +4,7 @@ moc="moc"
 resources="resources"
 
 ${moc} -V
-[[ "$?" != 0 ]] && {{ echo "'moc' command line not found!"; exit 1; }}
+[[ "$?" != 0 ]] && { echo "'moc' command line not found!"; exit 1; }
 
 # 1: cmd, 2: expected
 test(){
@@ -23,11 +23,13 @@ test_eq(){
   [[ "${res1}" != "${res2}" ]] && { printf "Test failed!\n- cmd1: '${cmd1}'\n- cmd2: '${cmd2}'\n- res1: '${res1}'\n- res2: '${res2}'\n"; }
 }
 
+echo "Conversion tests..."
 # Conversion
 ${moc} convert ${resources}/glimpse.moc.json --type smoc fits --force-u64 SMOC_GLIMPSE_u64.fits
 ${moc} convert ${resources}/glimpse.moc.json --type smoc fits             SMOC_GLIMPSE_u32.fits
 test_eq "${moc} convert SMOC_GLIMPSE_u32.fits ascii --fold 80" "${moc} convert SMOC_GLIMPSE_u64.fits ascii --fold 80"
 
+echo "Operation tests..."
 # Compute new mocs from operations
 ${moc} op degrade 0 SMOC_GLIMPSE_u32.fits fits SMOC_GLIMPSE_degrade_d0_u32.fits
 ${moc} op complement SMOC_GLIMPSE_u32.fits fits SMOC_GLIMPSE_not_u32.fits
@@ -59,7 +61,7 @@ test "egrep '^ *[0-9]' ${resources}/hip.psv | cut -d '|' -f 2-3 | tr -d ' ' | eg
 
 # Clean
 rm -f SMOC_GLIMPSE_*
-
+echo "All tests passed."
 
 exit 0
 

@@ -72,7 +72,7 @@ impl<T, Q, I> DegradeRangeIter<T, Q, I>
 }
 
 #[inline(always)]
-fn degrade_range<T: Idx>(range: &mut Range<T>, one_at_new_depth: T, rm_bits_mask: T, bits_to_be_rm_mask: T) {
+pub (crate) fn degrade_range<T: Idx>(range: &mut Range<T>, one_at_new_depth: T, rm_bits_mask: T, bits_to_be_rm_mask: T) {
   range.start &= rm_bits_mask;
   if range.end & bits_to_be_rm_mask != T::zero() {
     range.end = (range.end & rm_bits_mask) + one_at_new_depth;

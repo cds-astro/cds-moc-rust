@@ -11,7 +11,9 @@ use structopt::StructOpt;
 
 use healpix::nested::Layer;
 
-use moclib::qty::{Hpx, Time};
+use moclib::qty::{MocQty, Hpx, Time};
+use moclib::elem::valuedcell::valued_cells_to_moc_with_opt;
+use moclib::elemset::range::HpxRanges;
 use moclib::moc::RangeMOCIntoIterator;
 use moclib::moc::range::RangeMOC;
 use moclib::moc2d::{
@@ -67,6 +69,7 @@ pub enum From {
     r_deg: f64,
     #[structopt(subcommand)]
     out: OutputFormat
+    // add option: inside / overallaping / partially_in / centers_in 
   },
   #[structopt(name = "ellipse")]
   /// Create a Spatial MOC from the given elliptical cone
@@ -147,13 +150,52 @@ pub enum From {
     #[structopt(subcommand)]
     out: OutputFormat
   },
+  #[structopt(name = "vuniq")]
+  /// Create a Spatial MOC from a list of (non-overlapping) uniq cells associated with values (uniq first, then value),
+  /// i.e. from a multi-resolution map, putting completeness constraints.
+  ValuedCells {
+    /// Depth of the created MOC, in `[0, 29]`. Must be >= largest input cells depth.
+    depth: u8,
+    #[structopt(short = "d", long = "density")]
+    /// Input values are densities, i.e. they are not proportional to the area of their associated cells.
+    density: bool,
+    #[structopt(short = "f", long = "from", default_value = "0")]
+    /// Cumulative value at which we start putting cells in he MOC.
+    from_threshold: String,
+    #[structopt(short = "t", long = "to", default_value = "1")] // Valid for a proba (sum = 1 on the all sky)
+    /// Cumulative value at which we stop putting cells in he MOC.
+    to_threshold: String,
+    #[structopt(short = "a", long = "asc")]
+    /// Compute cumulative value from ascending density values instead of descending.
+    asc: bool,
+    #[structopt(short = "s", long = "not-strict")]
+    /// Cells overlapping with the upper or the lower cumulative bounds are not rejected.
+    not_strict: bool,
+    #[structopt(short = "p", long = "no-split")]
+    /// Split recursively the cells overlapping the upper or the lower cumulative bounds.
+    split: bool,
+    #[structopt(short = "r", long = "rev-descent")]
+    /// Perform the recursive descent from the highest to the lowest sub-cell, only with option 'split' 
+    /// (set both flags to be compatibile with Aladin) 
+    revese_recursive_descent: bool,
+    #[structopt(parse(from_os_str))]
+    /// The input file, use '-' for stdin
+    input: PathBuf,
+    #[structopt(short = "s", long = "separator", default_value = " ")]
+    /// Separator between both coordinates (default = ' ')
+    separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat
+  },
   #[structopt(name = "timestamp")]
   /// Create a Time MOC from a list of timestamp (one per line).
   Timestamp {
     /// Depth of the created MOC, in `[0, 61]`.
     depth: u8,
     #[structopt(long = "time-type", default_value = "jd")]
-    /// Time type: 'jd' (julian date), 'mjd' (modified julian date) or 'usec' (microsec since JD=0)
+    /// Time type: 'jd' (julian date), 'mjd' (modified julian date), 'usec' (microsec since JD=0), 
+    /// 'isorfc' (Gregorian date-time, Rfc3339, WARNING: no conversion to TCB),
+    /// or 'isosimple' (Gregorian date, 'YYYY-MM-DDTHH:MM:SS' WARNING: no conversion to TCB)
     time: InputTime,
     #[structopt(parse(from_os_str))]
     /// The input file, use '-' for stdin
@@ -167,7 +209,9 @@ pub enum From {
     /// Depth of the created MOC, in `[0, 61]`.
     depth: u8,
     #[structopt(long = "time-type", default_value = "jd")]
-    /// Time type: 'jd' (julian date), 'mjd' (modified julian date) or 'usec' (microsec since JD=0)
+    /// Time type: 'jd' (julian date), 'mjd' (modified julian date), 'usec' (microsec since JD=0), 
+    /// 'isorfc' (Gregorian date-time, Rfc3339, WARNING: no conversion to TCB),
+    /// or 'isosimple' (Gregorian date, 'YYYY-MM-DDTHH:MM:SS' WARNING: no conversion to TCB)
     time: InputTime,
     #[structopt(parse(from_os_str))]
     /// The input file, use '-' for stdin
@@ -187,7 +231,9 @@ pub enum From {
     /// Depth on the position, in `[0, 29]`.
     sdepth: u8,
     #[structopt(long = "time-type", default_value = "jd")]
-    /// Time type: 'jd' (julian date), 'mjd' (modified julian date) or 'usec' (microsec since JD=0)
+    /// Time type: 'jd' (julian date), 'mjd' (modified julian date), 'usec' (microsec since JD=0), 
+    /// 'isorfc' (Gregorian date-time, Rfc3339, WARNING: no conversion to TCB),
+    /// or 'isosimple' (Gregorian date, 'YYYY-MM-DDTHH:MM:SS' WARNING: no conversion to TCB)
     time: InputTime,
     #[structopt(parse(from_os_str))]
     /// The input file, use '-' for stdin
@@ -198,11 +244,28 @@ pub enum From {
     #[structopt(subcommand)]
     out: OutputFormat
   },
-  
-  // ST-MOC  todo!()
-  // moc from time_pos                    (TIME,RA,DEC)    
-  //                      Builder: Map of SMOC builders. First sort by time, then make SMOC (then union of ST-MOCs)
-  // moc from trange_pos                  (TMIN,TMAX,RA,DEC) Plus complexe...
+  #[structopt(name = "timerangepos")]
+  /// Create a Space-Time MOC from a list of time range and positions in decimal degrees 
+  /// (tmin first, then tmax, then longitude, and latitude)..
+  TimerangePos {
+    /// Depth on the time, in `[0, 61]`.
+    tdepth: u8,
+    /// Depth on the position, in `[0, 29]`.
+    sdepth: u8,
+    #[structopt(long = "time-type", default_value = "jd")]
+    /// Time type: 'jd' (julian date), 'mjd' (modified julian date), 'usec' (microsec since JD=0), 
+    /// 'isorfc' (Gregorian date-time, Rfc3339, WARNING: no conversion to TCB),
+    /// or 'isosimple' (Gregorian date, 'YYYY-MM-DDTHH:MM:SS' WARNING: no conversion to TCB)
+    time: InputTime,
+    #[structopt(parse(from_os_str))]
+    /// The input file, use '-' for stdin
+    input: PathBuf,
+    #[structopt(short = "s", long = "separator", default_value = " ")]
+    /// Separator between time lower and upper bounds (default = ' ')
+    separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat
+  },
 }
 
 impl From {
@@ -342,6 +405,99 @@ impl From {
         };
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
+      From::ValuedCells {
+        depth,
+        density,
+        from_threshold,
+        to_threshold,
+        asc,
+        not_strict,
+        split,
+        revese_recursive_descent,
+        input,
+        separator,
+        out
+      } => {
+        let from_threshold = from_threshold.parse::<f64>()?;
+        let to_threshold = to_threshold.parse::<f64>()?;
+        fn line2uvd_from_val(separator: &str, depth: u8, line: std::io::Result<String>) -> Result<(u64, f64, f64), Box<dyn Error>> {
+          let area_per_cell = (PI / 3.0) / (1_u64 << (depth << 1) as u32) as f64;  // = 4pi / (12*4^depth)
+          let line = line?;
+          let (uniq, val) = line.trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("split on space failed."))?;
+          let uniq = uniq.parse::<u64>()?;
+          let val  =  val.parse::<f64>()?;
+          let (cdepth, _) = Hpx::<u64>::from_uniq_hpx(uniq);
+          if cdepth > depth {
+            return Err(format!("Cell depth {} larger than MOC depth {} not supported.", cdepth, depth).into());
+          }
+          let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
+          Ok((uniq, val, val / (n_sub_cells * area_per_cell)))
+        }
+        fn line2uvd_from_dens(separator: &str, depth: u8, line: std::io::Result<String>) -> Result<(u64, f64, f64), Box<dyn Error>> {
+          let area_per_cell = (PI / 3.0) / (1_u64 << (depth << 1) as u32) as f64;  // = 4pi / (12*4^depth)
+          let line = line?;
+          let (uniq, dens) = line.trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("split on space failed."))?;
+          let uniq = uniq.parse::<u64>()?;
+          let dens = dens.parse::<f64>()?;
+          let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
+          if cdepth > depth {
+            return Err(format!("Cell depth {} larger than MOC depth {} not supported.", cdepth, depth).into());
+          }
+          let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
+          Ok((uniq, dens * n_sub_cells * area_per_cell, dens))
+        }
+        let ranges: HpxRanges<u64> = if density {
+          let line2uniq_val_dens = move |line: std::io::Result<String>| {
+            match line2uvd_from_dens(&separator, depth, line) {
+              Ok(uniq_val_dens) => Some(uniq_val_dens),
+              Err(e) => {
+                eprintln!("Error reading or parsing line: {:?}", e);
+                None
+              }
+            }
+          };
+         valued_cells_to_moc_with_opt::<u64, f64>(
+            depth,
+            if input == PathBuf::from(r"-") {
+              let stdin = std::io::stdin();
+              stdin.lock().lines().filter_map(line2uniq_val_dens).collect()
+            } else {
+              let f = File::open(input)?;
+              let reader = BufReader::new(f);
+              reader.lines().filter_map(line2uniq_val_dens).collect()
+            },
+            from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent
+          )
+        } else {
+          let line2uniq_val_dens = move |line: std::io::Result<String>| {
+            match line2uvd_from_val(&separator, depth, line) {
+              Ok(uniq_val_dens) => Some(uniq_val_dens),
+              Err(e) => {
+                eprintln!("Error reading or parsing line: {:?}", e);
+                None
+              }
+            }
+          };
+          valued_cells_to_moc_with_opt::<u64, f64>(
+            depth,
+            if input == PathBuf::from(r"-") {
+              let stdin = std::io::stdin();
+              stdin.lock().lines().filter_map(line2uniq_val_dens).collect()
+            } else {
+              let f = File::open(input)?;
+              let reader = BufReader::new(f);
+              reader.lines().filter_map(line2uniq_val_dens).collect()
+            },
+            from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent
+          )
+        };
+        let moc = RangeMOC::new(depth, ranges);
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
+      },
       From::Timestamp {
         depth,
         time,
@@ -416,9 +572,6 @@ impl From {
           )
         }
       },
-      // ST-MOC from t-moc + s-moc (we can then create a complex ST-MOC by union of elementary ST-MOCs)
-      // - e.g. multiple observation of the same area of the sky
-      // - XMM ST-MOC (from list of observations)?
       From::TimestampPos {
         tdepth,
         sdepth,
@@ -427,11 +580,13 @@ impl From {
         separator,
         out
       } => {
+        let time_shift = Time::<u64>::shift_from_depth_max(tdepth) as u32;
         let layer = healpix::nested::get(sdepth);
         fn line2tscoos(
           separator: &str,
           time: &InputTime, 
           layer: &Layer,
+          time_shift: u32,
           line: std::io::Result<String>
         ) -> Result<(u64, u64), Box<dyn Error>> {
           let line = line?;
@@ -445,11 +600,12 @@ impl From {
           let lat_deg = lat_deg.parse::<f64>()?;
           let lon = lon_deg2rad(lon_deg)?;
           let lat = lat_deg2rad(lat_deg)?;
+          let time_idx = time_us >> time_shift;
           let hpx = layer.hash(lon, lat);
-          Ok((time_us, hpx))
+          Ok((time_idx, hpx))
         }
         let line2tpos = move |line: std::io::Result<String>| {
-          match line2tscoos(&separator, &time, &layer, line) {
+          match line2tscoos(&separator, &time, &layer, time_shift, line) {
             Ok(lonlat) => Some(lonlat),
             Err(e) => {
               eprintln!("Error reading or parsing line: {:?}", e);
@@ -466,7 +622,65 @@ impl From {
           RangeMOC2::from_fixed_depth_cells(tdepth, sdepth, reader.lines().filter_map(line2tpos), None)
         };
         out.write_stmoc(moc2.into_range_moc2_iter())
+      },
+      From::TimerangePos {
+        tdepth,
+        sdepth,
+        time,
+        input,
+        separator,
+        out
+      } => {
+        let layer = healpix::nested::get(sdepth);
+        fn line2trcoos(
+          separator: &str,
+          time: &InputTime,
+          layer: &Layer,
+          line: std::io::Result<String>
+        ) -> Result<(Range<u64>, u64), Box<dyn Error>> {
+          let line = line?;
+          let (tmin, line) = line.trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("split to isolate tmin failed."))?;
+          let (tmax, line) = line.trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("split to isolate tmax failed."))?;
+          let (lon_deg, lat_deg) = line.split_once(separator)
+            .ok_or_else(|| String::from("split on space failed."))?;
+          let tmin = time.parse(tmin)?;
+          let tmax = time.parse(tmax)?;
+          if tmin > tmax {
+            return Err(format!("tmin > tmax: {} > {}", tmin, tmax).into());
+          }
+          let lon_deg = lon_deg.parse::<f64>()?;
+          let lat_deg = lat_deg.parse::<f64>()?;
+          let lon = lon_deg2rad(lon_deg)?;
+          let lat = lat_deg2rad(lat_deg)?;
+          let hpx = layer.hash(lon, lat);
+          Ok((tmin..tmax, hpx))
+        }
+        let line2trpos = move |line: std::io::Result<String>| {
+          match line2trcoos(&separator, &time, &layer, line) {
+            Ok(lonlat) => Some(lonlat),
+            Err(e) => {
+              eprintln!("Error reading or parsing line: {:?}", e);
+              None
+            }
+          }
+        };
+        let moc2: RangeMOC2<u64, Time<u64>, u64, Hpx<u64>> = if input == PathBuf::from(r"-") {
+          let stdin = std::io::stdin();
+          RangeMOC2::from_ranges_and_fixed_depth_cells(tdepth, sdepth, stdin.lock().lines().filter_map(line2trpos), None)
+        } else {
+          let f = File::open(input)?;
+          let reader = BufReader::new(f);
+          RangeMOC2::from_ranges_and_fixed_depth_cells(tdepth, sdepth, reader.lines().filter_map(line2trpos), None)
+        };
+        out.write_stmoc(moc2.into_range_moc2_iter())
       }
+      // ST-MOC from t-moc + s-moc (we can then create a complex ST-MOC by union of elementary ST-MOCs)
+      // - e.g. multiple observation of the same area of the sky
+      // - XMM ST-MOC (from list of observations)?
     }
   }
 }
@@ -487,4 +701,269 @@ fn lat_deg2rad(lat_deg: f64) -> Result<f64, Box<dyn Error>> {
   } else {
     Ok(lat)
   }
+}
+
+
+#[cfg(test)]
+mod tests {
+
+  use std::fs;
+  use std::path::PathBuf;
+  
+  use crate::from::From;
+  use crate::output::OutputFormat;
+  use crate::InputTime;
+
+
+
+  // Yes, I could have mad a single function with different parameters... 
+  
+  #[test]
+  fn test_from_valued_cells_1() {
+    let expected = "test/resources/gw190425z_skymap.default.expected.txt";
+    let actual = "test/resources/gw190425z_skymap.default.actual.txt";
+    let from = From::ValuedCells {
+      depth: 8,
+      density: true,
+      from_threshold: String::from("0"),
+      to_threshold: String::from("0.9"),
+      asc: false,
+      not_strict: true,
+      split: true,
+      revese_recursive_descent: false,
+      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+      separator: String::from(","),
+      out: OutputFormat::Ascii {
+        fold: Some(80),
+        range_len: false,
+        opt_file: Some(actual.into()),
+      }
+    };
+    from.exec().unwrap();
+    // Check results
+    let actual = fs::read_to_string(actual).unwrap();
+    let expected = fs::read_to_string(expected).unwrap();
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn test_from_valued_cells_2() {
+    let expected = "test/resources/gw190425z_skymap.rrd.expected.txt";
+    let actual = "test/resources/gw190425z_skymap.rrd.actual.txt";
+    let from = From::ValuedCells {
+      depth: 8,
+      density: true,
+      from_threshold: String::from("0"),
+      to_threshold: String::from("0.9"),
+      asc: false,
+      not_strict: true,
+      split: true,
+      revese_recursive_descent: true,
+      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+      separator: String::from(","),
+      out: OutputFormat::Ascii {
+        fold: Some(80),
+        range_len: false,
+        opt_file: Some(actual.into()),
+      }
+    };
+    from.exec().unwrap();
+    // Check results
+    let actual = fs::read_to_string(actual).unwrap();
+    let expected = fs::read_to_string(expected).unwrap();
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn test_from_valued_cells_3() {
+    let expected = "test/resources/gw190425z_skymap.strict.expected.txt";
+    let actual = "test/resources/gw190425z_skymap.strict.actual.txt";
+    let from = From::ValuedCells {
+      depth: 8,
+      density: true,
+      from_threshold: String::from("0"),
+      to_threshold: String::from("0.9"),
+      asc: false,
+      not_strict: false,
+      split: true,
+      revese_recursive_descent: false,
+      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+      separator: String::from(","),
+      out: OutputFormat::Ascii {
+        fold: Some(80),
+        range_len: false,
+        opt_file:  Some(actual.into()),
+      }
+    };
+    from.exec().unwrap();
+    // Check results
+    let actual = fs::read_to_string(actual).unwrap();
+    let expected = fs::read_to_string(expected).unwrap();
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn test_from_valued_cells_4() {
+    let expected = "test/resources/gw190425z_skymap.strict.rrd.expected.txt";
+    let actual = "test/resources/gw190425z_skymap.strict.rrd.actual.txt";
+    let from = From::ValuedCells {
+      depth: 8,
+      density: true,
+      from_threshold: String::from("0"),
+      to_threshold: String::from("0.9"),
+      asc: false,
+      not_strict: false,
+      split: true,
+      revese_recursive_descent: true,
+      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+      separator: String::from(","),
+      out: OutputFormat::Ascii {
+        fold: Some(80),
+        range_len: false,
+        opt_file:  Some(actual.into()),
+      }
+    };
+    from.exec().unwrap();
+    // Check results
+    let actual = fs::read_to_string(actual).unwrap();
+    let expected = fs::read_to_string(expected).unwrap();
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn test_from_valued_cells_5() {
+    let expected = "test/resources/gw190425z_skymap.strict.nosplit.expected.txt";
+    let actual = "test/resources/gw190425z_skymap.strict.nosplit.actual.txt";
+    let from = From::ValuedCells {
+      depth: 8,
+      density: true,
+      from_threshold: String::from("0"),
+      to_threshold: String::from("0.9"),
+      asc: false,
+      not_strict: false,
+      split: false,
+      revese_recursive_descent: false,
+      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+      separator: String::from(","),
+      out: OutputFormat::Ascii {
+        fold: Some(80),
+        range_len: false,
+        opt_file:  Some(actual.into()),
+      }
+    };
+    from.exec().unwrap();
+    // Check results
+    let actual = fs::read_to_string(actual).unwrap();
+    let expected = fs::read_to_string(expected).unwrap();
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn test_from_valued_cells_6() {
+    let expected = "test/resources/gw190425z_skymap.nosplit.expected.txt";
+    let actual = "test/resources/gw190425z_skymap.nosplit.actual.txt";
+    let from = From::ValuedCells {
+      depth: 8,
+      density: true,
+      from_threshold: String::from("0"),
+      to_threshold: String::from("0.9"),
+      asc: false,
+      not_strict: true,
+      split: false,
+      revese_recursive_descent: false,
+      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+      separator: String::from(","),
+      out: OutputFormat::Ascii {
+        fold: Some(80),
+        range_len: false,
+        opt_file:  Some(actual.into()),
+      }
+    };
+    from.exec().unwrap();
+    // Check results
+    let actual = fs::read_to_string(actual).unwrap();
+    let expected = fs::read_to_string(expected).unwrap();
+    assert_eq!(actual, expected);
+  }
+  
+  #[test]
+  fn st_moc_logxmm_range() {
+    // cat xmmlog.psv | tr '|' ',' | sed -r 's/ *, */,/g' | cut -d , -f '1,2,9,10' | awk -F , '{print $3","$4","$1","$2}' > xmmlog.csv
+    let from = From::TimerangePos {
+      tdepth: 24, //33,
+      sdepth: 7, //17,
+      time: InputTime::IsoSimple,
+      input: PathBuf::from("test/resources/xmmlog.csv"),
+      separator: String::from(","),
+      out: OutputFormat::Fits {
+        force_u64: true,
+        moc_id: None,
+        moc_type: None,
+        file: PathBuf::from("test/resources/xmmlog.range.stmoc.fits")
+      }
+    };
+    from.exec().unwrap();
+  }
+
+  
+  #[test]
+  fn st_moc_logxmm_val_1() {
+    // xmmlog1.csv from xmmlog.vot using TOPCAT
+    let expected = "test/resources/xmmlog.stmoc.t24.s7.expected.txt";
+    let actual = "test/resources/xmmlog.stmoc.t24.s7.actual.txt";
+    let from = From::TimestampPos {
+      tdepth: 24,
+      sdepth: 7,
+      time: InputTime::JD,
+      input: PathBuf::from("test/resources/xmmlog1.csv"),
+      separator: String::from(","),
+      out: OutputFormat::Ascii {
+        fold: Some(80),
+        range_len: false,
+        opt_file: Some(actual.into()),
+      }
+      /*out: OutputFormat::Fits {
+        force_u64: true,
+        moc_id: None,
+        moc_type: None,
+        file: PathBuf::from("test/resources/xmmlog.val.stmoc.fits")
+      }*/
+    };
+    from.exec().unwrap();
+    // Check results
+    let actual = fs::read_to_string(actual).unwrap();
+    let expected = fs::read_to_string(expected).unwrap();
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn st_moc_logxmm_val_2() {
+    // xmmlog1.csv from xmmlog.vot using TOPCAT
+    let expected = "test/resources/xmmlog.stmoc.t35.s10.expected.txt";
+    let actual = "test/resources/xmmlog.stmoc.t35.s10.actual.txt";
+    let from = From::TimestampPos {
+      tdepth: 35,
+      sdepth: 10,
+      time: InputTime::JD,
+      input: PathBuf::from("test/resources/xmmlog1.csv"),
+      separator: String::from(","),
+      out: OutputFormat::Ascii {
+        fold: Some(80),
+        range_len: false,
+        opt_file: Some(actual.into()),
+      }
+      /*out: OutputFormat::Ascii {
+        force_u64: true,
+        moc_id: None,
+        moc_type: None,
+        file: PathBuf::from(actual.into())
+      }*/
+    };
+    from.exec().unwrap();
+    // Check results
+    let actual = fs::read_to_string(actual).unwrap();
+    let expected = fs::read_to_string(expected).unwrap();
+    assert_eq!(actual, expected);
+  }
+  
 }

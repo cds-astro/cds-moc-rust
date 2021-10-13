@@ -1,7 +1,7 @@
 //! This module contains the structures used to perform operations on 2D Range MOCs iterators.
 
 pub mod or;    // <=> union
-// pub mod and; // <=> intersection
+// pub mod and; // <=> intersection TODO
 
 #[cfg(test)]
 mod tests {

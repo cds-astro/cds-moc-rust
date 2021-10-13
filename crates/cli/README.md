@@ -207,6 +207,13 @@ time moc filter position SMOC_GLIMPSE_u32.fits kids_dr2.csv --has-header --lon R
 (no rows in output)
 
 
+## To-do list
+
+* [ ] Add an option `overlapping (default), fully inside, partially inside, center inside` 
+      for cone, polygon, ...
+* [ ] Support valued MOCs (<=> Multi-Order Maps)?
+
+
 ## License
 
 Like most projects in Rust, this project is licensed under either of
