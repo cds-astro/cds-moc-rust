@@ -24,8 +24,9 @@ use crate::elem::cell::Cell;
 use crate::elemset::range::MocRanges;
 use crate::moc::{
   HasMaxDepth, ZSorted, NonOverlapping, MOCProperties,
-  RangeMOCIterator, RangeMOCIntoIterator
-};
+  RangeMOCIterator, RangeMOCIntoIterator,
+  CellMOCIterator, CellOrCellRangeMOCIterator
+ };
 use crate::ranges::SNORanges;
 use crate::moc::builder::{
   fixed_depth::{
@@ -38,6 +39,8 @@ use crate::moc::range::op::or::{or, OrRangeIter};
 use crate::moc::range::op::minus::{minus, MinusRangeIter};
 use crate::moc::range::op::and::{and, AndRangeIter};
 use crate::moc::range::op::xor::xor;
+use crate::deser::ascii::AsciiError;
+
 
 pub mod op;
 
@@ -65,7 +68,15 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   pub fn into_moc_ranges(self) -> MocRanges<T, Q> {
     self.ranges
   }
-
+  pub fn to_ascii(&self) -> Result<String, AsciiError> {
+    let mut sink = Vec::new();
+    (&self).into_range_moc_iter()
+      .cells()
+      .cellranges()
+      .to_ascii_ivoa(Some(80), true, &mut sink)?;
+    Ok(unsafe { String::from_utf8_unchecked(sink) })
+  }
+  
   pub fn eq_without_depth(&self, rhs: &Self) -> bool {
     self.ranges.eq(&rhs.ranges)
   }
