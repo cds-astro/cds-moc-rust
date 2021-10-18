@@ -24,6 +24,12 @@ For tools able to display MOCs, see:
 * [Aladin Lite](https://aladin.u-strasbg.fr/AladinLite/), "a lightweight version of the Aladin Sky Atlas running in the browser";
 * [MOCPy](https://cds-astro.github.io/mocpy/) scripts, a python wrapper using the very same Rust MOC library.
 
+## Release
+
+The github [releases](https://github.com/cds-astro/cds-moc-rust/releases) section number 
+is the [MOCCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli) 
+and [MOCWasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli) 
+release number.
 
 ## Install/test
 
@@ -88,12 +94,12 @@ pub fn or<T, Q, U, R, I1, J1, K1, I2, J2, K2>(
     + [X] `or`
     + [ ] `and`, `complement`, `fold`, ...
 * [ ] Implement a function dividing a disjoint MOCs into a list of joint MOCs
-      (use the order and the flag of a BMOC).
+      (tip: use the order and the flag of a BMOC, the flag telling is the cell has already been visited).
 * [ ] Implement the compact notation (bits coding quad-tree traversal) for S-MOCs (binary + ASCII Base 64)
 * [ ] Implement compact S-MOC: single z-order curve sorted array of indices with a 2 bits flag telling
       whether the index is a single index, a range lower bound or a range upper bound
-* [ ] Implement multi-MOC operations resorting to a sweep line like algo.
-* [ ] Make a PostgresQL wrapper using e.g. [pgx](https://github.com/zombodb/pgx/)
+* [ ] Implement multi-MOC operations resorting to a sweep line (a sweep line is already used in ST-MOC builder from ranges).
+* [ ] Make a PostgresQL wrapper using e.g. [pgx](https://github.com/zombodb/pgx/)?
 
 ## License
 
