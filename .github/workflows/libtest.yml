@@ -8,10 +8,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu-latest, macOS-latest]
 
     steps:
     - uses: actions/checkout@v2
     - name: Run lib tests
       run: cargo test --workspace --verbose -- --nocapture
+
+
+  test_win: 
+    name: Test on windows # Do not compare with external file due to \r...
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run lib tests
+      run: cargo test --verbose -- --nocapture
 

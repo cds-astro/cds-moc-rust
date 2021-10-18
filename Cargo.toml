@@ -9,7 +9,7 @@ authors = [
   "Matthieu Baumann <baumannmatthieu0@gmail.com>"
 ]
 description = """
-Liibrary made to create and manipulate HEALPix
+Library made to create and manipulate HEALPix
 Multi-Order Coverages maps (MOCs), see https://ivoa.net/documents/MOC/
 """
 license = "Apache-2.0 OR MIT"
