@@ -88,10 +88,7 @@ jobs:
         shell: pwsh
         run: |
           Get-Item *
-          Get-ChildItem $PSScriptRoot\target
-          Get-ChildItem $PSScriptRoot\target\${{ matrix.config.target }}
-          Get-ChildItem $PSScriptRoot\target\${{ matrix.config.target }}\release
-          Compress-Archive -Path $PSScriptRoot\target\${{ matrix.config.target }}\release\moc -DestinationPath moc-${{ needs.create-github-release.outputs.version }}-${{ matrix.config.target }}.zip
+          Compress-Archive -Path  D:\a\cds-moc-rust\cds-moc-rust\target\${{ matrix.config.target }}\release\moc -DestinationPath moc-${{ needs.create-github-release.outputs.version }}-${{ matrix.config.target }}.zip
       - name: Upload compressed binary asset
         if: matrix.config.os != 'windows-latest'
         uses: actions/upload-release-asset@v1
