@@ -47,6 +47,12 @@ fn test_new_version_ref<T: Idx, Q: MocQty<T>>(ranges_moc: &RangeMOC<T, Q>) -> Ve
   v
 }
 
+fn test_new_version_ref_2<T: Idx, Q: MocQty<T>>(ranges_moc: &RangeMOC<T, Q>) -> Vec<T> {
+  let mut v: Vec<T> = ranges_moc.into_range_moc_iter().cells().map(|cell| cell.uniq_hpx()).collect();
+  v.sort_unstable();
+  v
+}
+
 fn bench_ranges2cells(c: &mut Criterion) {
   // https://bheisler.github.io/criterion.rs/book/user_guide/comparing_functions.html
   let mut group = c.benchmark_group("Ranges2Cells");
@@ -59,6 +65,8 @@ fn bench_ranges2cells(c: &mut Criterion) {
     |b| b.iter(|| test_old_version(create_ranges())));
   group.bench_function("CDS HEALPix ref and sort",
     |b| b.iter(|| test_new_version_ref(&range_moc)));
+  group.bench_function("CDS HEALPix ref and sort V2",
+                       |b| b.iter(|| test_new_version_ref_2(&range_moc)));
 }
 
 criterion_group!(benches, bench_ranges2cells);
