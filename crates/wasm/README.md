@@ -248,7 +248,7 @@ wasm-pack publish
 * [ ] Add possibility to filter an array of `(jd, lon, lat)` with a `ST-MOCs`
 * [ ] Add `overlap/contains(MOC, MOC)` methods? (use cases?)
 * [ ] (Internal change for performances) add native operations on `RangeMOC2` instead of transforming in `TimeSpaceMoc`
-
+* [ ] Implement an [egui](https://crates.io/crates/egui) interface
 
 ## License
 

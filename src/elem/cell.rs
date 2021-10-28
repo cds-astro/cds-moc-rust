@@ -25,22 +25,35 @@ impl<T: Idx> Cell<T> {
             Ordering::Greater => self.idx.cmp(&other.idx.unsigned_shl(Q::shift(self.depth - other.depth) as u32)),
         }
     }
-}
-impl<T: Idx> Cell<T> {
+
+    /// From HEALPix standard uniq numbering (natural order follow the hierarchy, from low to high resolution)
     pub fn from_uniq_hpx(uniq: T) -> Self {
         let (depth, idx) = Hpx::<T>::from_uniq_hpx(uniq);
         Self { depth, idx }
     }
+    /// To HEALPix standard uniq numbering (natural order follow the hierarchy, from low to high resolution)
     pub fn uniq_hpx(&self) -> T {
         Hpx::<T>::uniq_hpx(self.depth, self.idx)
     }
 
+    /// From generic uniq numbering (natural order follow the hierarchy, from low to high resolution)
     pub fn from_uniq<Q: MocQty<T>>(uniq: T) -> Self {
         let (depth, idx) = Q::from_uniq_gen(uniq);
         Self { depth, idx }
     }
+    /// To generic uniq numbering (natural order follow the hierarchy, from low to high resolution)
     pub fn uniq<Q: MocQty<T>>(&self) -> T {
         Q::to_uniq_gen(self.depth, self.idx)
+    }
+
+    /// From generic uniq numbering (natural order follow the z-order curve, mixing resolutions)
+    pub fn from_zuniq<Q: MocQty<T>>(zuniq: T) -> Self {
+        let (depth, idx) = Q::from_zuniq(zuniq);
+        Self { depth, idx }
+    }
+    /// To generic uniq numbering (natural order follow the z-order curve, mixing resolutions)
+    pub fn zuniq<Q: MocQty<T>>(&self) -> T {
+        Q::to_zuniq(self.depth, self.idx)
     }
 }
 impl<T: Idx, Q: MocQty<T>> From<MocCell<T, Q>> for Cell<T> {

@@ -1,5 +1,14 @@
 # `moc` Change Log
 
+## 0.6.0
+
+Released 2021-XX-XX
+
+### Added
+
+* `Split` a disjoint MOC into joint MOCs
+
+
 ## 0.5.0
 
 Released 2021-10-18
@@ -13,7 +22,7 @@ Released 2021-10-18
 
 ### Bug correction
 
-* Coorect a bug in MocFromValuedCells
+* Correct a bug in MocFromValuedCells
 * Several other bug corrections
 
 ## 0.4.0

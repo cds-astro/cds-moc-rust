@@ -1,6 +1,8 @@
 
 use wasm_bindgen::JsValue;
 
+use moclib::moc::{RangeMOCIterator, CellMOCIterator, CellMOCIntoIterator};
+
 use super::store;
 use super::common::{SMOC, TMOC, STMOC, InternalMoc};
 
@@ -12,19 +14,23 @@ pub(crate) enum Op1 {
   Contract,
   ExtBorder,
   IntBorder,
+  Split,
 }
 impl Op1 {
+  fn is_split(&self) -> bool {
+    matches!(self, Op1::Split)
+  }
+
   fn perform_op_on_smoc(self, moc: &SMOC) -> Result<SMOC, String> {
-    Ok(
-      match self {
-        Op1::Complement => moc.not(),
-        Op1::Degrade { new_depth } => moc.degraded(new_depth),
-        Op1::Extend => moc.expanded(),
-        Op1::Contract => moc.contracted(),
-        Op1::ExtBorder => moc.external_border(),
-        Op1::IntBorder => moc.internal_border(),
-      }
-    )
+    match self {
+      Op1::Complement => Ok(moc.not()),
+      Op1::Degrade { new_depth } => Ok(moc.degraded(new_depth)),
+      Op1::Extend => Ok(moc.expanded()),
+      Op1::Contract => Ok(moc.contracted()),
+      Op1::ExtBorder => Ok(moc.external_border()),
+      Op1::IntBorder => Ok(moc.internal_border()),
+      Op1::Split =>  Err(String::from("Split must be catch before this :o/.")),
+    }
   }
   fn perform_op_on_tmoc(self, moc: &TMOC) -> Result<TMOC, String> {
     match self {
@@ -34,6 +40,7 @@ impl Op1 {
       Op1::Contract => Err(String::from("Contract border not implemented (yet) for T-MOCs.")),
       Op1::ExtBorder => Err(String::from("External border not implemented (yet) for T-MOCs.")),
       Op1::IntBorder => Err(String::from("Internal border not implemented (yet) for T-MOCs.")),
+      Op1::Split => Err(String::from("Split not implemented for T-MOCs.")),
     }
   }
   fn perform_op_on_stmoc(self, _moc: &STMOC) -> Result<STMOC, String> {
@@ -44,19 +51,51 @@ impl Op1 {
       Op1::Contract =>  Err(String::from("Contract border not implemented (yet) for ST-MOCs.")),
       Op1::ExtBorder =>  Err(String::from("External border not implemented (yet) for ST-MOCs.")),
       Op1::IntBorder => Err(String::from("Internal border not implemented (yet) for ST-MOCs.")),
+      Op1::Split => Err(String::from("Split not implemented for ST-MOCs.")),
     }
   }
 }
 
-/// Performs the given operation on the given MOC and store the resulting MOC in the store.
-pub(crate) fn op1(name: &str, op: Op1, res_name: &str) -> Result<(), JsValue> {
-  store::op1(
+pub(crate) fn op1_count_split(name: &str) -> Result<u32, JsValue> {
+  store::op1_gen(
     name,
     move |moc| match moc {
-      InternalMoc::Space(m) => op.perform_op_on_smoc(m).map(InternalMoc::Space),
-      InternalMoc::Time(m) => op.perform_op_on_tmoc(m).map(InternalMoc::Time),
-      InternalMoc::TimeSpace(m) => op.perform_op_on_stmoc(m).map(InternalMoc::TimeSpace),
-    },
-    res_name
+      InternalMoc::Space(m) => Ok(m.split_into_joint_mocs().len() as u32),
+      InternalMoc::Time(_) => Err(String::from("Split not implemented for T-MOCs.")),
+      InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
+    }
   )
+}
+
+
+/// Performs the given operation on the given MOC and store the resulting MOC in the store.
+pub(crate) fn op1(name: &str, op: Op1, res_name: &str) -> Result<(), JsValue> {
+  if op.is_split() {
+    store::op1_multi_res(
+      name,
+      move |moc| match moc {
+        InternalMoc::Space(m) => {
+          let mut cellmocs = m.split_into_joint_mocs();
+          Ok(
+            cellmocs.drain(..)
+              .map(|cell_moc| InternalMoc::Space(cell_moc.into_cell_moc_iter().ranges().into_range_moc()))
+              .collect()
+          )
+        },
+        InternalMoc::Time(_) => Err(String::from("Split not implemented for T-MOCs.")),
+        InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
+      },
+      res_name
+    )
+  } else {
+    store::op1(
+      name,
+      move |moc| match moc {
+        InternalMoc::Space(m) => op.perform_op_on_smoc(m).map(InternalMoc::Space),
+        InternalMoc::Time(m) => op.perform_op_on_tmoc(m).map(InternalMoc::Time),
+        InternalMoc::TimeSpace(m) => op.perform_op_on_stmoc(m).map(InternalMoc::TimeSpace),
+      },
+      res_name
+    )
+  }
 }

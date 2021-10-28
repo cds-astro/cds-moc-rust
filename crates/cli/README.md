@@ -209,6 +209,7 @@ time moc filter position SMOC_GLIMPSE_u32.fits kids_dr2.csv --has-header --lon R
 
 ## To-do list
 
+* [ ] Contact [gnuastro](https://www.gnu.org/software/gnuastro) ?
 * [ ] Add filter on ST-MOCs
 * [ ] Add ST-MOC 'intersection' and 'folds' in streaming mode (for a low memory footprint)
 * [ ] Add an option `overlapping (default), fully inside, partially inside, center inside` 

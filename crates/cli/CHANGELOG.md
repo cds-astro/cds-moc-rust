@@ -1,6 +1,15 @@
 # `moc-cli` Change Log
 
+## 0.2.0
+
+Released 2021-08-16.
+
+* Add `split` operation on S-MOCs
+
+
 ## 0.1.0
+
+Released 2021-10-18.
 
 * Add creation of S-MOC from a Multi-Order Map, i.e. a non-overlapping list of (uniq, value) rows  
 * Add building ST-MOC from (time, ra, dec) rows

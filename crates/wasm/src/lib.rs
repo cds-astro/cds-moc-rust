@@ -18,6 +18,8 @@ use web_sys::{
 use js_sys::{Array, Uint8Array};
 
 use moclib::qty::{MocQty, Hpx, Time};
+use moclib::elem::valuedcell::valued_cells_to_moc_with_opt;
+use moclib::elemset::range::HpxRanges;
 use moclib::moc::{
   CellMOCIterator, CellMOCIntoIterator,
   RangeMOCIterator,
@@ -47,7 +49,7 @@ use self::common::{
   lon_deg2rad, lat_deg2rad
 };
 use self::load::{from_fits_gen, from_fits_u64};
-use self::op1::{Op1, op1};
+use self::op1::{Op1, op1, op1_count_split};
 use self::op2::{Op2, op2};
 
 /// Number of microseconds in a 24h day.
@@ -639,6 +641,70 @@ pub fn from_decimal_jd_range(name: &str, depth: u8, jd_ranges: Box<[f64]>) ->  R
   store::add(name, InternalMoc::Time(moc))
 }
 
+/// Create a new S-MOC from the given lists of UNIQ and Values.
+/// # Params
+/// * `name`: the name to be given to the MOC
+/// * `depth`: S-MOC maximum depth in `[0, 29]`, Must be >= largest input cells depth.
+/// * `density`: Input values are densities, i.e. they are not proportional to the area of their associated cells.
+/// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
+/// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
+/// * `asc`: Compute cumulative value from ascending density values instead of descending (often = false).
+/// * `not_strict`: Cells overlapping with the upper or the lower cumulative bounds are not rejected (often = false).
+/// * `split`: Split recursively the cells overlapping the upper or the lower cumulative bounds (often = false).
+/// * `revese_recursive_descent`: Perform the recursive descent from the highest to the lowest sub-cell, only with option 'split' (set both flags to be compatibile with Aladin)
+/// * `uniqs`: array of uniq HEALPix cells
+/// * `values`: array of values associated to the HEALPix cells
+#[wasm_bindgen(js_name = "fromValuedCells", catch)]
+pub fn from_valued_cells(
+  name: &str,
+  depth: u8,
+  density: bool,
+  from_threshold: f64,
+  to_threshold: f64,
+  asc: bool,
+  not_strict: bool,
+  split: bool,
+  revese_recursive_descent: bool,
+  uniqs: Box<[f64]>,
+  values: Box<[f64]>,
+) -> Result<(), JsValue> {
+  let depth = depth.max(
+    uniqs.iter()
+      .map(|uniq| Hpx::<u64>::from_uniq_hpx(*uniq as u64).0)
+      .max()
+      .unwrap_or(depth)
+  );
+  let area_per_cell = (PI / 3.0) / (1_u64 << (depth << 1) as u32) as f64;  // = 4pi / (12*4^depth)
+  let ranges: HpxRanges<u64> = if density {
+    valued_cells_to_moc_with_opt::<u64, f64>(
+      depth,
+      uniqs.iter().zip(values.iter())
+        .map(|(uniq, dens)| {
+          let uniq = *uniq as u64;
+          let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
+          let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
+          (uniq, dens * n_sub_cells * area_per_cell, *dens)
+        }).collect(),
+      from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent
+    )
+  } else {
+    valued_cells_to_moc_with_opt::<u64, f64>(
+      depth,
+      uniqs.iter().zip(values.iter())
+        .map(|(uniq, val)| {
+          let uniq = *uniq as u64;
+          let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
+          let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
+          (uniq, *val, val / (n_sub_cells * area_per_cell))
+        }).collect(),
+      from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent
+    )
+  };
+  let moc = RangeMOC::new(depth, ranges);
+  store::add(name, InternalMoc::Space(moc))
+}
+
+// BUILD ST-MOCs!!
 
 /////////////////////////
 // OPERATIONS ON 1 MOC //
@@ -653,6 +719,18 @@ pub fn not(moc: &str, res_name: &str) -> Result<(), JsValue> {
 #[wasm_bindgen(catch)]
 pub fn complement(moc: &str, res_name: &str) -> Result<(), JsValue> {
   op1(moc, Op1::Complement, res_name)
+}
+
+/// Split the given disjoint S-MOC int joint S-MOCs.
+/// WARNING: may create a lot of new MOCs, exec `splitCount` first!!
+#[wasm_bindgen(catch)]
+pub fn split(moc: &str, res_name: &str) -> Result<(), JsValue> {
+  op1(moc, Op1::Split, res_name)
+}
+/// Count the number of joint S-MOC splitting the given disjoint S-MOC.
+#[wasm_bindgen(js_name = "splitCount", catch)]
+pub fn split_count(moc: &str) -> Result<u32, JsValue> {
+  op1_count_split(moc)
 }
 
 #[wasm_bindgen(catch)]

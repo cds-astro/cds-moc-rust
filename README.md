@@ -93,7 +93,7 @@ pub fn or<T, Q, U, R, I1, J1, K1, I2, J2, K2>(
 * [ ] Add operations on `RangeMOC2`
     + [X] `or`
     + [ ] `and`, `complement`, `fold`, ...
-* [ ] Implement a function dividing a disjoint MOCs into a list of joint MOCs
+* [X] Implement a function dividing a disjoint MOCs into a list of joint MOCs
       (tip: use the order and the flag of a BMOC, the flag telling is the cell has already been visited).
 * [ ] Implement the compact notation (bits coding quad-tree traversal) for S-MOCs (binary + ASCII Base 64)
 * [ ] Implement compact S-MOC: single z-order curve sorted array of indices with a 2 bits flag telling

@@ -25,7 +25,7 @@ use moclib::deser::{
   ascii::{to_ascii_ivoa, to_ascii_stream, moc2d_to_ascii_ivoa},
 };
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Clone, Debug)]
 pub enum OutputFormat {
   #[structopt(name = "ascii")]
   /// Output an ASCII MOC (VO compatible)
@@ -70,6 +70,18 @@ pub enum OutputFormat {
 
 impl OutputFormat {
 
+  /// Clone this output format, providing a number to possibly change the name
+  pub fn clone_with_number(&self, num: usize) -> Self {
+    let mut new = self.clone();
+    match &mut new {
+      OutputFormat::Ascii { opt_file: Some(path), .. } => add_number_before_extension(num, path),
+      OutputFormat::Json { opt_file: Some(path), .. } => add_number_before_extension(num, path),
+      OutputFormat::Fits { file, .. } => add_number_before_extension(num, file),
+      _ => { },
+    };
+    new
+  }
+
   pub fn is_fits(&self) -> bool {
     matches!(self, OutputFormat::Fits { .. })
   }
@@ -111,7 +123,18 @@ impl OutputFormat {
       self.write_moc(it)
     }
   }
-  
+
+  pub fn write_smoc_from_cells_possibly_converting_to_u64<T: Idx, I>(self, it: I) -> Result<(), Box<dyn Error>>
+    where
+      I: CellMOCIterator<T, Qty=Hpx<T>>
+  {
+    if self.is_fits_forced_to_u64() {
+      self.write_moc(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it.ranges()))
+    } else {
+      self.write_moc_from_cells(it)
+    }
+  }
+
   pub fn write_tmoc_possibly_auto_converting_from_u64<I>(self, it: I) -> Result<(), Box<dyn Error>>
     where
       I: RangeMOCIterator<u64, Qty=Time<u64>>
@@ -175,6 +198,41 @@ impl OutputFormat {
       },
     }
   }
+
+  pub fn write_moc_from_cells<T, Q, I>(self, it: I) -> Result<(), Box<dyn Error>>
+    where
+      T: Idx,
+      Q: MocQty<T>,
+      I: CellMOCIterator<T, Qty=Q>
+  {
+    match self {
+      OutputFormat::Ascii { fold, range_len, opt_file: None } => {
+        let stdout = io::stdout();
+        to_ascii_ivoa(it.cellranges(), &fold, range_len, stdout.lock()).map_err(|e| e.into())
+      },
+      OutputFormat::Ascii { fold, range_len, opt_file: Some(path) } => {
+        let file = File::create(path)?;
+        to_ascii_ivoa(it.cellranges(), &fold, range_len, BufWriter::new(file)).map_err(|e| e.into())
+      },
+      OutputFormat::Json { fold, opt_file: None } => {
+        let stdout = io::stdout();
+        to_json_aladin(it, &fold, "", stdout.lock()).map_err(|e| e.into())
+      },
+      OutputFormat::Json { fold, opt_file: Some(path) } => {
+        let file = File::create(path)?;
+        to_json_aladin(it, &fold, "", BufWriter::new(file)).map_err(|e| e.into())
+      },
+      OutputFormat::Fits { force_u64: _, moc_id, moc_type, file } => {
+        // Here I don't know how to convert the generic qty MocQty<T> into MocQty<u64>...
+        let file = File::create(file)?;
+        ranges_to_fits_ivoa(it.ranges(), moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
+      },
+      OutputFormat::Stream => {
+        let stdout = io::stdout();
+        to_ascii_stream(it.cellranges(), true, stdout.lock()).map_err(|e| e.into())
+      },
+    }
+  }
   
   pub fn write_stmoc<T, I, J, K, L>(self, stmoc: L)
                            -> Result<(), Box<dyn Error>>
@@ -222,4 +280,11 @@ impl OutputFormat {
     }
   }
   
+}
+
+fn add_number_before_extension(num: usize, path: &mut PathBuf) {
+  match path.extension().and_then(|s| s.to_str()).map(|s| String::from(s)) {
+    Some(ext) => path.set_extension(format!("{}.{}", num, ext)),
+    None => path.set_extension(format!("{}", num)),
+  };
 }

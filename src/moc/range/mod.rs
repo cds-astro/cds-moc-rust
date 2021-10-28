@@ -14,6 +14,7 @@ use healpix::nested::{
   zone_coverage,
   box_coverage,
   append_external_edge,
+  external_edge_struct,
   bmoc::BMOC,
 };
 use healpix::sph_geom::ContainsSouthPoleMethod;
@@ -21,26 +22,32 @@ use healpix::sph_geom::ContainsSouthPoleMethod;
 use crate::idx::Idx;
 use crate::qty::{MocQty, Hpx, Time, Bounded};
 use crate::elem::cell::Cell;
-use crate::elemset::range::MocRanges;
+use crate::elemset::{
+  range::MocRanges,
+  cell::{MocCells, Cells}
+};
+use crate::ranges::SNORanges;
 use crate::moc::{
   HasMaxDepth, ZSorted, NonOverlapping, MOCProperties,
   RangeMOCIterator, RangeMOCIntoIterator,
-  CellMOCIterator, CellOrCellRangeMOCIterator
- };
-use crate::ranges::SNORanges;
-use crate::moc::builder::{
-  fixed_depth::{
-    FixedDepthMocBuilder,
-    OwnedOrderedFixedDepthCellsToRangesFromU64
+  CellMOCIterator, CellOrCellRangeMOCIterator,
+  cell::CellMOC,
+  builder::{
+    fixed_depth::{
+      FixedDepthMocBuilder,
+      OwnedOrderedFixedDepthCellsToRangesFromU64
+    },
+    maxdepth_range::RangeMocBuilder
   },
-  maxdepth_range::RangeMocBuilder
+  range::op::{
+    or::{or, OrRangeIter},
+    minus::{minus, MinusRangeIter},
+    and::{and, AndRangeIter},
+    xor::xor
+  }
 };
-use crate::moc::range::op::or::{or, OrRangeIter};
-use crate::moc::range::op::minus::{minus, MinusRangeIter};
-use crate::moc::range::op::and::{and, AndRangeIter};
-use crate::moc::range::op::xor::xor;
 use crate::deser::ascii::AsciiError;
-
+use healpix::compass_point::Ordinal;
 
 pub mod op;
 
@@ -313,7 +320,100 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     let left = self.not().expanded();
     and(left.into_range_moc_iter(), self.into_range_moc_iter())
   }
-  
+
+  pub fn split_into_joint_mocs(&self) -> Vec<CellMOC<T, Hpx<T>>> {
+    let mut elems: Vec<T> = (&self).into_range_moc_iter()
+      .cells()
+      .map(|cell| cell.zuniq::<Hpx<T>>() << 1)// add the "already_visit" bit set to 0
+      .collect();
+    // The vector is supposed to be sorted!
+    debug_assert!(
+      elems.iter().fold((true, T::zero()), |(b, prev), curr| (b & (prev <= *curr), *curr)).0
+    );
+    let mut mocs: Vec<CellMOC<T, Hpx<T>>> = Default::default();
+    while !elems.is_empty() {
+      let mut stack: Vec<T> = Default::default();
+      let first_mut: &mut T = elems.first_mut().unwrap(); // unwrap ok since we tested empty just before
+      *first_mut |= T::one();
+      stack.push((*first_mut) >> 1); // Put the value without the bit flag
+      while !stack.is_empty() {
+        let zuniq = stack.pop().unwrap(); // Unwrap ok since the loop ensures the stack is not empty
+        let Cell { depth, idx} = Cell::<T>::from_zuniq::<Hpx<T>>(zuniq);
+        let mut stack_changed = false;
+        let ext_edge = external_edge_struct(depth, idx.to_u64(), self.depth_max - depth);
+        // for neig in external_edge(depth, idx.to_u64(), self.depth_max - depth).into_iter() { //_sorted
+        for neig in ext_edge.get_edge(&Ordinal::SE).iter()
+          .chain(ext_edge.get_edge(&Ordinal::SW).iter())
+          .chain(ext_edge.get_edge(&Ordinal::NE).iter())
+          .chain(ext_edge.get_edge(&Ordinal::NW).iter()) { // Not the most efficient impl in the word... :o/
+          let neig = T::from_u64(*neig);
+          let neig_zuniq = <Hpx<T>>::to_zuniq(self.depth_max, neig) << 1;
+          match elems.binary_search(&neig_zuniq) {
+            Ok(i) => { // => not marked
+              let elem_mut: &mut T = elems.get_mut(i).unwrap();
+              *elem_mut |= T::one();
+              stack.push((*elem_mut) >> 1);
+              stack_changed = true;
+              debug_assert!((*elems.get(i).unwrap()) & T::one() == T::one());
+            },
+            Err(i) => {
+              // The deeper zuniq is can be lower or higher than the one's of the larger cells
+              // containing it. it depends if the location of the sentinel bit of low resolution
+              // cells match a 0 or a 1 in the deeper resolutiont index.
+              if i > 0 { // Check the lower zuniq
+                let zuniq_with_flag_mut = elems.get_mut(i - 1).unwrap();
+                if *zuniq_with_flag_mut & T::one() != T::one() { // flag not yet set (else do nothing)
+                  let Cell { depth: tdepth, idx: tidx} = Cell::<T>::from_zuniq::<Hpx<T>>((*zuniq_with_flag_mut) >> 1);
+                  if tidx == (neig >> ((self.depth_max - tdepth) << 1) as usize) { // neig included in tidx
+                    *zuniq_with_flag_mut |= T::one();
+                    stack.push((*zuniq_with_flag_mut) >> 1);
+                    stack_changed = true;
+                    debug_assert!((*elems.get(i - 1).unwrap()) & T::one() == T::one());
+                  }
+                }
+              }
+              if i < elems.len() { // Check the higher zuniq
+                let zuniq_with_flag_mut = elems.get_mut(i).unwrap();
+                if *zuniq_with_flag_mut & T::one() != T::one() { // flag not yet set (else do nothing)
+                  let Cell { depth: tdepth, idx: tidx} = Cell::<T>::from_zuniq::<Hpx<T>>((*zuniq_with_flag_mut) >> 1);
+                  if tidx == (neig >> ((self.depth_max - tdepth) << 1) as usize) { // neig included in tidx
+                    *zuniq_with_flag_mut |= T::one();
+                    stack.push((*zuniq_with_flag_mut) >> 1);
+                    stack_changed = true;
+                    debug_assert!((*elems.get(i).unwrap()) & T::one() == T::one());
+                  }
+                }
+              }
+            },
+          }
+            //
+        }
+        // Ensure the stack is a stack (ordered, no duplicate)
+        if stack_changed {
+          stack.sort_unstable(); // probably slow to call this at each iteration... but BTreeSet.pop_first is nighlty so far :o/
+          debug_assert!({ // The stack does not contains duplicates
+            let l1 = elems.len();
+            elems.dedup();
+            let l2 = elems.len();
+            l1 == l2
+          });
+        }
+      }
+      // One could use drain_filter but it is not stable yet (we do not want to use nightly) :o/
+      let moc = CellMOC::new(
+        self.depth_max,
+        MocCells::new(Cells::new(
+          elems.iter().cloned().filter(|zuniq_with_flag| (*zuniq_with_flag) & T::one() == T::one())
+            .map(|zuniq_with_flag| Cell::<T>::from_zuniq::<Hpx<T>>(zuniq_with_flag >> 1))
+            .collect()
+        ))
+      );
+      mocs.push(moc);
+      elems.retain(|zuniq| *zuniq & T::one() == T::zero());
+    }
+    mocs
+  }
+
 }
 
 

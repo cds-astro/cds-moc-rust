@@ -109,6 +109,39 @@ pub(crate) fn op1<F>(name: &str, op: F, res_name: &str) -> Result<(), JsValue>
   Ok(())
 }
 
+pub(crate) fn op1_gen<T, F>(name: &str, op: F) -> Result<T, JsValue>
+  where
+    F: Fn(&InternalMoc) -> Result<T, String>
+{
+  let store = get_store();
+  let store = store.read().map_err(|_| JsValue::from_str("Read lock poisoned"))?;
+  let moc = store.get(name).ok_or_else(|| JsValue::from_str(&format!("MOC '{}' not found", name)))?;
+  op(moc).map_err(|e| JsValue::from_str(&e))
+}
+
+/// Perform an operation on a MOC and store the resulting MOC.
+pub(crate) fn op1_multi_res<F>(name: &str, op: F, res_name_prefix: &str) -> Result<(), JsValue>
+  where
+    F: Fn(&InternalMoc) -> Result<Vec<InternalMoc>, String>
+{
+  let store = get_store();
+  // Perform read operations first
+  let res_mocs = {
+    let store = store.read().map_err(|_| JsValue::from_str("Read lock poisoned"))?;
+    let moc = store.get(name).ok_or_else(|| JsValue::from_str(&format!("MOC '{}' not found", name)))?;
+    op(moc).map_err(|e| JsValue::from_str(&e))?
+  };
+  // Then write operation.
+  // Remark: we could have called directly add(res_name, res_moc)
+  //         (still carefully releasing the read lock before the call),
+  //         but we (so far) preferred to spare one `get_store` call
+  let mut store = store.write().map_err(|_| JsValue::from_str("Write lock poisoned"))?;
+  for (i, res_moc) in res_mocs.into_iter().enumerate() {
+    (*store).insert(format!("{}_{}", res_name_prefix, i), res_moc);
+  }
+  Ok(())
+}
+
 /// Perform an operation between 2 MOCs and store the resulting MOC.
 pub(crate) fn op2<F>(left_name: &str, right_name: &str, op: F, res_name: &str) -> Result<(), JsValue> 
   where 

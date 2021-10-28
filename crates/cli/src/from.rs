@@ -163,7 +163,7 @@ pub enum From {
     /// Cumulative value at which we start putting cells in he MOC.
     from_threshold: String,
     #[structopt(short = "t", long = "to", default_value = "1")] // Valid for a proba (sum = 1 on the all sky)
-    /// Cumulative value at which we stop putting cells in he MOC.
+    /// Cumulative value at which we stop putting cells in the MOC.
     to_threshold: String,
     #[structopt(short = "a", long = "asc")]
     /// Compute cumulative value from ascending density values instead of descending.
@@ -713,8 +713,6 @@ mod tests {
   use crate::from::From;
   use crate::output::OutputFormat;
   use crate::InputTime;
-
-
 
   // Yes, I could have mad a single function with different parameters... 
   

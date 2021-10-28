@@ -312,6 +312,16 @@ mod tests {
 
 
     #[test]
+    fn test_hpx_zuniq() {
+        for depth in 0..8 {
+            for idx in 0..Hpx::<u64>::n_cells(depth) {
+                assert_eq!((depth, idx), Hpx::<u64>::from_zuniq(Hpx::<u64>::to_zuniq(depth, idx)));
+            }
+        }
+    }
+
+
+    #[test]
     fn test_hpx() {
         // Independent of T
         assert_eq!(Hpx::<u64>::DIM, 2);

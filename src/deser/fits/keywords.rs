@@ -176,7 +176,7 @@ impl FitsCard for TimeSys {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MocType {
   Image,
   Catalog,

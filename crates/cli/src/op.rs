@@ -44,6 +44,17 @@ pub enum Op {
     op: Op1Args
   },
 
+  #[structopt(name = "split")]
+  /// Split the disjoint parts of the MOC into distinct MOCs, SMOC only.
+  /// WARNING: this may create a lot of files, use first option `--count`.
+  Split {
+    #[structopt(short = "-c", long = "--count")]
+    /// Only prints the number of disjoint MOCs (security before really executing the task)
+    count: bool,
+    #[structopt(flatten)]
+    op: Op1Args
+  },
+
   #[structopt(name = "extend")]
   /// Add an extra border of cells having the MOC depth, SMOC only
   Extend(Op1Args),
@@ -88,6 +99,7 @@ impl Op {
     match self {
       Op::Complement(op) => op.exec(Op1::Complement),
       Op::Degrade { new_depth, op } => op.exec(Op1::Degrade { new_depth }),
+      Op::Split{ count, op } => op.exec(Op1::Split { count }),
       Op::Extend(op) => op.exec(Op1::Extend),
       Op::Contract(op) => op.exec(Op1::Contract),
       Op::ExtBorder(op) => op.exec(Op1::ExtBorder),
@@ -181,6 +193,7 @@ fn op1_exec_on_fits_timehpx<T: Idx>(
 pub enum Op1 {
   Complement,
   Degrade { new_depth: u8 },
+  Split { count: bool},
   Extend,
   Contract,
   ExtBorder,
@@ -211,6 +224,18 @@ impl Op1 {
     match self {
       Op1::Complement => out.write_smoc_possibly_converting_to_u64(moc_it.not()),
       Op1::Degrade  { new_depth } =>  out.write_smoc_possibly_converting_to_u64(moc_it.degrade(new_depth)), // out.write_smoc_converting(moc_it.degrade(new_depth)),
+      Op1::Split { count }=> {
+        let mocs = moc_it.into_range_moc().split_into_joint_mocs();
+        if count {
+          println!("{}", mocs.len());
+        } else {
+          for (num, cell_moc) in mocs.into_iter().enumerate() {
+            let nout = out.clone_with_number(num);
+            nout.write_smoc_from_cells_possibly_converting_to_u64(cell_moc.into_cell_moc_iter())?;
+          }
+        }
+        Ok(())
+      },
       Op1::Extend => out.write_smoc_possibly_converting_to_u64(moc_it.into_range_moc().expanded_iter()),
       Op1::Contract => out.write_smoc_possibly_converting_to_u64(moc_it.into_range_moc().contracted_iter()),
       Op1::ExtBorder => out.write_smoc_possibly_converting_to_u64(moc_it.into_range_moc().external_border_iter()),
@@ -226,6 +251,7 @@ impl Op1 {
     match self {
       Op1::Complement => out.write_tmoc_possibly_converting_to_u64(moc_it.not()),
       Op1::Degrade  { new_depth } => out.write_tmoc_possibly_converting_to_u64(moc_it.degrade(new_depth)), // out.write_tmoc_converting(moc_it.degrade(new_depth)),
+      Op1::Split { .. } => Err(String::from("No 'split' operation on T-MOCs.").into()),
       Op1::Extend => Err(String::from("No 'extend' operation on T-MOCs.").into()),
       Op1::Contract => Err(String::from("No 'contract' operation on T-MOCs.").into()),
       Op1::ExtBorder => Err(String::from("No 'extborder' operation on T-MOCs.").into()),
@@ -250,6 +276,7 @@ impl Op1 {
     match self {
       Op1::Complement => todo!(), // Not yet implemented on ST-MOC!! Do we add time ranges with full space S-MOCs?
       Op1::Degrade  { .. } => todo!(), // Not yet implemented on ST-MOC!! Degrade on T, on S, on both (take two paramaeters)?
+      Op1::Split { .. } => Err(String::from("No 'split' operation on ST-MOCs.").into()),
       Op1::Extend => Err(String::from("No 'extend' operation on ST-MOCs.").into()),
       Op1::Contract => Err(String::from("No 'contract' operation on ST-MOCs.").into()),
       Op1::ExtBorder => Err(String::from("No 'extborder' operation on ST-MOCs.").into()),
@@ -828,4 +855,47 @@ impl Op2 {
     }
   }
 
+}
+
+
+#[cfg(test)]
+mod tests {
+  use std::path::PathBuf;
+
+  use crate::op::{Op1Args, Op};
+  use crate::input::ReducedInputFormat;
+  use crate::output::OutputFormat;
+  use std::fs;
+
+  // Yes, I could have mad a single function with different parameters...
+
+  #[test]
+  fn test_split_bayestar() {
+    let from = Op::Split {
+      count: false,//  true,
+      op: Op1Args {
+        input: PathBuf::from("test/resources/MOC_0.9_bayestar.multiorder.fits"),
+        input_fmt: ReducedInputFormat::Fits,
+        output: /*OutputFormat::Fits {
+          force_u64: true,
+          moc_id: None,
+          moc_type: None,
+          file: "test/resources/MOC_0.9_bayestar.multiorder.split.fits".into(),
+        }*/OutputFormat::Ascii {
+          fold: Some(80),
+          range_len: false,
+          opt_file: Some("test/resources/Bayestar.multiorder.actual.ascii".into()),
+        }
+      }
+    };
+    from.exec().unwrap();
+    // Check results
+    for i in 0..9 {
+      let expected = format!("test/resources/Bayestar.multiorder.expected.{}.ascii", i);
+      let actual = format!("test/resources/Bayestar.multiorder.actual.{}.ascii", i);
+      let actual = fs::read_to_string(actual).unwrap();
+      let expected = fs::read_to_string(expected).unwrap();
+      assert_eq!(actual, expected);
+    }
+  }
 }
