@@ -321,6 +321,19 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     and(left.into_range_moc_iter(), self.into_range_moc_iter())
   }
 
+  /// Split the disjoint MOC into joint MOCs.
+  /// # Algo description
+  /// * We work on zuniq indices (i.e. special uniq notation for which the natural order follows
+  ///  the z-order curve order, mixing the various resolutions), shifted of one bit to the left
+  ///  so that we use the LSB to mark the cells we already visited.
+  /// * The MOC is a list of ordered zuniq cells + marker bit.
+  /// * We start with the first cell, mark it, look for its neighbour.
+  /// * For each neighbour we find (or we find a super-cel containing it),
+  ///   we mark the cell as visited and push it into the stack of cells we want to check the neighbours
+  /// * When the stackis empty, we visited all neighbours of neighbours of neighbours of ...
+  /// * We form a new MOC from all marked cells that we put in a list,
+  /// * and we remove them from the original MOC.
+  /// * We continue the process with the updated original MOC
   pub fn split_into_joint_mocs(&self) -> Vec<CellMOC<T, Hpx<T>>> {
     let mut elems: Vec<T> = (&self).into_range_moc_iter()
       .cells()
@@ -357,9 +370,9 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
               debug_assert!((*elems.get(i).unwrap()) & T::one() == T::one());
             },
             Err(i) => {
-              // The deeper zuniq is can be lower or higher than the one's of the larger cells
-              // containing it. it depends if the location of the sentinel bit of low resolution
-              // cells match a 0 or a 1 in the deeper resolutiont index.
+              // The deeper zuniq may be lower or higher than the one's of the larger cells
+              // containing it. It depends if the location of the sentinel bit of low resolution
+              // cells match a 0 or a 1 in the deeper resolution index.
               if i > 0 { // Check the lower zuniq
                 let zuniq_with_flag_mut = elems.get_mut(i - 1).unwrap();
                 if *zuniq_with_flag_mut & T::one() != T::one() { // flag not yet set (else do nothing)
@@ -373,6 +386,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
                 }
               }
               if i < elems.len() { // Check the higher zuniq
+                // Yes, duplicated code, onle the index is different and we should put this in a function we call...
                 let zuniq_with_flag_mut = elems.get_mut(i).unwrap();
                 if *zuniq_with_flag_mut & T::one() != T::one() { // flag not yet set (else do nothing)
                   let Cell { depth: tdepth, idx: tidx} = Cell::<T>::from_zuniq::<Hpx<T>>((*zuniq_with_flag_mut) >> 1);
@@ -386,7 +400,6 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
               }
             },
           }
-            //
         }
         // Ensure the stack is a stack (ordered, no duplicate)
         if stack_changed {
