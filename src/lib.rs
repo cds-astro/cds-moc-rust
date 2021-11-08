@@ -9,6 +9,7 @@
 //! (moc-wasm for example).
 //!
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::ThreadPoolBuildError;
 
 pub mod idx;
@@ -34,6 +35,7 @@ pub mod utils;
 /// Must be called only once!
 /// If not called, the default number of threads is the number of physical core.
 /// See [rayon doc](https://docs.rs/rayon/1.5.1/rayon/struct.ThreadPoolBuilder.html)
+#[cfg(not(target_arch = "wasm32"))]
 pub fn init_par(num_threads: usize) -> Result<(), ThreadPoolBuildError> {
   rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global()
 }

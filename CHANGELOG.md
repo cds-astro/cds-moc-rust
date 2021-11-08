@@ -7,7 +7,7 @@ Released 2021-XX-XX
 ### Added
 
 * `Split` a disjoint MOC into joint MOCs
-
+* Add direct support for FITS Multi-Order Map
 
 ## 0.5.0
 

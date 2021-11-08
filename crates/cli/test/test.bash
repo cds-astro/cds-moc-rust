@@ -23,6 +23,12 @@ test_eq(){
   [[ "${res1}" != "${res2}" ]] && { printf "Test failed!\n- cmd1: '${cmd1}'\n- cmd2: '${cmd2}'\n- res1: '${res1}'\n- res2: '${res2}'\n"; }
 }
 
+
+
+
+#moc from vuniq -s , -d --to 8334.837891 8 gw190425z_skymap.multiorder.csv fits gw190425z.moc.fits
+#moc from vuniq -s , --to 0.90 8 gw190425z_skymap.multiorder.csv fits gw190425z.moc.fits
+
 echo "Conversion tests..."
 # Conversion
 ${moc} convert ${resources}/glimpse.moc.json --type smoc fits --force-u64 SMOC_GLIMPSE_u64.fits

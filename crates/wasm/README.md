@@ -62,6 +62,9 @@ TBW
 Following the provided [index.html](index.html) example, 
 use the `moc` prefix to, call the following methods (e.g. `moc.list()`):
 ```bash
+# In case of failure, enable Rust stack trace
+debugOn();
+
 # Info
 # - List the name of the MOCs loaded in memory.
 list() -> Array<String>
@@ -94,6 +97,13 @@ tmocFromJsonUrl(name, url)
 stmocFromJson(name, data: String)
 stmocFromJsonUrl(name, url)
 
+# - fires the select dialogto load a multi-order map FITS file and create a MOC from the given parameters
+fromLocalMultiOrderMap(from_threshold: f64, to_threshold: f64, asc: bool, not_strict: bool, split: bool, revese_recursive_descent: bool)
+# - load a multi-order map FITS file and create a MOC from the given parameters
+fromFitsMulitOrderMap(name, data: UInt8Array, from_threshold: f64, to_threshold: f64, asc: bool, not_strict: bool, split: bool, revese_recursive_descent: bool)
+# - load a multi-order map FITS file of given URL and create a MOC from the given parameters
+fromMultiOrderMapFitsUrl(name, url, from_threshold: f64, to_threshold: f64, asc: bool, not_strict: bool, split: bool, revese_recursive_descent: bool)
+
 # Save a MOC
 # - get the FITS binary representation of the MOC of given name  
 toFits(name) -> Uint8Array
@@ -117,8 +127,10 @@ fromPolygon(name, depth, vertices_deg: Float64Array, complement: boolean)
 fromCoo(name, depth, coos_deg: Float64Array)
 # - create a T-MOC from a list of Julian Days
 fromDecimalJDs(name, depth, jd: Float64Array)
-#  -create a T-MOC from a list of Juliand Days range
+# - create a T-MOC from a list of Juliand Days range
 fromDecimalJDRanges(name, depth, jd_ranges: Float64Array)
+# - reate a new S-MOC from the given lists of UNIQ and Values (i.e. from a Multi-Order Map)
+fromValuedCells(name, depth,  density: bool, from_threshold: f64, to_threshold: f64, asc: bool,  not_strict: bool, split: bool, revese_recursive_descent: bool, uniqs: Float64Array, values: Float64Array)
 
 # Single MOC operations
 # S/T-MOC
@@ -129,6 +141,8 @@ extend(name, out_name)
 contract(name, out_name)
 externalBorder(name, out_name)
 internalBorder(name, out_name)
+splitCount(name)
+split(name, out_name_prefix)
 
 # Two MOCs operations
 or/union(left_name, right_name, out_name)
@@ -146,7 +160,7 @@ filterJDs(name, jds: Float64Array) -> Uint8Array
 
 ```
 
-## Example
+## Example 1: 2MASS and SDSS DR12 MOCs
 
 In the [index.html](index.html) web page put behind a server (see next section), 
 simply copy/paste those line the web browser console:
@@ -182,6 +196,36 @@ console.log(moc.toJson('2mass_inter_sdss12_d2'));
 
 // Save the result of the intersection in a FITS file
 moc.toFitsFile('2mass_inter_sdss12');
+```
+
+## Example 2: Build a MOC from a Multi-Order Map and split it into disjoint MOCs
+
+```java
+var n;
+// Load a multi-order map and create a MOC on-the-fly
+await moc.fromMultiOrderMapFitsUrl('lalmap', 'http://cdsxmatch.u-strasbg.fr/lab/moc/LALInference.multiorder.fits', 0.0, 0.9, false, false, false, false);
+// List MOCs loaded in the page
+console.log(moc.list());
+
+// Init a timer
+console.time('timer');
+// Count the number of disjoint MOCs in the MOC
+n = moc.splitCount('lalmap');
+console.log("n sub_mocs: " + n);
+console.timeLog('timer', 'Spit count');
+// Do split the MOC in 10 sub-MOCs
+moc.split('lalmap', 'lalmap_sub');
+console.timeLog('timer', 'Spit');
+// Remove timer
+console.timeEnd('timer');
+        
+// List MOCs loaded in the page
+console.log(moc.list());
+
+// Get info on sub-MOCs
+for (let i = 0; i < n; i++){
+    console.log("Coverage percentage sub "+i+": "+moc.info("lalmap_sub_"+i).coverage_percentage);
+}
 ```
 
 ## Install/run locally

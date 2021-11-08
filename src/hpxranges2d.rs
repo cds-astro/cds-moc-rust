@@ -5,6 +5,8 @@ use std::ops::Range;
 use std::convert::From;
 
 use num::One;
+
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 use crate::idx::Idx;
@@ -143,6 +145,7 @@ where
     /// - `d1` must be valid (within `[0, <T>::MAXDEPTH]`)
     /// - `d2` must be valid (within `[0, <S>::MAXDEPTH]`)
     /// - `x` and `y` must have the same size.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn create_from_times_positions(
         x: Vec<TT>,
         y: Vec<ST>,
@@ -192,6 +195,72 @@ where
     ///
     /// # Arguments
     ///
+    /// * `x` - A set of values expressed that will be converted to
+    ///   ranges and degraded at the depth ``d1``.
+    ///   This quantity axe may refer to a time (expressed in µs), a redshift etc...
+    ///   This will define the first dimension of the coverage.
+    /// * `y` - A set of spatial HEALPix cell indices at the depth ``d2``.
+    ///   This will define the second dimension of the coverage.
+    /// * `d1` - The depth of the coverage along its 1st dimension.
+    /// * `d2` - The depth of the coverage along its 2nd dimension.
+    ///
+    /// The resulted 2D coverage will be of depth (``d1``, ``d2``)
+    ///
+    /// # Precondition
+    ///
+    /// - `d1` must be valid (within `[0, <T>::MAXDEPTH]`)
+    /// - `d2` must be valid (within `[0, <S>::MAXDEPTH]`)
+    /// - `x` and `y` must have the same size.
+    #[cfg(target_arch = "wasm32")]
+    pub fn create_from_times_positions(
+        x: Vec<TT>,
+        y: Vec<ST>,
+        d1: u8,
+        d2: u8,
+    ) -> HpxRanges2D<TT, T, ST> {
+        let s1 = T::shift_from_depth_max(d1); // ((Self::<T>::MAX_DEPTH - d1) << 1) as u32;
+        let mut off1: TT = One::one();
+        off1 = off1.unsigned_shl(s1 as u32) - One::one();
+
+        let mut m1: TT = One::one();
+        m1 = m1.checked_mul(&!off1).unwrap();
+
+        let x = x
+          .into_iter()
+          .map(|r| {
+              let a: TT = r & m1;
+              let b: TT = r
+                .checked_add(&One::one())
+                .unwrap()
+                .checked_add(&off1)
+                .unwrap()
+                & m1;
+              a..b
+          })
+          .collect::<Vec<_>>();
+
+        // More generic: Hpx::<ST>::shift_from_depth_max(d2)
+        let s2 = ((Hpx::<ST>::MAX_DEPTH - d2) << 1) as u32;
+        let y = y
+          .into_iter()
+          .map(|r| {
+              let a = r.unsigned_shl(s2);
+              let b = r.checked_add(&One::one()).unwrap().unsigned_shl(s2);
+              // We do not want a min_depth along the 2nd dimension
+              // making sure that the created Ranges<ST> is valid.
+              Ranges::<ST>::new_unchecked(vec![a..b])
+          })
+          .collect::<Vec<_>>();
+
+        let ranges = Ranges2D::<TT, ST>::new(x, y).make_consistent();
+
+        HpxRanges2D(ranges.into())
+    }
+    
+    /// Create a Quantity/Space 2D coverage
+    ///
+    /// # Arguments
+    ///
     /// * `x` - A set of quantity ranges that will be degraded to the depth ``d1``.
     ///   This quantity axe may refer to a time (expressed in µs), a redshift etc...
     ///   This will define the first dimension of the coverage.
@@ -205,7 +274,8 @@ where
     ///
     /// - `d2` must be valid (within `[0, <S>::MAXDEPTH]`)
     /// - `x` and `y` must have the same size.
-    /// - `x` must contain `[a..b]` ranges where `b > a`.
+    /// - `x` must contain `[a..b]` ranges where `b > a`
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn create_from_time_ranges_positions(
         x: Vec<Range<TT>>,
         y: Vec<ST>,
@@ -272,6 +342,74 @@ where
     /// - `d2` must be valid (within `[0, <S>::MAXDEPTH]`)
     /// - `x` and `y` must have the same size.
     /// - `x` must contain `[a..b]` ranges where `b > a`.
+    #[cfg(target_arch = "wasm32")]
+    pub fn create_from_time_ranges_positions(
+        x: Vec<Range<TT>>,
+        y: Vec<ST>,
+        d1: u8,
+        d2: u8,
+    ) -> HpxRanges2D<TT, T, ST> {
+        let s1 = T::shift_from_depth_max(d1);
+        let mut off1: TT = One::one();
+        off1 = off1.unsigned_shl(s1 as u32) - One::one();
+
+        let mut m1: TT = One::one();
+        m1 = m1.checked_mul(&!off1).unwrap();
+
+        let x = x
+          .into_iter()
+          .filter_map(|r| {
+              let a: TT = r.start & m1;
+              let b: TT = r.end
+                .checked_add(&off1)
+                .unwrap()
+                & m1;
+              if b > a {
+                  Some(a..b)
+              } else {
+                  None
+              }
+          })
+          .collect::<Vec<_>>();
+
+        // More generic: Hpx::<ST>::shift_from_depth_max(d2)
+        let s2 = ((Hpx::<ST>::MAX_DEPTH - d2) << 1) as u32;
+        let y = y
+          .into_iter()
+          .map(|r| {
+              let a = r.unsigned_shl(s2);
+              let b = r.checked_add(&One::one()).unwrap().unsigned_shl(s2);
+              // We do not want a min_depth along the 2nd dimension
+              // making sure that the created Ranges<S> is valid.
+              Ranges::<ST>::new_unchecked(vec![a..b])
+          })
+          .collect::<Vec<_>>();
+
+        let ranges = Moc2DRanges::<TT, T, ST, Hpx<ST>>::new(x, y)
+          .make_consistent();
+
+        HpxRanges2D(ranges)
+    }
+
+    /// Create a Quantity/Space 2D coverage
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - A set of quantity ranges that will be degraded to the depth ``d1``.
+    ///   This quantity axe may refer to a time (expressed in µs), a redshift etc...
+    ///   This will define the first dimension of the coverage.
+    /// * `y` - A set of spatial HEALPix cell indices at the depth ``d2``.
+    ///   This will define the second dimension of the coverage.
+    /// * `d2` - The depth of the coverage along its 2nd dimension.
+    ///
+    /// The resulted 2D coverage will be of depth (``d1``, ``d2``)
+    ///
+    /// # Precondition
+    ///
+    /// - `d2` must be valid (within `[0, <S>::MAXDEPTH]`)
+    /// - `x` and `y` must have the same size.
+    /// - `x` must contain `[a..b]` ranges where `b > a`.
+    #[cfg(target_arch = "wasm32")]
     pub fn create_from_time_ranges_spatial_coverage(
         x: Vec<Range<TT>>,
         y: Vec<HpxRanges<ST>>,
@@ -285,7 +423,7 @@ where
         m1 = m1.checked_mul(&!off1).unwrap();
 
         let x = x
-            .into_par_iter()
+            .into_iter()
             .filter_map(|r| {
                 let a: TT = r.start & m1;
                 let b: TT = r.end
@@ -301,7 +439,7 @@ where
             .collect::<Vec<_>>();
 
         let y = y
-            .into_par_iter()
+            .into_iter()
             .map(|r| r.0)
             .collect::<Vec<_>>();
 
@@ -331,9 +469,10 @@ where
         coverage: &HpxRanges2D<TT, T, ST>,
     ) -> HpxRanges<ST> {
         let coverage = &coverage.0.ranges2d;
-        let ranges = coverage.x
-            .par_iter()
-            .zip_eq(coverage.y.par_iter())
+       
+        
+        #[cfg(not(target_arch = "wasm32"))]
+        let ranges = coverage.x.par_iter().zip_eq(coverage.y.par_iter())
             // Filter the time ranges to keep only those
             // that intersects with ``x``
             .filter_map(|(t, s)| {
@@ -349,6 +488,20 @@ where
                 Ranges::<ST>::default,
                 |s1, s2| s1.union(&s2),
             );
+
+        #[cfg(target_arch = "wasm32")]
+        let ranges = coverage.x.iter().zip(coverage.y.iter())
+          .filter_map(|(t, s)| {
+              if x.intersects(t) {
+                  Some(s.clone())
+              } else {
+                  None
+              }
+          })
+          // Compute the union of all the 2nd
+          // dim ranges that have been kept
+          .reduce(|s1, s2| s1.union(&s2))
+          .unwrap_or(Default::default());
 
         ranges.into()
     }
@@ -373,8 +526,11 @@ where
         coverage: &HpxRanges2D<TT, T, ST>,
     ) -> MocRanges<TT, T> {
         let coverage = &coverage.0.ranges2d;
-        let t_ranges = coverage.x.par_iter()
-            .zip_eq(coverage.y.par_iter())
+        #[cfg(not(target_arch = "wasm32"))]
+        let it = coverage.x.par_iter().zip_eq(coverage.y.par_iter());
+        #[cfg(target_arch = "wasm32")]
+        let it = coverage.x.iter().zip(coverage.y.iter());
+        let t_ranges = it
             // Filter the time ranges to keep only those
             // that lie into ``x``
             .filter_map(|(t, s)| {

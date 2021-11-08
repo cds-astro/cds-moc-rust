@@ -60,6 +60,7 @@ impl<T: Idx, Q: MocQty<T>> Default for MocRanges<T, Q> {
 impl<'a, T: Idx, Q: MocQty<T>> SNORanges<'a, T> for MocRanges<T, Q> {
 
     type Iter = Iter<'a, Range<T>>;
+    #[cfg(not(target_arch = "wasm32"))]
     type ParIter = rayon::slice::Iter<'a, Range<T>>;
 
     fn is_empty(&self) -> bool {
@@ -70,6 +71,7 @@ impl<'a, T: Idx, Q: MocQty<T>> SNORanges<'a, T> for MocRanges<T, Q> {
         self.0.iter()
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn par_iter(&'a self) -> Self::ParIter {
         self.0.par_iter()
     }

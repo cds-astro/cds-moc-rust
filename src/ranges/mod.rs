@@ -10,7 +10,9 @@ use std::ptr::slice_from_raw_parts;
 
 use num::{Zero, Integer, PrimInt, One};
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
 use crate::{
@@ -24,6 +26,7 @@ pub mod ranges2d;
 pub trait SNORanges<'a, T: Idx>: Sized {
 
     type Iter: Iterator<Item = &'a Range<T>>;
+    #[cfg(not(target_arch = "wasm32"))]
     type ParIter: ParallelIterator<Item = &'a Range<T>>;
 
     fn is_empty(&self) -> bool;
@@ -31,9 +34,11 @@ pub trait SNORanges<'a, T: Idx>: Sized {
     /// The iterator **MUST** return sorted and non-overlapping ranges
     fn iter(&'a self) -> Self::Iter;
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn par_iter(&'a self) -> Self::ParIter;
 
     fn intersects(&self, x: &Range<T>) -> bool;
+    #[cfg(not(target_arch = "wasm32"))]
     fn par_intersects(&'a self, x: &Range<T>) -> bool {
         self.par_iter()
           .map(|r| !(x.start >= r.end || x.end <= r.start))
@@ -43,6 +48,7 @@ pub trait SNORanges<'a, T: Idx>: Sized {
     fn contains_val(&self, x: &T) -> bool;
 
     fn contains(&self, x: &Range<T>) -> bool;
+    #[cfg(not(target_arch = "wasm32"))]
     fn par_contains(&'a self, x: &Range<T>) -> bool {
         self.par_iter()
           .map(|r| x.start >= r.start && x.end <= r.end)
@@ -79,6 +85,7 @@ pub trait SNORanges<'a, T: Idx>: Sized {
 
     /// Performs a logical OR between all the bounds of all ranges,
     /// and returns the number of trailing zeros.
+    #[cfg(not(target_arch = "wasm32"))]
     fn par_trailing_zeros(&'a self) -> u8 {
         let all_vals_or: T = self.par_iter()
           .fold(T::zero, |res, x| res | x.start | x.end)
@@ -117,8 +124,11 @@ impl<T: Idx> Ranges<T> {
     }
 
     /// Internally sorts the input vector and ensures there is no overlapping (or consecutive) ranges.
-    pub fn new_from(mut data: Vec<Range<T>>) -> Self {
+    pub fn new_from(mut data: Vec<Range<T>>) -> Self { 
+        #[cfg(not(target_arch = "wasm32"))]
         (&mut data).par_sort_unstable_by(|left, right| left.start.cmp(&right.start));
+        #[cfg(target_arch = "wasm32")]
+        (&mut data).sort_unstable_by(|left, right| left.start.cmp(&right.start));
         Self::new_from_sorted(data)
     }
 
@@ -151,6 +161,7 @@ impl<T: Idx> Index<usize> for Ranges<T> {
 impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
 
     type Iter = Iter<'a, Range<T>>;
+    #[cfg(not(target_arch = "wasm32"))]
     type ParIter = rayon::slice::Iter<'a, Range<T>>;
 
     fn is_empty(&self) -> bool {
@@ -161,6 +172,7 @@ impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
         self.0.iter()
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn par_iter(&'a self) -> Self::ParIter {
         self.0.par_iter()
     }

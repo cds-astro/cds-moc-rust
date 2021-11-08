@@ -28,7 +28,7 @@ wasm-bindgen = { version = "0.2.75", features = ["serde-serialize"]  }
 wasm-bindgen-futures = "0.4.25"
 js-sys = "0.3.52"
 unreachable = "0.1" # Added for wasm size optimization, see  https://rustwasm.github.io/book/reference/code-size.html
-
+console_error_panic_hook = "0.1.7"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.0"

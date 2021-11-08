@@ -38,6 +38,7 @@ use crate::moc2d::{
 pub mod common;
 pub mod error;
 pub mod keywords;
+pub mod multiordermap;
 
 #[derive(Debug)]
 pub enum MocIdxType<R: BufRead> {

@@ -3,6 +3,7 @@ use std::cmp;
 use std::ops::Range;
 use std::collections::HashSet;
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 use crate::idx::Idx;
@@ -373,6 +374,7 @@ impl<T: Idx, S: Idx> Ranges2D<T, S> {
 
 impl<'a, T: Idx, S: Idx> SNORanges2D<'a, T, S> for Ranges2D<T, S> {
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn make_consistent(mut self) -> Self {
         if !self.is_empty() {
             let mut sorted_time_bound_ranges = self.x.par_iter()
@@ -436,14 +438,87 @@ impl<'a, T: Idx, S: Idx> SNORanges2D<'a, T, S> for Ranges2D<T, S> {
         self
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn make_consistent(mut self) -> Self {
+        if !self.is_empty() {
+            let mut sorted_time_bound_ranges = self.x.iter()
+              .enumerate()
+              .map(|(idx, t)| {
+                  let start_b = BoundRange::new(t.start, idx, true);
+                  let end_b = BoundRange::new(t.end, idx, false);
+                  vec![start_b, end_b]
+              })
+              .flatten()
+              .collect::<Vec<_>>();
+
+            (&mut sorted_time_bound_ranges).sort_unstable_by(|l, r| {
+                l.cmp(r)
+            });
+
+            let mut time_ranges = vec![];
+            let mut spatial_coverages = vec![];
+
+            let mut ranges_idx = HashSet::new();
+            ranges_idx.insert(0);
+            let mut prev_time_bound = sorted_time_bound_ranges
+              .first()
+              .unwrap()
+              .x;
+            for time_bound in sorted_time_bound_ranges.iter().skip(1) {
+                let cur_time_bound = time_bound.x;
+
+                if cur_time_bound > prev_time_bound && !ranges_idx.is_empty() {
+                    let spatial_coverage = ranges_idx.iter()
+                      .map(|coverage_idx| self.y[*coverage_idx].clone())
+                      .reduce(|s1, s2| s1.union(&s2))
+                      .unwrap_or(Ranges::<S>::default());
+
+                    time_ranges.push(prev_time_bound..cur_time_bound);
+                    spatial_coverages.push(spatial_coverage);
+                }
+
+                if time_bound.start {
+                    // A new time range begins, we add its S-MOC idx
+                    // to the set
+                    ranges_idx.insert(time_bound.y_idx);
+                } else {
+                    ranges_idx.remove(&time_bound.y_idx);
+                }
+
+                prev_time_bound = cur_time_bound;
+            }
+
+            // Time ranges are not overlapping anymore but can be next
+            // to each other.
+            // One must check if they are equal and if so, merge them.
+            self.compress(time_ranges, spatial_coverages);
+        }
+
+        self
+    }
+
     fn is_empty(&self) -> bool {
         self.x.is_empty()
     }
 
     fn contains(&self, time: T, range: &Range<S>) -> bool {
         // Check whether the time lies in the ranges of the `T` dimension
+        #[cfg(not(target_arch = "wasm32"))]
         let in_first_dim = self.x
           .par_iter()
+          .enumerate()
+          .filter_map(|(idx, r)| {
+              let in_time_range = time >= r.start && time <= r.end;
+              if in_time_range {
+                  Some(idx)
+              } else {
+                  None
+              }
+          })
+          .collect::<Vec<_>>();
+        #[cfg(target_arch = "wasm32")]
+          let in_first_dim = self.x
+          .iter()
           .enumerate()
           .filter_map(|(idx, r)| {
               let in_time_range = time >= r.start && time <= r.end;

@@ -2,6 +2,7 @@
 use std::ops::Range;
 use std::marker::PhantomData;
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 use crate::idx::Idx;
@@ -130,6 +131,7 @@ impl<TT, T, ST, S> Moc2DRanges<TT, T, ST, S>
   ///
   /// If the `NestedRanges2D<T, S>` is empty, the depth returned
   /// is set to (0, 0)
+  #[cfg(not(target_arch = "wasm32"))]
   pub fn compute_min_depth(&self) -> (u8, u8) {
     let y = self.ranges2d.y
       .par_iter()
@@ -149,6 +151,43 @@ impl<TT, T, ST, S> Moc2DRanges<TT, T, ST, S>
         // then look at the trailing zeros (in the compute_min_depth method)
         .fold_with(TT::zero(), |acc, range| acc | range.start | range.end)
         .reduce(TT::zero, |a, b| a | b)
+    );
+
+    (x, y)
+  }
+
+  /// Compute the smallest possible depth of the coverage
+  ///
+  /// # Returns
+  ///
+  /// A tuple containing two values:
+  ///
+  /// * The maximum depth along the `T` axis
+  /// * The maximum depth along the `S` axis
+  ///
+  /// # Info
+  ///
+  /// If the `NestedRanges2D<T, S>` is empty, the depth returned
+  /// is set to (0, 0)
+  #[cfg(target_arch = "wasm32")]
+  pub fn compute_min_depth(&self) -> (u8, u8) {
+    let y = self.ranges2d.y
+      .iter()
+      // Compute the depths of the Ranges<S>
+      .map(|ranges| MocRanges::<ST, S>::compute_min_depth_gen(ranges))
+      // Get the max of these depths
+      .max()
+      // If there are no ranges, the max depth
+      // along the second dimension is set to 0
+      .unwrap_or(0);
+
+    // The computation is very light (logical OR), so I wonder about the the cost (overhead)
+    // of the parallelization here (except for very large MOCs)...
+    let x = T::compute_min_depth(
+        self.ranges2d.x.iter()
+        // Perform a logical 'or' between (upper and lower bounds of) all indices of the first dimension
+        // then look at the trailing zeros (in the compute_min_depth method)
+        .fold(TT::zero(), |acc, range| acc | range.start | range.end)
     );
 
     (x, y)

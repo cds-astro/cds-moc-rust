@@ -26,42 +26,85 @@
       </br>
       <label>ST-MOCs from local FITS/JSON/ASCII:</label>
       <button onclick="moc.fromLocalFile('space-time');">Load ST-MOC</button>
+      </br>
+      <label>MOC from local multi-order-map (FITS):</label>
+      <button onclick="moc.fromLocalMultiOrderMap(0.0, 0.9, false, false, false, false);">Load MultiOrderMap</button>
     </p>
     <p>
       Try copy/paste and exec the following lines of javascript from your web-browser console:
       <pre>
-// Load 2MASS and SDSS DR12 MOCs from CDS      
-await moc.fromFitsUrl('2mass', 'http://alasky.u-strasbg.fr/footprints/tables/vizier/II_246_out/MOC');
-await moc.fromFitsUrl('sdss12', 'http://alasky.u-strasbg.fr/footprints/tables/vizier/V_147_sdss12/MOC');
+(async () => {      
+  // Load 2MASS and SDSS DR12 MOCs from CDS      
+  await moc.fromFitsUrl('2mass', 'http://alasky.u-strasbg.fr/footprints/tables/vizier/II_246_out/MOC');
+  await moc.fromFitsUrl('sdss12', 'http://alasky.u-strasbg.fr/footprints/tables/vizier/V_147_sdss12/MOC');
+  
+  // List MOCs loaded in the page
+  console.log(moc.list());
+        
+  // Init a timer
+  console.time('timer');
+  // Performs MOC intersection
+  moc.and('2mass', 'sdss12', '2mass_inter_sdss12');
+  // Log time
+  console.timeLog('timer', 'Intersection');
+  // Performs MOC union
+  moc.or('2mass', 'sdss12', '2mass_union_sdss12');
+  // Log time
+  console.timeLog('timer', 'Union');
+  // Degrade to order 2 the result of the intersection      
+  moc.degrade('2mass_inter_sdss12', 2, '2mass_inter_sdss12_d2')
+  // Remove timer
+  console.timeEnd('timer');
+        
+  // List MOCs loaded in the page
+  console.log(moc.list());
+        
+  // Print the ASCII and JSON serializations of '2mass_inter_sdss12_d2'
+  console.log(moc.toAscii('2mass_inter_sdss12_d2'));
+  console.log(moc.toJson('2mass_inter_sdss12_d2'));
+  
+  // Save the result of the intersection in a FITS file
+  moc.toFitsFile('2mass_inter_sdss12');
+  return;
+})();
+      </pre>
+    </p>
+    <p>
+      Try copy/paste and exec the following lines of javascript to manipulate multi-order maps
+      (no CORS on cdsxmatch, so the data URL works only if this page URL is on cdsxmatch)
+      <pre>
+var n;
+(async () => {
+  // Load a multi-order map and create a MOC on-the-fly
+  await moc.fromMultiOrderMapFitsUrl('lalmap', 'http://cdsxmatch.u-strasbg.fr/lab/moc/LALInference.multiorder.fits', 0.0, 0.9, false, false, false, false);
+  // List MOCs loaded in the page
+  console.log(moc.list());
 
-// List MOCs loaded in the page
-console.log(moc.list());
-      
-// Init a timer
-console.time('timer');
-// Performs MOC intersection
-moc.and('2mass', 'sdss12', '2mass_inter_sdss12');
-// Log time
-console.timeLog('timer', 'Intersection');
-// Performs MOC union
-moc.or('2mass', 'sdss12', '2mass_union_sdss12');
-// Log time
-console.timeLog('timer', 'Union');
-// Degrade to order 2 the result of the intersection      
-moc.degrade('2mass_inter_sdss12', 2, '2mass_inter_sdss12_d2')
-// Remove timer
-console.timeEnd('timer');
-      
-// List MOCs loaded in the page
-console.log(moc.list());
-      
-// Print the ASCII and JSON serializations of '2mass_inter_sdss12_d2'
-console.log(moc.toAscii('2mass_inter_sdss12_d2'));
-console.log(moc.toJson('2mass_inter_sdss12_d2'));
+  // Init a timer
+  console.time('timer');
 
-// Save the result of the intersection in a FITS file
-moc.toFitsFile('2mass_inter_sdss12');
+  // Count the number of disjoint MOCs in the MOC
+  n = moc.splitCount('lalmap');
+  console.log("n sub_mocs: " + n);
+  console.timeLog('timer', 'Spit count'); 
+
+  // Do split the MOC in 10 sub-MOCs
+  moc.split('lalmap', 'lalmap_sub');
+  console.timeLog('timer', 'Spit'); 
+  // Remove timer
+  console.timeEnd('timer');
+
+  // List MOCs loaded in the page
+  console.log(moc.list()); 
+
+  // Get info on sub-MOCs
+  for (let i = 0; i < n; i++) {  
+    console.log("Coverage percentage sub " + i  + ": " + moc.info("lalmap_sub_" + i).coverage_percentage);
+  }
+  return;
+})();
       </pre>
     </p>
   </body>
 </html>
+
