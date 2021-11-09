@@ -2,7 +2,7 @@
 
 ## 0.2.0
 
-Released 2021-08-16.
+Released 2021-11-09.
 
 * Add `split` operation on S-MOCs
 

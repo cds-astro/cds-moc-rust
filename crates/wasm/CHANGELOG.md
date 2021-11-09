@@ -2,7 +2,7 @@
 
 ## 0.2.0
 
-Released 2021-xx-xx.
+Released 2021-11-09.
 
 ### Added
 
