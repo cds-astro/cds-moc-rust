@@ -68,6 +68,9 @@ quick_error! {
     ElemNotFound(elem: String, line: String) {
       display("Element '{}' not found in '{}'.", elem, line)
     }
+    NotValid {
+      display("The ascci MOC is not valid (contains overlapping elements)")
+    }
   }
 }
 
@@ -270,12 +273,16 @@ pub fn from_ascii_ivoa<T, Q>(input: &str) -> Result<CellOrCellRangeMOC<T, Q>, As
   // Sort the list
   //println!("MOC before sort {:?}", &moc);
   moc.sort_by(|a, b| a.flat_cmp::<Q>(b));
-  /*println!("MOC after sort {:?}", &moc);
-  let v: Vec<Range<T>> = moc.iter().map(|e| MocRange::<T, Q>::from(e).0).collect();
-  println!("MOC ranges {:?}", &v);*/
+  //println!("MOC after sort {:?}", &moc);
+  //let v: Vec<Range<T>> = moc.iter().map(|e| MocRange::<T, Q>::from(e).0).collect();
+  //println!("MOC ranges {:?}", &v);
 
   // Check non-overlaping property
-  // TODO: add check for non-overlaping ranges?
+  for (e1, e2) in moc.iter().zip(moc.iter().skip(1)) {
+    if e1.overlap::<Q>(e2) {
+      return Err(AsciiError::NotValid);
+    }
+  }
   // Return the result
   Ok(CellOrCellRangeMOC::new(depth_max, MocCellOrCellRanges::new(CellOrCellRanges::new(moc))))
 }
@@ -536,6 +543,28 @@ mod tests {
     assert_eq!(cellit.next(), None);
   }
 
+  #[test]
+  fn test_from_ascii_ivoa_v2() {
+    //let smoc_ascii = "5/8-10 42-46 54 8 6/4500 8/45";
+    let smoc_ascii = "5/8-10 42-46 54 6/4500 8/45";
+    let smoc = from_ascii_ivoa::<u64, Hpx::<u64>>(&smoc_ascii).unwrap();
+    let mut rit = smoc.into_cellcellrange_moc_iter().ranges();
+    assert_eq!(rit.depth_max(), 8);
+    assert_eq!(rit.next(), Some(197912092999680..202310139510784));
+    assert_eq!(rit.next(), Some(2251799813685248..3096224743817216));
+    assert_eq!(rit.next(), Some(11821949021847552..13229323905400832));
+    assert_eq!(rit.next(), Some(15199648742375424..15481123719086080));
+    assert_eq!(rit.next(), Some(316659348799488000..316729717543665664));
+    assert_eq!(rit.next(), None);
+  }
+
+  #[test]
+  fn test_from_ascii_ivoa_not_valid() {
+    let smoc_ascii = "5/8-10 42-46 54 8 6/4500 8/45";
+    assert!(from_ascii_ivoa::<u64, Hpx::<u64>>(&smoc_ascii).is_err());
+  }
+  
+  
   #[test]
   fn test_fromto_ascii_ivoa() {
     let rm = RangeMOC::new(29,

@@ -6,6 +6,7 @@ use crate::qty::MocQty;
 
 use super::cell::{Cell, MocCell};
 use super::cellrange::{CellRange, MocCellRange};
+use super::range::MocRange;
 
 /// The motivation for this enum is the ASCII serialization which looks like:
 /// > 3/3 10 4/16-18 22 5/19-20 17/222 28/123456789 29/
@@ -36,6 +37,12 @@ impl<T: Idx> CellOrCellRange<T> {
             Ordering::Less => i_l.unsigned_shl(Q::shift(d2 - d1) as u32).cmp(i_r),
             Ordering::Greater => i_l.cmp(&i_r.unsigned_shl(Q::shift(d1 - d2) as u32)),
         }
+    }
+    
+    pub fn overlap<Q: MocQty<T>>(&self, other: &Self) -> bool {
+        let range1: MocRange::<T, Q> = self.into();
+        let range2: MocRange::<T, Q> = other.into();
+        !(range1.0.end <= range2.0.start || range2.0.end <= range1.0.start)
     }
 }
 

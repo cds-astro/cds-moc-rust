@@ -197,7 +197,12 @@ fn from_json_aladin_internal<T, Q>(value: &Value) -> Result<CellMOC<T, Q>, Box<d
       // Sort the cell list
       cells.sort_by(|a, b| a.flat_cmp::<Q>(b));
       // Check for non-overlapping cells
-      // TODO: add non-overlapping check
+      for (e1, e2) in cells.iter().zip(cells.iter().skip(1)) {
+        if e1.overlap::<Q>(e2) {
+          return Err(String::from("The json MOC is not valid (contains overlapping elements").into());
+        }
+      }
+      
       Ok(CellMOC::new(depth_max, MocCells::new(Cells::new(cells))))
     },
     _ => Err(format!("Wrong JSON root type. Expected: Object. Actual: {:?}", &value).into()),

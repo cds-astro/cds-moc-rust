@@ -2,10 +2,11 @@
 
 ## 0.6.0
 
-Released 2021-XX-XX
+Released 2021-11-15
 
 ### Added
 
+* Add well formed ASCII/Json tests at deserialization
 * `Split` a disjoint MOC into joint MOCs
 * Add direct support for FITS Multi-Order Map
 

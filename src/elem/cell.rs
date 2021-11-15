@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 
 use crate::idx::Idx;
 use crate::qty::{MocQty, Hpx};
+use crate::elem::range::MocRange;
 
 /// A MOC cell, i.e. an index at a given depth.
 /// Without attached quantities, we do not know the shift from one depth to another, and
@@ -54,6 +55,12 @@ impl<T: Idx> Cell<T> {
     /// To generic uniq numbering (natural order follow the z-order curve, mixing resolutions)
     pub fn zuniq<Q: MocQty<T>>(&self) -> T {
         Q::to_zuniq(self.depth, self.idx)
+    }
+
+    pub fn overlap<Q: MocQty<T>>(&self, other: &Self) -> bool {
+        let range1: MocRange::<T, Q> = self.into();
+        let range2: MocRange::<T, Q> = other.into();
+        !(range1.0.end <= range2.0.start || range2.0.end <= range1.0.start)
     }
 }
 impl<T: Idx, Q: MocQty<T>> From<MocCell<T, Q>> for Cell<T> {
