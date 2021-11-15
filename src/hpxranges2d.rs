@@ -409,7 +409,6 @@ where
     /// - `d2` must be valid (within `[0, <S>::MAXDEPTH]`)
     /// - `x` and `y` must have the same size.
     /// - `x` must contain `[a..b]` ranges where `b > a`.
-    #[cfg(target_arch = "wasm32")]
     pub fn create_from_time_ranges_spatial_coverage(
         x: Vec<Range<TT>>,
         y: Vec<HpxRanges<ST>>,

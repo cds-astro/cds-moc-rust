@@ -1,5 +1,13 @@
 # `moc` Change Log
 
+## 0.6.1
+
+Released 2021-11-15
+
+### Modification
+
+* Remove the wasm/nowasm `create_from_time_ranges_spatial_coverage` instead of wasm only (used in MOCPy) 
+
 ## 0.6.0
 
 Released 2021-11-15
