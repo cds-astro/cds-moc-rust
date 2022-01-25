@@ -119,6 +119,7 @@ toJsonFile(name, fold: null|int)
 # Create MOC
 # - create a S-MOC from a geometric shape
 fromCone(name, depth, lon_deg, lat_deg, radius_deg) 
+fromRing(name, depth, lon_deg, lat_deg, internal_radius_deg, external_radius_deg) 
 fromEllipse(name, depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)
 fromZone(name, depth, lon_deg_min, lat_deg_min, lon_deg_max, lat_deg_max)
 fromBox(name, depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)
@@ -141,8 +142,12 @@ extend(name, out_name)
 contract(name, out_name)
 externalBorder(name, out_name)
 internalBorder(name, out_name)
+# -- split considering the 4 direct neighbours (NE, NW, SE, SW) as being part of the same region
 splitCount(name)
 split(name, out_name_prefix)
+# -- split considering the 4 direct neighbours (NE, NW, SE, SW) plus the 4 indirect neighbours (S, N, E, W) as being part of the same region
+splitIndirectCount(name)
+splitIndirect(name, out_name_prefix)
 
 # Two MOCs operations
 or/union(left_name, right_name, out_name)

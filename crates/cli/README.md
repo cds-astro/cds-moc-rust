@@ -107,17 +107,25 @@ USAGE:
 [...]
 
 SUBCOMMANDS:
-    box          Create a Spatial MOC from the given box
-    cone         Create a Spatial MOC from the given cone
-    ellipse      Create a Spatial MOC from the given elliptical cone
-    help         Prints this message or the help of the given subcommand(s)
-    polygon      Create a Spatial MOC from the given polygon
-    pos          Create a Spatial MOC from a list of positions in decimal degrees (one pair per line, longitude
-                 first, then latitude)
-    timerange    Create a Time MOC from a list of time range (one range per line, lower bound first, then upper
-                 bound)
-    timestamp    Create a Time MOC from a list of timestamp (one per line)
-    zone         Create a Spatial MOC from the given zone
+    box             Create a Spatial MOC from the given box
+    cone            Create a Spatial MOC from the given cone
+    ellipse         Create a Spatial MOC from the given elliptical cone
+    help            Prints this message or the help of the given subcommand(s)
+    polygon         Create a Spatial MOC from the given polygon
+    pos             Create a Spatial MOC from a list of positions in decimal degrees (one pair per line, longitude
+                    first, then latitude)
+    ring            Create a Spatial MOC from the given ring
+    timerange       Create a Time MOC from a list of time range (one range per line, lower bound first, then upper
+                    bound)
+    timerangepos    Create a Space-Time MOC from a list of time range and positions in decimal degrees (tmin first,
+                    then tmax, then longitude, and latitude)..
+    timestamp       Create a Time MOC from a list of timestamp (one per line)
+    timestamppos    Create a Space-Time MOC from a list of timestamp and positions in decimal degrees (timestamp
+                    first, then longitude, then latitude)..
+    vuniq           Create a Spatial MOC from a list of (non-overlapping) uniq cells associated with values (uniq
+                    first, then value), i.e. from a multi-resolution map, putting completeness constraints
+    zone            Create a Spatial MOC from the given zone
+
 ```
 
 `moc op --help`:
@@ -140,6 +148,8 @@ SUBCOMMANDS:
     minus         Performs the logical operation 'AND(left, NOT(right))' between 2 MOCs (= left minus right)
     sfold         Returns the union of the T-MOCs associated to S-MOCs intersecting the given S-MOC. Left: S-MOC,
                   right: ST-MOC, res: T-MOC
+    split         Split the disjoint parts of the MOC into distinct MOCs, SMOC only. WARNING: this may create a lot
+                  of files, use first option `--count`
     tfold         Returns the union of the S-MOCs associated to T-MOCs intersecting the given T-MOC. Left: T-MOC,
                   right: ST-MOC, res: S-MOC
     union         Performs a logical 'OR' between 2 MOCs (= MOC union)
@@ -158,6 +168,7 @@ moc info my_res.fits
 
 moc from cone 11 0.0 +0.0 0.1 ascii --fold 50 my_cone.ascii
 moc convert -t smoc my_cone.ascii fits -f my_cone.fits
+moc from ring 10 13.158329 -72.80028  5.64323 10.0 ascii --fold 80
 ```
 
 Building a MOC from the [Hipparcos](https://vizier.u-strasbg.fr/viz-bin/VizieR-3?-source=I/239/hip_main&-out.max=50&-out.form=HTML%20Table&-out.add=_r&-out.add=_RAJ,_DEJ&-sort=_r&-oc.form=sexa)
