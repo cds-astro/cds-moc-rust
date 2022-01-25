@@ -1,6 +1,6 @@
 [package]
 name = "moc-cli"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = """
 moc is a command-line to create and manipulate HEALPix
@@ -27,10 +27,8 @@ test = false
 moclib = { package = "moc", path = "../.." }
 num = "0.4"
 structopt = "0.3"
-healpix = { package = "cdshealpix", version = "0.5.5" }
-# healpix = { package = "cdshealpix", path = "../../rust-healpix" }
+healpix = { package = "cdshealpix", version = "0.6.0" }
 rayon = "1.5.1"
-# chrono = "0.4" # To parse ISO date-time
 time = { version = "0.3.3", features = ["parsing"] }
 
 [package.metadata.deb]
@@ -56,4 +54,3 @@ extended-description = """\
 moc-cli is a command-line to create and manipulate HEALPix
 Multi-Order Coverages maps (MOCs), see https://ivoa.net/documents/MOC/.
 """
-

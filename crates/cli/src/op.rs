@@ -48,6 +48,9 @@ pub enum Op {
   /// Split the disjoint parts of the MOC into distinct MOCs, SMOC only.
   /// WARNING: this may create a lot of files, use first option `--count`.
   Split {
+    #[structopt(short = "-i", long = "--8neigh")]
+    /// Account for indirect neighbours (8-neigh) instead of direct neighbours (4-neigh) only.
+    indirect_neigh: bool,
     #[structopt(short = "-c", long = "--count")]
     /// Only prints the number of disjoint MOCs (security before really executing the task)
     count: bool,
@@ -99,7 +102,7 @@ impl Op {
     match self {
       Op::Complement(op) => op.exec(Op1::Complement),
       Op::Degrade { new_depth, op } => op.exec(Op1::Degrade { new_depth }),
-      Op::Split{ count, op } => op.exec(Op1::Split { count }),
+      Op::Split{ indirect_neigh, count, op } => op.exec(Op1::Split { indirect_neigh, count }),
       Op::Extend(op) => op.exec(Op1::Extend),
       Op::Contract(op) => op.exec(Op1::Contract),
       Op::ExtBorder(op) => op.exec(Op1::ExtBorder),
@@ -193,7 +196,7 @@ fn op1_exec_on_fits_timehpx<T: Idx>(
 pub enum Op1 {
   Complement,
   Degrade { new_depth: u8 },
-  Split { count: bool},
+  Split { indirect_neigh: bool, count: bool },
   Extend,
   Contract,
   ExtBorder,
@@ -224,8 +227,8 @@ impl Op1 {
     match self {
       Op1::Complement => out.write_smoc_possibly_converting_to_u64(moc_it.not()),
       Op1::Degrade  { new_depth } =>  out.write_smoc_possibly_converting_to_u64(moc_it.degrade(new_depth)), // out.write_smoc_converting(moc_it.degrade(new_depth)),
-      Op1::Split { count }=> {
-        let mocs = moc_it.into_range_moc().split_into_joint_mocs();
+      Op1::Split { indirect_neigh, count }=> {
+        let mocs = moc_it.into_range_moc().split_into_joint_mocs(indirect_neigh);
         if count {
           println!("{}", mocs.len());
         } else {
@@ -872,6 +875,7 @@ mod tests {
   #[test]
   fn test_split_bayestar() {
     let from = Op::Split {
+      indirect_neigh: false,
       count: false,//  true,
       op: Op1Args {
         input: PathBuf::from("test/resources/MOC_0.9_bayestar.multiorder.fits"),

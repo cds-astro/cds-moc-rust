@@ -69,6 +69,7 @@ extern "C" {
   fn log(s: &str);
 }
 
+
 /// Activate debugging mode (Rust stacktrace)
 #[wasm_bindgen(js_name = "debugOn")]
 pub fn debug_on() {
@@ -672,6 +673,31 @@ pub fn from_cone(name: &str, depth: u8,  lon_deg: f64, lat_deg: f64, radius_deg:
   }
 }
 
+#[wasm_bindgen(js_name = "fromRing", catch)]
+pub fn from_ring(
+  name: &str,
+  depth: u8,
+  lon_deg: f64,
+  lat_deg: f64,
+  internal_radius_deg: f64,
+  external_radius_deg: f64
+) ->  Result<(), JsValue> {
+  let lon = lon_deg2rad(lon_deg)?;
+  let lat = lat_deg2rad(lat_deg)?;
+  let r_int = internal_radius_deg.to_radians();
+  let r_ext = external_radius_deg.to_radians();
+  if r_int <= 0.0 || PI <= r_int {
+    Err(JsValue::from_str("Internal radius must be in ]0, pi["))
+  } else if r_ext <= 0.0 || PI <= r_ext {
+    Err(JsValue::from_str("External radius must be in ]0, pi["))
+  } else if r_ext < r_int {
+    Err(JsValue::from_str("External radius must be larger than the internal radius"))
+  } else {
+    let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_ring(lon, lat, r_int, r_ext, depth, 2);
+    store::add(name, InternalMoc::Space(moc))
+  }
+}
+
 #[wasm_bindgen(js_name = "fromEllipse", catch)]
 pub fn from_elliptical_cone(
   name: &str, depth: u8,  
@@ -895,16 +921,32 @@ pub fn complement(moc: &str, res_name: &str) -> Result<(), JsValue> {
 }
 
 /// Split the given disjoint S-MOC int joint S-MOCs.
+/// Split "direct", i.e. we consider 2 neighboring cells to be the same only if the share an edge.
 /// WARNING: may create a lot of new MOCs, exec `splitCount` first!!
 #[wasm_bindgen(catch)]
 pub fn split(moc: &str, res_name: &str) -> Result<(), JsValue> {
   op1(moc, Op1::Split, res_name)
 }
-/// Count the number of joint S-MOC splitting the given disjoint S-MOC.
+/// Count the number of joint S-MOC splitting ("direct") the given disjoint S-MOC.
 #[wasm_bindgen(js_name = "splitCount", catch)]
 pub fn split_count(moc: &str) -> Result<u32, JsValue> {
-  op1_count_split(moc)
+  op1_count_split(moc, false)
 }
+
+/// Split the given disjoint S-MOC int joint S-MOCs.
+/// Split "indirect", i.e. we consider 2 neighboring cells to be the same if the share an edge
+/// or a vertex.
+/// WARNING: may create a lot of new MOCs, exec `splitIndirectCount` first!!
+#[wasm_bindgen(js_name = "splitIndirect", catch)]
+pub fn split_indirect(moc: &str, res_name: &str) -> Result<(), JsValue> {
+  op1(moc, Op1::SplitIndirect, res_name)
+}
+/// Count the number of joint S-MOC splitting ("direct") the given disjoint S-MOC.
+#[wasm_bindgen(js_name = "splitIndirectCount", catch)]
+pub fn split_indirect_count(moc: &str) -> Result<u32, JsValue> {
+  op1_count_split(moc, true)
+}
+
 
 #[wasm_bindgen(catch)]
 pub fn degrade(moc: &str, new_depth: u8, res_name: &str) -> Result<(), JsValue> {

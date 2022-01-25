@@ -8,13 +8,14 @@ use std::num::TryFromIntError;
 
 use healpix::nested::{
   cone_coverage_approx_custom,
+  ring_coverage_approx_custom,
   elliptical_cone_coverage_custom,
   polygon_coverage,
   custom_polygon_coverage,
   zone_coverage,
   box_coverage,
   append_external_edge,
-  external_edge_struct,
+  external_edge, external_edge_struct,
   bmoc::BMOC,
 };
 use healpix::sph_geom::ContainsSouthPoleMethod;
@@ -322,6 +323,14 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   }
 
   /// Split the disjoint MOC into joint MOCs.
+  /// # Param
+  ///   `includeIndirectNeighbours`: see [this page](http://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/connect.html),
+  ///     by default we use a 4-connectivity (i.e. we consider only direct-neighbours, 
+  ///     i.e. neighbouring cells sharing an edge with the central cell). 
+  ///     It makes sense if we consider the contours when splitting a MOC.
+  ///     Setting `includeIndirectNeighbours` to `true` we consider the indirect-neighbours, i.e.
+  ///     the cell only sharing a vertex with the central cell, as been part of the same MOC.
+  ///   
   /// # Algo description
   /// * We work on zuniq indices (i.e. special uniq notation for which the natural order follows
   ///  the z-order curve order, mixing the various resolutions), shifted of one bit to the left
@@ -334,7 +343,29 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   /// * We form a new MOC from all marked cells that we put in a list,
   /// * and we remove them from the original MOC.
   /// * We continue the process with the updated original MOC
-  pub fn split_into_joint_mocs(&self) -> Vec<CellMOC<T, Hpx<T>>> {
+  pub fn split_into_joint_mocs(&self, include_indirect_neighbours: bool) -> Vec<CellMOC<T, Hpx<T>>> {
+    if include_indirect_neighbours {
+      self.split_into_joint_mocs_gen(|depth, idx, delta_depth| external_edge(depth, idx, delta_depth))
+    } else {
+      self.split_into_joint_mocs_gen(
+        |depth, idx, delta_depth| {
+          let ext_edge = external_edge_struct(depth, idx, delta_depth);
+          ext_edge.get_edge(&Ordinal::SE).iter()
+            .chain(ext_edge.get_edge(&Ordinal::SW).iter())
+            .chain(ext_edge.get_edge(&Ordinal::NE).iter())
+            .chain(ext_edge.get_edge(&Ordinal::NW).iter())
+            .cloned()
+            .collect::<Vec<u64>>()
+            .into_boxed_slice()
+        }
+      )
+    }
+  } 
+  
+  fn split_into_joint_mocs_gen<F>(&self, fn_neighbours: F) -> Vec<CellMOC<T, Hpx<T>>>
+    where
+      F: Fn(u8, u64, u8) -> Box<[u64]>
+  {
     let mut elems: Vec<T> = (&self).into_range_moc_iter()
       .cells()
       .map(|cell| cell.zuniq::<Hpx<T>>() << 1)// add the "already_visit" bit set to 0
@@ -353,12 +384,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
         let zuniq = stack.pop().unwrap(); // Unwrap ok since the loop ensures the stack is not empty
         let Cell { depth, idx} = Cell::<T>::from_zuniq::<Hpx<T>>(zuniq);
         let mut stack_changed = false;
-        let ext_edge = external_edge_struct(depth, idx.to_u64(), self.depth_max - depth);
-        // for neig in external_edge(depth, idx.to_u64(), self.depth_max - depth).into_iter() { //_sorted
-        for neig in ext_edge.get_edge(&Ordinal::SE).iter()
-          .chain(ext_edge.get_edge(&Ordinal::SW).iter())
-          .chain(ext_edge.get_edge(&Ordinal::NE).iter())
-          .chain(ext_edge.get_edge(&Ordinal::NW).iter()) { // Not the most efficient impl in the word... :o/
+        for neig in fn_neighbours(depth, idx.to_u64(), self.depth_max - depth).iter() {
           let neig = T::from_u64(*neig);
           let neig_zuniq = <Hpx<T>>::to_zuniq(self.depth_max, neig) << 1;
           match elems.binary_search(&neig_zuniq) {
@@ -468,9 +494,9 @@ impl RangeMOC<u64, Hpx<u64>> {
   }
 
   /// # Input
-  /// - `cone_lon` the longitude of the center of the cone, in radians
-  /// - `cone_lat` the latitude of the center of the cone, in radians
-  /// - `cone_radius` the radius of the cone, in radians
+  /// - `lon` the longitude of the center of the cone, in radians
+  /// - `lat` the latitude of the center of the cone, in radians
+  /// - `radius` the radius of the cone, in radians
   /// - `depth`: the MOC depth
   /// - `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
@@ -496,6 +522,22 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// - if this layer depth + `delta_depth` > the max depth (i.e. 29)
   pub fn from_elliptical_cone(lon: f64, lat: f64, a: f64, b: f64, pa: f64, depth: u8, delta_depth: u8) -> Self {
     Self::from(elliptical_cone_coverage_custom(depth, delta_depth, lon, lat, a, b, pa))
+  }
+
+  /// # Input
+  /// - `lon` the longitude of the center of the ring, in radians
+  /// - `lat` the latitude of the center of the ring, in radians
+  /// - `radius_int` the internal radius of the ring, in radians
+  /// - `radius_ext` the external radius of the ring, in radians
+  /// - `depth`: the MOC depth
+  /// - `delta_depth` the difference between the MOC depth and the depth at which the computations
+  ///   are made (should remain quite small).
+  ///
+  /// # Panics
+  /// * If this layer depth + `delta_depth` > the max depth (i.e. 29)
+  /// * If `radius_ext < radius_int`
+  pub fn from_ring(lon: f64, lat: f64, radius_int: f64, radius_ext: f64, depth: u8, delta_depth: u8) -> Self {
+    Self::from(ring_coverage_approx_custom(depth, delta_depth, lon, lat, radius_int, radius_ext))
   }
 
   /// # Input

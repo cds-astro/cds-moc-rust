@@ -788,7 +788,10 @@ fn from_fits_nuniq<T, R>(
   }
   let mut v: Vec<Cell<T>> = Vec::with_capacity(n_elems);
   for _ in 0..n_elems {
-    v.push(Cell::from_uniq_hpx(T::read::<_, BigEndian>(&mut reader)?));
+    let uniq = T::read::<_, BigEndian>(&mut reader)?;
+    if uniq > T::zero() { // Bug in Aladin writting extra uniq of values set to 0!!
+      v.push(Cell::from_uniq_hpx(uniq));
+    }
   }
   v.sort_by(|a, b| a.flat_cmp::<Hpx::<T>>(b));
   Ok(CellMOC::new(depth_max, MocCells::<T, Hpx::<T>>::new(Cells::new(v))))
@@ -1138,6 +1141,23 @@ mod tests {
     }
   }
 
+  #[test]
+  fn test_read_v2_smoc_uniq_fits() {
+    let path_buf1 = PathBuf::from("resources/MOC2.0/GW190425.fits");
+    let path_buf2 = PathBuf::from("../resources/MOC2.0/GW190425.fits");
+    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let reader = BufReader::new(file);
+    match from_fits_ivoa(reader) {
+      Ok(MocIdxType::U32(MocQtyType::Hpx(MocType::Cells(moc1)))) => {
+        assert_eq!(moc1.depth_max(), 8);
+        assert_eq!(875, moc1.len());
+      }
+      Err(e) => println!("{}", e),
+      _ => assert!(false),
+    }
+    
+  }
+  
   #[test]
   fn test_read_v1_smoc_fits() {
     let path_buf1 = PathBuf::from("resources/MOC2.0/SMOC_test.fits");

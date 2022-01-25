@@ -1,5 +1,20 @@
 # `moc` Change Log
 
+## 0.7.0
+
+Released 2022-01-XX
+
+### Added
+
+* Add MOC fromm ring
+* Add the possibility to choose indirect neighbours (8, instead of the 4 direct neighbours) when splitting a MOC
+
+### Enhancement
+
+* Make FITS deserialization more robust for UNIQ indices
+  (to cope with a -- now fixed -- Aladin bug adding trailing '0' uniq indices)  
+
+
 ## 0.6.1
 
 Released 2021-11-15

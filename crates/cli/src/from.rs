@@ -71,6 +71,22 @@ pub enum From {
     out: OutputFormat
     // add option: inside / overallaping / partially_in / centers_in 
   },
+  #[structopt(name = "ring")]
+  /// Create a Spatial MOC from the given ring
+  Ring {
+    /// Depth of the created MOC, in `[0, 29]`.
+    depth: u8,
+    /// Longitude of the ring center (in degrees)
+    lon_deg: f64,
+    /// Latitude of the ring center (in degrees)
+    lat_deg: f64,
+    /// Internal radius of the ring (in degrees)
+    r_int_deg: f64,
+    /// External radius of the ring (in degrees)
+    r_ext_deg: f64,
+    #[structopt(subcommand)]
+    out: OutputFormat
+  },
   #[structopt(name = "ellipse")]
   /// Create a Spatial MOC from the given elliptical cone
   EllipticalCone {
@@ -286,6 +302,29 @@ impl From {
           Err(String::from("Radius must be in ]0, pi[").into())
         } else {
           let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_cone(lon, lat, r, depth, 2);
+          out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
+        }
+      },
+      From::Ring {
+        depth,
+        lon_deg,
+        lat_deg,
+        r_int_deg,
+        r_ext_deg,
+        out
+      } => {
+        let lon = lon_deg2rad(lon_deg)?;
+        let lat = lat_deg2rad(lat_deg)?;
+        let r_int = r_int_deg.to_radians();
+        let r_ext = r_ext_deg.to_radians();
+        if r_int <= 0.0 || PI <= r_int {
+          Err(String::from("Internal radius must be in ]0, pi[").into())
+        } else if r_ext <= 0.0 || PI <= r_ext {
+          Err(String::from("External radius must be in ]0, pi[").into())
+        } else if r_ext <= r_int {
+          Err(String::from("External radius must be larger than the internal radius").into())
+        } else {
+          let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_ring(lon, lat, r_int, r_ext, depth, 2);
           out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
         }
       },
@@ -715,7 +754,30 @@ mod tests {
   use crate::InputTime;
 
   // Yes, I could have mad a single function with different parameters... 
-  
+
+  #[test]
+  fn test_from_ring() {
+    let expected = "test/resources/test.from_ring.expected.txt";
+    let actual = "test/resources/test.from_ring.actual.txt";
+    let from = From::Ring {
+      depth: 10,
+      lon_deg: 13.158329,
+      lat_deg: -72.80028,
+      r_int_deg: 5.64323,
+      r_ext_deg: 10.0,
+      out: OutputFormat::Ascii {
+        fold: Some(80),
+        range_len: false,
+        opt_file: Some(actual.into()),
+      }
+    };
+    from.exec().unwrap();
+    // Check results
+    let actual = fs::read_to_string(actual).unwrap();
+    let expected = fs::read_to_string(expected).unwrap();
+    assert_eq!(actual, expected);
+  }
+
   #[test]
   fn test_from_valued_cells_1() {
     let expected = "test/resources/gw190425z_skymap.default.expected.txt";

@@ -15,10 +15,15 @@ pub(crate) enum Op1 {
   ExtBorder,
   IntBorder,
   Split,
+  SplitIndirect
 }
 impl Op1 {
-  fn is_split(&self) -> bool {
+
+  fn is_split_4neigh(&self) -> bool {
     matches!(self, Op1::Split)
+  }
+  fn is_split_8neigh(&self) -> bool {
+    matches!(self, Op1::SplitIndirect)
   }
 
   fn perform_op_on_smoc(self, moc: &SMOC) -> Result<SMOC, String> {
@@ -29,7 +34,7 @@ impl Op1 {
       Op1::Contract => Ok(moc.contracted()),
       Op1::ExtBorder => Ok(moc.external_border()),
       Op1::IntBorder => Ok(moc.internal_border()),
-      Op1::Split =>  Err(String::from("Split must be catch before this :o/.")),
+      Op1::Split | Op1::SplitIndirect  =>  Err(String::from("Split must be catch before this :o/.")),
     }
   }
   fn perform_op_on_tmoc(self, moc: &TMOC) -> Result<TMOC, String> {
@@ -40,7 +45,7 @@ impl Op1 {
       Op1::Contract => Err(String::from("Contract border not implemented (yet) for T-MOCs.")),
       Op1::ExtBorder => Err(String::from("External border not implemented (yet) for T-MOCs.")),
       Op1::IntBorder => Err(String::from("Internal border not implemented (yet) for T-MOCs.")),
-      Op1::Split => Err(String::from("Split not implemented for T-MOCs.")),
+      Op1::Split | Op1::SplitIndirect => Err(String::from("Split not implemented for T-MOCs.")),
     }
   }
   fn perform_op_on_stmoc(self, _moc: &STMOC) -> Result<STMOC, String> {
@@ -51,16 +56,16 @@ impl Op1 {
       Op1::Contract =>  Err(String::from("Contract border not implemented (yet) for ST-MOCs.")),
       Op1::ExtBorder =>  Err(String::from("External border not implemented (yet) for ST-MOCs.")),
       Op1::IntBorder => Err(String::from("Internal border not implemented (yet) for ST-MOCs.")),
-      Op1::Split => Err(String::from("Split not implemented for ST-MOCs.")),
+      Op1::Split | Op1::SplitIndirect => Err(String::from("Split not implemented for ST-MOCs.")),
     }
   }
 }
 
-pub(crate) fn op1_count_split(name: &str) -> Result<u32, JsValue> {
+pub(crate) fn op1_count_split(name: &str, indirect_neigh: bool) -> Result<u32, JsValue> {
   store::op1_gen(
     name,
     move |moc| match moc {
-      InternalMoc::Space(m) => Ok(m.split_into_joint_mocs().len() as u32),
+      InternalMoc::Space(m) => Ok(m.split_into_joint_mocs(indirect_neigh).len() as u32),
       InternalMoc::Time(_) => Err(String::from("Split not implemented for T-MOCs.")),
       InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
     }
@@ -70,12 +75,12 @@ pub(crate) fn op1_count_split(name: &str) -> Result<u32, JsValue> {
 
 /// Performs the given operation on the given MOC and store the resulting MOC in the store.
 pub(crate) fn op1(name: &str, op: Op1, res_name: &str) -> Result<(), JsValue> {
-  if op.is_split() {
+  if op.is_split_4neigh() || op.is_split_8neigh() {
     store::op1_multi_res(
       name,
       move |moc| match moc {
         InternalMoc::Space(m) => {
-          let mut cellmocs = m.split_into_joint_mocs();
+          let mut cellmocs = m.split_into_joint_mocs(op.is_split_8neigh());
           Ok(
             cellmocs.drain(..)
               .map(|cell_moc| InternalMoc::Space(cell_moc.into_cell_moc_iter().ranges().into_range_moc()))

@@ -1,5 +1,14 @@
 # `moc-wasm` Change Log
 
+## 0.3.0
+
+Released 2022-01-XX
+
+* Add moc from ring
+* Add indirect split (in addition to direct split)
+* More robust FITS deserialization with the UNIQ scheme (no bug in case of trailing 0 uniq indices)
+
+
 ## 0.2.0
 
 Released 2021-11-09.

@@ -289,8 +289,20 @@ impl<T> MocQty<T> for Time<T> where T: Idx { }
 mod tests {
     use crate::qty::{MocableQty, MocQty, Time, Hpx};
 
+
+    #[test]
+    fn test_hpx_uniq_ext() {
+        println!("{:?}", Hpx::<u32>::from_uniq_hpx(96));
+    }
+    
     #[test]
     fn test_hpx_uniq() {
+        for depth in 0..8 {
+            for idx in 0..Hpx::<u32>::n_cells(depth) {
+                assert_eq!((depth, idx), Hpx::<u32>::from_uniq_hpx(Hpx::<u32>::uniq_hpx(depth, idx)));
+            }
+        }
+        
        for depth in 0..8 {
            for idx in 0..Hpx::<u64>::n_cells(depth) {
                 assert_eq!((depth, idx), Hpx::<u64>::from_uniq_hpx(Hpx::<u64>::uniq_hpx(depth, idx)));
