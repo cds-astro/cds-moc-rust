@@ -2,7 +2,7 @@
 
 ## 0.3.0
 
-Released 2022-01-XX
+Released 2022-02-04
 
 * Add moc from ring
 * Add indirect split (in addition to direct split)

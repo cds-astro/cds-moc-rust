@@ -2,7 +2,7 @@
 
 ## 0.7.0
 
-Released 2022-01-XX
+Released 2022-02-04
 
 ### Added
 

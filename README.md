@@ -2,12 +2,20 @@
 
 # `moc`
 
-The Rust MOC library used in
+Read, write, create and manipulate HEALPix **M**ulti-**O**rder **C**overage maps (**MOC**s),
+i.e. discretized geomatrical surfaces on the unit sphere.
+
+[![](https://img.shields.io/crates/v/moc.svg)](https://crates.io/crates/moc)
+[![](https://img.shields.io/crates/d/moc.svg)](https://crates.io/crates/moc)
+[![API Documentation on docs.rs](https://docs.rs/moc/badge.svg)](https://docs.rs/moc/)
+[![BenchLib](https://github.com/cds-astro/cds-moc-rust/actions/workflows/bench.yml/badge.svg)](https://github.com/cds-astro/cds-moc-rust/actions/workflows/bench.yml)
+
+MOC Lib Rust, the Rust MOC library used in
 [MOCPy](https://github.com/cds-astro/mocpy),
 [MOCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli) and
 [MOCWasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm).
-Read, write, create and manipulate HEALPix **M**ulti-**O**rder **C**overage maps (**MOC**s),
-i.e. discretized geomatrical surfaces on the unit sphere.
+
+MOC Lib Rust rely on the [CDS HEALPix Rust library](https://github.com/cds-astro/cds-healpix-rust).
 
 ## About
 
