@@ -1,5 +1,12 @@
 # `moc-wasm` Change Log
 
+## 0.3.1
+
+Realeased 2022-02-07
+
+* Fix erroneous inequality tests in `from_box` and `from_ellipse`
+
+
 ## 0.3.0
 
 Released 2022-02-04
