@@ -75,7 +75,7 @@ impl<T, Q, I, U, R> HasMaxDepth for ConvertIterator<T, Q, I, U, R>
     R: MocQty<U>,
 {
   fn depth_max(&self) -> u8 {
-    self.it.depth_max()
+    self.it.depth_max().min(R::MAX_DEPTH)
   }
 }
 impl<T, Q, I, U, R> ZSorted for ConvertIterator<T, Q, I, U, R>
@@ -192,7 +192,7 @@ impl<Q1, T, Q, I> HasMaxDepth for ConvertFromU64Iterator<Q1, T, Q, I>
     I: RangeMOCIterator<u64, Qty=Q1>,
 {
   fn depth_max(&self) -> u8 {
-    self.it.depth_max()
+    self.it.depth_max().min(Q::MAX_DEPTH)
   }
 }
 impl<Q1, T, Q, I> ZSorted for ConvertFromU64Iterator<Q1, T, Q, I>

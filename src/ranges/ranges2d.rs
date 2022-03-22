@@ -539,7 +539,7 @@ impl<'a, T: Idx, S: Idx> SNORanges2D<'a, T, S> for Ranges2D<T, S> {
             // Check whether the pixel coordinate lies in the `S` dimension
             // coverage where the time lies.
             let s_coverage = &self.y[*idx_first_dim];
-            s_coverage.contains(range)
+            s_coverage.contains_range(range)
         } else {
             unreachable!();
         }

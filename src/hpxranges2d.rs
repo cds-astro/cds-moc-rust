@@ -475,7 +475,7 @@ where
             // Filter the time ranges to keep only those
             // that intersects with ``x``
             .filter_map(|(t, s)| {
-                if x.intersects(t) {
+                if x.intersects_range(t) {
                     Some(s.clone())
                 } else {
                     None
@@ -491,7 +491,7 @@ where
         #[cfg(target_arch = "wasm32")]
         let ranges = coverage.x.iter().zip(coverage.y.iter())
           .filter_map(|(t, s)| {
-              if x.intersects(t) {
+              if x.intersects_range(t) {
                   Some(s.clone())
               } else {
                   None
@@ -534,7 +534,7 @@ where
             // that lie into ``x``
             .filter_map(|(t, s)| {
                 for r in s.iter() {
-                    if !y.contains(r) {
+                    if !y.contains_range(r) {
                         return None;
                     }
                 }

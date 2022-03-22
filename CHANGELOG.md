@@ -1,5 +1,14 @@
 # `moc` Change Log
 
+## 0.7.1
+
+Released 2022-03-22 (not a bug fix)
+
+### Added
+
+* Possibility to perform operations on borrowed ranges in addition to owned ranges
+
+
 ## 0.7.0
 
 Released 2022-02-04

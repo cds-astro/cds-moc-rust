@@ -25,6 +25,8 @@ pub mod ranges2d;
 /// SNO = Sorted Non-Overlapping
 pub trait SNORanges<'a, T: Idx>: Sized {
 
+    type OwnedRanges: SNORanges<'a, T>;
+
     type Iter: Iterator<Item = &'a Range<T>>;
     #[cfg(not(target_arch = "wasm32"))]
     type ParIter: ParallelIterator<Item = &'a Range<T>>;
@@ -37,9 +39,9 @@ pub trait SNORanges<'a, T: Idx>: Sized {
     #[cfg(not(target_arch = "wasm32"))]
     fn par_iter(&'a self) -> Self::ParIter;
 
-    fn intersects(&self, x: &Range<T>) -> bool;
+    fn intersects_range(&self, x: &Range<T>) -> bool;
     #[cfg(not(target_arch = "wasm32"))]
-    fn par_intersects(&'a self, x: &Range<T>) -> bool {
+    fn par_intersects_range(&'a self, x: &Range<T>) -> bool {
         self.par_iter()
           .map(|r| !(x.start >= r.end || x.end <= r.start))
           .any(|a| a)
@@ -47,33 +49,35 @@ pub trait SNORanges<'a, T: Idx>: Sized {
 
     fn contains_val(&self, x: &T) -> bool;
 
-    fn contains(&self, x: &Range<T>) -> bool;
+    fn contains_range(&self, x: &Range<T>) -> bool;
     #[cfg(not(target_arch = "wasm32"))]
-    fn par_contains(&'a self, x: &Range<T>) -> bool {
+    fn par_contains_range(&'a self, x: &Range<T>) -> bool {
         self.par_iter()
           .map(|r| x.start >= r.start && x.end <= r.end)
           .any(|a| a)
     }
 
-    fn merge(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self;
+    fn intersects(&self, rhs: &Self) -> bool;
+    
+    fn merge(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self::OwnedRanges;
 
-    fn union(&self, other: &Self) -> Self;
+    fn union(&self, other: &Self) -> Self::OwnedRanges;
     /*fn union(&self, other: &Self) -> Self {
         self.merge(other, |a, b| a || b)
     }*/
 
-    fn intersection(&self, other: &Self) -> Self;
+    fn intersection(&self, other: &Self) -> Self::OwnedRanges;
     /*fn intersection(&self, other: &Self) -> Self {
         self.merge(other, |a, b| a && b)
     }*/
 
-    fn difference(&self, other: &Self) -> Self {
+    fn difference(&self, other: &Self) -> Self::OwnedRanges {
         self.merge(other, |a, b| a && !b)
     }
 
     /// Returns the complement assuming that the possible values are
     /// in `[0, upper_bound_exclusive[`.
-    fn complement_with_upper_bound(&self, upper_bound_exclusive: T) -> Self;
+    fn complement_with_upper_bound(&self, upper_bound_exclusive: T) -> Self::OwnedRanges;
 
     /// Performs a logical OR between all the bounds of all ranges,
     /// and returns the number of trailing zeros.
@@ -132,6 +136,18 @@ impl<T: Idx> Ranges<T> {
         Self::new_from_sorted(data)
     }
 
+    pub fn as_bytes(&self) -> &[u8] {
+        let offset = self.0.as_ptr().align_offset(mem::align_of::<u8>());
+        // I suppose that align with u8 is never a problem.
+        assert_eq!(offset, 0);
+        unsafe {
+            std::slice::from_raw_parts(
+                (&self.0).as_ptr() as *const u8,
+                (self.0.len() << 1) * std::mem::size_of::<T>(),
+            )
+        }
+    }
+
     /*/// Make the `Ranges<T>` consistent
     ///
     /// # Info
@@ -160,6 +176,100 @@ impl<T: Idx> Index<usize> for Ranges<T> {
 
 impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
 
+    type OwnedRanges = Self;
+
+    type Iter = Iter<'a, Range<T>>;
+    #[cfg(not(target_arch = "wasm32"))]
+    type ParIter = rayon::slice::Iter<'a, Range<T>>;
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn iter(&'a self) -> Self::Iter {
+        self.0.iter()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn par_iter(&'a self) -> Self::ParIter {
+        self.0.par_iter()
+    }
+
+    fn intersects_range(&self, x: &Range<T>) -> bool {
+        BorrowedRanges(&self.0).intersects_range(x)
+    }
+
+    fn contains_val(&self, x: &T) -> bool {
+        BorrowedRanges(&self.0).contains_val(x)
+    }
+
+    fn contains_range(&self, x: &Range<T>) -> bool {
+        BorrowedRanges(&self.0).contains_range(x)
+    }
+
+    fn intersects(&self, rhs: &Self) -> bool {
+        BorrowedRanges(&self.0).intersects(&BorrowedRanges(&rhs.0))
+    }
+    
+    fn union(&self, other: &Self) -> Self {
+        BorrowedRanges(&self.0).union(&BorrowedRanges(&other.0))
+    }
+
+    fn intersection(&self, other: &Self) -> Self {
+        BorrowedRanges(&self.0).intersection(&BorrowedRanges(&other.0))
+    }
+
+    #[allow(clippy::many_single_char_names)]
+    fn merge(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self {
+        BorrowedRanges(&self.0).merge(&BorrowedRanges(&other.0), op)
+    }
+
+    fn complement_with_upper_bound(&self, upper_bound_exclusive: T) -> Self {
+        BorrowedRanges(&self.0).complement_with_upper_bound(upper_bound_exclusive)
+    }
+}
+
+/// To perform operations on e.g. a buffer without having to own the ranges
+pub struct BorrowedRanges<'a, T: Idx>(pub &'a [Range<T>]);
+
+impl<'a, T: Idx> From<&'a Ranges<T>> for BorrowedRanges<'a, T> {
+    fn from(ranges: &'a Ranges<T>) -> Self {
+        BorrowedRanges(&ranges.0)
+    }
+}
+
+impl<'a, T: Idx> From<&'a [u8]> for BorrowedRanges<'a, T> {
+    fn from(blob: &'a [u8]) -> Self {
+        let offset = blob.as_ptr().align_offset(mem::align_of::<Range<T>>());
+        if offset != 0 {
+            panic!("Not aligned array!!");
+        }
+        let len = blob.len() / std::mem::size_of::<Range<T>>();
+        debug_assert_eq!(blob.len(), len * std::mem::size_of::<Range<T>>());
+        BorrowedRanges( unsafe {
+            &* slice_from_raw_parts(blob.as_ptr() as *const Range<T>, len)
+        })
+    }
+}
+
+impl<'a, T: Idx> BorrowedRanges<'a, T> {
+    pub fn as_bytes(&self) -> &[u8] {
+        let offset = self.0.as_ptr().align_offset(mem::align_of::<u8>());
+        // I suppose that align with u8 is never a problem.
+        assert_eq!(offset, 0);
+        unsafe {
+            std::slice::from_raw_parts(
+                self.0.as_ptr() as *const u8,
+                (self.0.len() << 1) * std::mem::size_of::<T>(),
+            )
+        }
+    }
+}
+
+impl<'a, T: Idx> SNORanges<'a, T> for BorrowedRanges<'a, T> {
+
+    type OwnedRanges = Ranges<T>;
+
     type Iter = Iter<'a, Range<T>>;
     #[cfg(not(target_arch = "wasm32"))]
     type ParIter = rayon::slice::Iter<'a, Range<T>>;
@@ -178,28 +288,46 @@ impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
     }
 
     // The MOC **MUST BE** consistent!
-    fn intersects(&self, x: &Range<T>) -> bool {
-        let len = self.0.len() << 1;
+    fn intersects_range(&self, x: &Range<T>) -> bool {
+        let len = self.0.len();
+        // Quick rejection test
+        if len == 0 || x.end <= self.0[0].start || self.0[len - 1].end <= x.start {
+            return false;
+        }
+        let len = len << 1;
         let ptr = self.0.as_ptr();
+        // It is ok because (see test test_alignment()):
+        // * T is a primitive type in practice, and size_of(T) << 1 == size_of(Range<T>)
+        // * the alignment of Range<T> is the same as the alignment of T (see test_alignment)
+        // But: https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html
         let result: &[T] = unsafe {
             &* slice_from_raw_parts(ptr as *const T, len)
         };
         match result.binary_search(&x.start) {
             Ok(i) => {
                 i & 1 == 0 // even index => x.start = range.start => Ok
-                || (i + 1 < len && x.end > result[i + 1]) // else (odd index) => upper bound => Check x.end > next range.start
+                  || (i + 1 < len && x.end > result[i + 1]) // else (odd index) => upper bound => Check x.end > next range.start
             },
             Err(i) => {
                 i & 1 == 1 // index is odd => x.start inside the range
-                || (i < len && x.end > result[i]) // else (even index) => Check x.end > range.start
+                  || (i < len && x.end > result[i]) // else (even index) => Check x.end > range.start
             },
         }
     }
 
     // The MOC **MUST BE** consistent!
     fn contains_val(&self, x: &T) -> bool {
-        let len = self.0.len() << 1;
+        let len = self.0.len();
+        // Quick rejection test
+        if len == 0 || *x < self.0[0].start || self.0[len - 1].end <= *x {
+            return false;
+        }
+        let len = len << 1;
         let ptr = self.0.as_ptr();
+        // It is ok because (see test test_alignment()):
+        // * T is a primitive type in practice, and size_of(T) << 1 == size_of(Range<T>)
+        // * the alignment of Range<T> is the same as the alignment of T (see test_alignment)
+        // But: https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html
         let result: &[T] = unsafe {
             &* slice_from_raw_parts(ptr as *const T, len)
         };
@@ -211,10 +339,15 @@ impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
     }
 
     // The MOC **MUST BE** consistent!
-    fn contains(&self, x: &Range<T>) -> bool {
-        let len = self.0.len() << 1;
+    fn contains_range(&self, x: &Range<T>) -> bool {
+        let len = self.0.len();
+        // Quick rejection test
+        if len == 0 || x.end <= self.0[0].start || self.0[len - 1].end <= x.start {
+            return false;
+        }
+        let len = len << 1;
         let ptr = self.0.as_ptr();
-        // It is ok because:
+        // It is ok because (see test test_alignment()):
         // * T is a primitive type in practice, and size_of(T) << 1 == size_of(Range<T>)
         // * the alignment of Range<T> is the same as the alignment of T (see test_alignment)
         // But: https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html
@@ -228,225 +361,16 @@ impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
         }
     }
 
-    /* 270 us
-    fn intersection(&self, other: &Self) -> Self {
+    fn intersects(&self, rhs: &Self) -> bool {
+        // Quickly adaptedd from "intersection", we may find a better option
         let l = &self.0;
-        let len_l = l.len();
-        let r = &other.0;
-        let len_r = r.len();
-        // Quick rejection test
-        if len_l == 0 || len_r == 0
-          || l[0].start >= r[len_r - 1].end
-          || l[len_l - 1].end <= r[0].start
-        {
-            return Ranges(Default::default());
-        }
-        // Use binary search to find the starting element
-        let (i_l, i_r) = if l[0].start < r[0].start {
-            let i_l = match l.binary_search_by(|l_range| l_range.start.cmp(&r[0].start)) {
-                Ok(i) => i,
-                Err(i) => i - 1,
-            };
-            (i_l, 0)
-        } else if l[0].start > r[0].start {
-            let i_r = match r.binary_search_by(|r_range| r_range.start.cmp(&l[0].start)) {
-                Ok(i) => i,
-                Err(i) => i - 1,
-            };
-            (0, i_r)
-        } else {
-            (0, 0)
-        };
-        // Perform the iterator algo in the two sub-arrays :)
-        let mut left_it = l[i_l..].iter();
-        let mut right_it = r[i_r..].iter();
-        let mut left = left_it.next();
-        let mut right = right_it.next();
-        let mut res = Vec::with_capacity(((len_l - i_l) + (len_r - i_r)) as usize);
-        while let (Some(l), Some(r)) = (&left, &right) {
-            let from = l.start.max(r.start);
-            let l_to = l.end;
-            let r_to = r.end;
-            let to = match l_to.cmp(&r_to) {
-                Ordering::Less => {
-                    left = left_it.next();
-                    l_to
-                },
-                Ordering::Greater => {
-                    right = right_it.next();
-                    r_to
-                },
-                Ordering::Equal => {
-                    left = left_it.next();
-                    right = right_it.next();
-                    l_to
-                },
-            };
-            if from < to {
-                res.push(from..to);
-            }
-        }
-        Ranges(res)
-    }*/
-
-    /*// 180 us
-    fn intersection(&self, other: &Self) -> Self {
-        // utils.flatten()/unfallten()
-        let l = &self.0;
-        let r = &other.0;
-        // Quick rejection test
-        if l.len() == 0 || r.len() == 0
-          || l[0].start >= r[r.len() - 1].end
-          || l[l.len() - 1].end <= r[0].start
-        {
-            return Ranges(Default::default());
-        }
-        // Use binary search to find the starting indices
-        let (mut il, mut ir) = if l[0].start < r[0].start {
-            let il = match l.binary_search_by(|l_range| l_range.start.cmp(&r[0].start)) {
-                Ok(i) => i,
-                Err(i) => i - 1,
-            };
-            (il, 0)
-        } else if l[0].start > r[0].start {
-            let ir = match r.binary_search_by(|r_range| r_range.start.cmp(&l[0].start)) {
-                Ok(i) => i,
-                Err(i) => i - 1,
-            };
-            (0, ir)
-        } else {
-            (0, 0)
-        };
-        let mut res = Vec::with_capacity(l.len() + r.len());
-        while il < l.len() && ir < r.len() {
-            while il < l.len() && l[il].end <= r[ir].start { // |--l--| |--r--|
-                il += 1;
-            }
-            while ir < r.len() && r[ir].end <= l[il].start { // |--r--| |--l--|
-                ir += 1;
-            }
-            if il == l.len() || ir == r.len() {
-                break;
-            } else if l[il].end <= r[ir].start {
-                continue;
-            }
-            let from = l[il].start.max(r[ir].start);
-            if l[il].end < r[ir].end {
-                res.push(from..l[il].end);
-                il += 1;
-            } else if l[il].end > r[ir].end {
-                res.push(from..r[ir].end);
-                ir += 1;
-            } else {
-                res.push(from..l[il].end);
-                il += 1;
-                ir += 1;
-            }
-        }
-        Ranges(res)
-    }*/
-
-    
-    fn union(&self, other: &Self) -> Self {
-        let l = &self.0;
-        let r = &other.0;
-        // Deal with cases in which one of the two ranges (or both) is empty
-        if l.is_empty() {
-            return Ranges(r.clone());
-        } else if r.is_empty() {
-            return Ranges(l.clone());
-        }
-        // Init result
-        let mut res = Vec::with_capacity(l.len() + r.len());
-        // Use binary search to find the starting indices (and starts with a simple array copy)
-        let (il, ir) = if l[0].end < r[0].start {
-            let il = match l.binary_search_by(|l_range| l_range.end.cmp(&r[0].start)) {
-                Ok(i) => i,
-                Err(i) => i,
-            };
-            res.extend_from_slice(&l[..il]);
-            (il, 0)
-        } else if l[0].start > r[0].end {
-            let ir = match r.binary_search_by(|r_range| r_range.end.cmp(&l[0].start)) {
-                Ok(i) => i,
-                Err(i) => i,
-            };
-            res.extend_from_slice(&r[..ir]);
-            (0, ir)
-        } else {
-            (0, 0)
-        };
-        // Now regular work
-        let mut left_it = l[il..].iter();
-        let mut right_it = r[ir..].iter();
-        let mut left = left_it.next().cloned();
-        let mut right = right_it.next().cloned();
-
-        fn consume_while_end_lower_than<'a, T, I>(it: &mut I, to: T) -> Option<&'a Range<T>>
-            where
-                T: Idx,
-                I: Iterator<Item=&'a Range<T>>,
-        {
-            let mut curr = it.next();
-            while let Some(c) = &curr {
-                if c.end > to {
-                    break;
-                } else {
-                    curr = it.next();
-                }
-            }
-            curr
-        }
-
-        loop {
-            match (&mut left, &mut right) {
-                (Some(ref mut l), Some(ref mut r)) =>
-                    if l.end < r.start {        // L--L R--R
-                        res.push(mem::replace(&mut left, left_it.next().cloned()).unwrap());
-                    } else if r.end < l.start { // R--R L--L
-                        res.push(mem::replace(&mut right, right_it.next().cloned()).unwrap());
-                    } else if l.end <= r.end {    //    R--L--L--R
-                        if l.start < r.start {    // or L--R--L--R
-                            r.start = l.start;
-                        }
-                        left = consume_while_end_lower_than(&mut left_it, r.end).cloned();
-                    } else {                      //    L--R--R--L
-                        if r.start < l.start {    // or R--L--R--L
-                            l.start = r.start;
-                        }
-                        right = consume_while_end_lower_than(&mut right_it, l.end).cloned();
-                    },
-                (Some(ref l), None) => {
-                    res.push(l.clone());
-                    for l in left_it {
-                        res.push(l.clone());
-                    }
-                    break;
-                },
-                (None, Some(ref r)) => {
-                    res.push(r.clone());
-                    for r in right_it {
-                        res.push(r.clone());
-                    }
-                    break;
-                },
-                (None, None) => break,
-            };
-        }
-        res.shrink_to_fit();
-        Ranges::new_unchecked(res)
-    }
-
-    fn intersection(&self, other: &Self) -> Self {
-        // utils.flatten()/unfallten()
-        let l = &self.0;
-        let r = &other.0;
+        let r = &rhs.0;
         // Quick rejection test
         if l.is_empty() || r.is_empty()
           || l[0].start >= r[r.len() - 1].end
           || l[l.len() - 1].end <= r[0].start
         {
-            return Ranges(Default::default());
+            return false;
         }
         // Use binary search to find the starting indices
         let (il, ir) = match l[0].start.cmp(&r[0].start) {
@@ -467,55 +391,38 @@ impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
             Ordering::Equal => (0, 0),
         };
         // Now simple sequential algo
-        let mut res = Vec::with_capacity(l.len() + r.len() - (il + ir));
         let mut left_it = l[il..].iter();
         let mut right_it = r[ir..].iter();
         let mut left = left_it.next();
         let mut right = right_it.next();
         while let (Some(el), Some(er)) = (&left, &right) {
-           if el.end <= er.start { // |--l--| |--r--|
-               left = left_it.next();
-               while let Some(el) = &left {
-                   if el.end <= er.start {
-                       left = left_it.next();
-                   } else {
-                       break;
-                   }
-               }
-           } else if er.end <= el.start { // |--r--| |--l--|
-               right = right_it.next();
-               while let Some(er) = &right {
-                   if er.end <= el.start {
-                       right = right_it.next();
-                   } else {
-                       break;
-                   }
-               }
-           } else {
-               let from = el.start.max(er.start);
-               match el.end.cmp(&er.end) {
-                   Ordering::Less => {
-                       res.push(from..el.end);
-                       left = left_it.next();
-                   },
-                   Ordering::Greater => {
-                       res.push(from..er.end);
-                       right = right_it.next();
-                   },
-                   Ordering::Equal => {
-                       res.push(from..el.end);
-                       left = left_it.next();
-                       right = right_it.next();
-                   }
-               }
-           }
+            if el.end <= er.start { // |--l--| |--r--|
+                left = left_it.next();
+                while let Some(el) = &left {
+                    if el.end <= er.start {
+                        left = left_it.next();
+                    } else {
+                        break;
+                    }
+                }
+            } else if er.end <= el.start { // |--r--| |--l--|
+                right = right_it.next();
+                while let Some(er) = &right {
+                    if er.end <= el.start {
+                        right = right_it.next();
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                return true
+            }
         }
-        res.shrink_to_fit();
-        Ranges::new_unchecked(res)
+        return false;
     }
-
+    
     #[allow(clippy::many_single_char_names)]
-    fn merge(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self {
+    fn merge(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self::OwnedRanges {
         let l = &self.0;
         let ll = l.len() << 1;
 
@@ -599,7 +506,174 @@ impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
         Ranges::new_unchecked(utils::unflatten(&mut result))
     }
 
-    fn complement_with_upper_bound(&self, upper_bound_exclusive: T) -> Self {
+    fn union(&self, other: &Self) -> Self::OwnedRanges {
+        let l = self.0;
+        let r = other.0;
+        // Deal with cases in which one of the two ranges (or both) is empty
+        if l.is_empty() {
+            return Ranges(r.to_vec().into_boxed_slice());
+        } else if r.is_empty() {
+            return Ranges(l.to_vec().into_boxed_slice());
+        }
+        // Init result
+        let mut res = Vec::with_capacity(l.len() + r.len());
+        // Use binary search to find the starting indices (and starts with a simple array copy)
+        let (il, ir) = if l[0].end < r[0].start {
+            let il = match l.binary_search_by(|l_range| l_range.end.cmp(&r[0].start)) {
+                Ok(i) => i,
+                Err(i) => i,
+            };
+            res.extend_from_slice(&l[..il]);
+            (il, 0)
+        } else if l[0].start > r[0].end {
+            let ir = match r.binary_search_by(|r_range| r_range.end.cmp(&l[0].start)) {
+                Ok(i) => i,
+                Err(i) => i,
+            };
+            res.extend_from_slice(&r[..ir]);
+            (0, ir)
+        } else {
+            (0, 0)
+        };
+        // Now regular work
+        let mut left_it = l[il..].iter();
+        let mut right_it = r[ir..].iter();
+        let mut left = left_it.next().cloned();
+        let mut right = right_it.next().cloned();
+
+        fn consume_while_end_lower_than<'a, T, I>(it: &mut I, to: T) -> Option<&'a Range<T>>
+            where
+              T: Idx,
+              I: Iterator<Item=&'a Range<T>>,
+        {
+            let mut curr = it.next();
+            while let Some(c) = &curr {
+                if c.end > to {
+                    break;
+                } else {
+                    curr = it.next();
+                }
+            }
+            curr
+        }
+
+        loop {
+            match (&mut left, &mut right) {
+                (Some(ref mut l), Some(ref mut r)) =>
+                    if l.end < r.start {        // L--L R--R
+                        res.push(mem::replace(&mut left, left_it.next().cloned()).unwrap());
+                    } else if r.end < l.start { // R--R L--L
+                        res.push(mem::replace(&mut right, right_it.next().cloned()).unwrap());
+                    } else if l.end <= r.end {    //    R--L--L--R
+                        if l.start < r.start {    // or L--R--L--R
+                            r.start = l.start;
+                        }
+                        left = consume_while_end_lower_than(&mut left_it, r.end).cloned();
+                    } else {                      //    L--R--R--L
+                        if r.start < l.start {    // or R--L--R--L
+                            l.start = r.start;
+                        }
+                        right = consume_while_end_lower_than(&mut right_it, l.end).cloned();
+                    },
+                (Some(ref l), None) => {
+                    res.push(l.clone());
+                    for l in left_it {
+                        res.push(l.clone());
+                    }
+                    break;
+                },
+                (None, Some(ref r)) => {
+                    res.push(r.clone());
+                    for r in right_it {
+                        res.push(r.clone());
+                    }
+                    break;
+                },
+                (None, None) => break,
+            };
+        }
+        res.shrink_to_fit();
+        Ranges::new_unchecked(res)
+    }
+
+    fn intersection(&self, other: &Self) -> Self::OwnedRanges {
+        // utils.flatten()/unfallten()
+        let l = &self.0;
+        let r = &other.0;
+        // Quick rejection test
+        if l.is_empty() || r.is_empty()
+          || l[0].start >= r[r.len() - 1].end
+          || l[l.len() - 1].end <= r[0].start
+        {
+            return Ranges(Default::default());
+        }
+        // Use binary search to find the starting indices
+        let (il, ir) = match l[0].start.cmp(&r[0].start) {
+            Ordering::Less => {
+                let il = match l.binary_search_by(|l_range| l_range.start.cmp(&r[0].start)) {
+                    Ok(i) => i,
+                    Err(i) => i - 1,
+                };
+                (il, 0)
+            },
+            Ordering::Greater => {
+                let ir = match r.binary_search_by(|r_range| r_range.start.cmp(&l[0].start)) {
+                    Ok(i) => i,
+                    Err(i) => i - 1,
+                };
+                (0, ir)
+            },
+            Ordering::Equal => (0, 0),
+        };
+        // Now simple sequential algo
+        let mut res = Vec::with_capacity(l.len() + r.len() - (il + ir));
+        let mut left_it = l[il..].iter();
+        let mut right_it = r[ir..].iter();
+        let mut left = left_it.next();
+        let mut right = right_it.next();
+        while let (Some(el), Some(er)) = (&left, &right) {
+            if el.end <= er.start { // |--l--| |--r--|
+                left = left_it.next();
+                while let Some(el) = &left {
+                    if el.end <= er.start {
+                        left = left_it.next();
+                    } else {
+                        break;
+                    }
+                }
+            } else if er.end <= el.start { // |--r--| |--l--|
+                right = right_it.next();
+                while let Some(er) = &right {
+                    if er.end <= el.start {
+                        right = right_it.next();
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                let from = el.start.max(er.start);
+                match el.end.cmp(&er.end) {
+                    Ordering::Less => {
+                        res.push(from..el.end);
+                        left = left_it.next();
+                    },
+                    Ordering::Greater => {
+                        res.push(from..er.end);
+                        right = right_it.next();
+                    },
+                    Ordering::Equal => {
+                        res.push(from..el.end);
+                        left = left_it.next();
+                        right = right_it.next();
+                    }
+                }
+            }
+        }
+        res.shrink_to_fit();
+        Ranges::new_unchecked(res)
+    }
+
+    fn complement_with_upper_bound(&self, upper_bound_exclusive: T) -> Self::OwnedRanges {
         let ranges = &self.0;
         let mut result = Vec::<Range<T>>::with_capacity((ranges.len() + 1) as usize);
 
@@ -631,39 +705,6 @@ impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
     }
 }
 
-/*
-impl From<Ranges<u64>> for Array2<u64> {
-    fn from(input: Ranges<u64>) -> Self {
-        ranges_to_array2d(input)
-    }
-}
-impl From<Ranges<i64>> for Array2<i64> {
-    fn from(input: Ranges<i64>) -> Self {
-        ranges_to_array2d(input)
-    }
-}*/
-
-
-/*pub fn ranges_to_array2d<T: Idx>(input: Ranges<T>) -> Array2<T> {
-    if input.is_empty() {
-        // Warning: Empty 2D numpy arrays coming from python
-        // have the shape (1, 0).
-        // By consistency, we also return a (1, 0) Array2 to python
-        Array2::zeros((1, 0))
-    } else {
-        let mut ranges = input.0;
-        // Cast Vec<Range<u64>> to Vec<u64>
-        let len = ranges.len();
-        let data = utils::flatten(&mut ranges);
-
-        // Get a Array1 from the Vec<u64> without copying any data
-        let result: Array1<T> = data.into();
-
-        // Reshape the result to get a Array2 of shape (N x 2) where N is the number
-        // of HEALPix cell contained in the moc
-        result.into_shape((len, 2)).unwrap().to_owned()
-    }
-}*/
 
 
 #[derive(Debug)]

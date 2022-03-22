@@ -59,6 +59,8 @@ impl<T: Idx, Q: MocQty<T>> Default for MocRanges<T, Q> {
 
 impl<'a, T: Idx, Q: MocQty<T>> SNORanges<'a, T> for MocRanges<T, Q> {
 
+    type OwnedRanges = Self;
+
     type Iter = Iter<'a, Range<T>>;
     #[cfg(not(target_arch = "wasm32"))]
     type ParIter = rayon::slice::Iter<'a, Range<T>>;
@@ -84,18 +86,22 @@ impl<'a, T: Idx, Q: MocQty<T>> SNORanges<'a, T> for MocRanges<T, Q> {
         self.0.intersection(&other.0).into()
     }
 
-    fn intersects(&self, x: &Range<T>) -> bool {
-        self.0.intersects(x)
+    fn intersects_range(&self, x: &Range<T>) -> bool {
+        self.0.intersects_range(x)
     }
 
     fn contains_val(&self, x: &T) -> bool {
         self.0.contains_val(x)
     }
 
-    fn contains(&self, x: &Range<T>) -> bool {
-        self.0.contains(x)
+    fn contains_range(&self, x: &Range<T>) -> bool {
+        self.0.contains_range(x)
     }
 
+    fn intersects(&self, rhs: &Self) -> bool {
+        self.0.intersects(&rhs.0)
+    }
+    
     fn merge(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self {
         Self(self.0.merge(&other.0, op), PhantomData)
     }
