@@ -30,6 +30,7 @@ For tools able to display MOCs, see:
 
 From this [demo page](http://cdsxmatch.u-strasbg.fr/lab/moc/).
 
+
 ### Put it in your own Web page
 
 Download the last `moc-wasm-vxx.tar.gz` from the[github release page](https://github.com/cds-astro/cds-moc-rust/releases).
@@ -50,6 +51,11 @@ And add this in your HTML body:
 ```
 This [the example page](https://github.com/cds-astro/cds-moc-rust/blob/main/crates/wasm/index.html).
 
+
+### Used by
+
+Example of web page(s) using MOCwasm:
+* [Gravitational-Wave Sky Localizations](https://virgo.pg.infn.it/maps/index.html)
 
 
 ### Use it in you project with NPM
@@ -81,7 +87,7 @@ fromLocalFile(empty|'space'|'time'|'space-time')
 # - load the MOC from a FITS file content in the provided UInt8Array 
 fromFits(name, data: UInt8Array)
 # - load the MOC stored in a FITS file of given URL, and store it with the given name 
-fromFitsUrl(name, url)
+fromFitsUrl(name, url) // A string of supported mimi types can be passed in an additional last parameter
 # - load S/T/ST-MOC from a ASCII String or an ASCII file
 smocFromAscii(name, data: String)
 smocFromAsciiUrl(name, url)
@@ -102,7 +108,7 @@ fromLocalMultiOrderMap(from_threshold: f64, to_threshold: f64, asc: bool, not_st
 # - load a multi-order map FITS file and create a MOC from the given parameters
 fromFitsMulitOrderMap(name, data: UInt8Array, from_threshold: f64, to_threshold: f64, asc: bool, not_strict: bool, split: bool, revese_recursive_descent: bool)
 # - load a multi-order map FITS file of given URL and create a MOC from the given parameters
-fromMultiOrderMapFitsUrl(name, url, from_threshold: f64, to_threshold: f64, asc: bool, not_strict: bool, split: bool, revese_recursive_descent: bool)
+fromMultiOrderMapFitsUrl(name, url, from_threshold: f64, to_threshold: f64, asc: bool, not_strict: bool, split: bool, revese_recursive_descent: bool) // A string of supported mime types can be passed in an additional last parameter
 
 # Save a MOC
 # - get the FITS binary representation of the MOC of given name  

@@ -1,5 +1,12 @@
 # `moc-wasm` Change Log
 
+## 0.3.2
+
+Realeased 2022-03-22
+
+* Fix all `toFile` methods (encoding problem when direclty saving a blob) 
+* Add the possibility to overwrite the supported mime type when loading a FITS file from a URL  
+
 ## 0.3.1
 
 Realeased 2022-02-07

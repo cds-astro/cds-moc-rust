@@ -152,7 +152,7 @@ pub fn drop(name: &str) -> Result<(), JsValue> {
 async fn from_url(
   name: String,
   url: String,
-  mime: &'static str,
+  mime: &str,
   parse: Box<dyn Fn(&str, &[u8]) ->  Result<(), JsValue>>
 ) -> Result<(), JsValue>
 {
@@ -160,11 +160,15 @@ async fn from_url(
   let mut opts = RequestInit::new();
   opts.method("GET");
   opts.mode(RequestMode::Cors);
-
+  
+  let window = web_sys::window().ok_or_else(|| JsValue::from_str("Unable to get the Window"))?;
+  
   let request = Request::new_with_str_and_init(&url, &opts)?;
   request.headers().set("Accept", mime)?;
+  
+  let document = window.document().ok_or_else(|| JsValue::from_str("Unable to get the Windows Document"))?;
+  request.headers().set("Referer", &document.referrer())?; // For CORS
 
-  let window = web_sys::window().ok_or_else(|| JsValue::from_str("Unable to get the Window"))?;
   let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
 
   let resp: Response = resp_value.dyn_into().map_err(|_| JsValue::from_str("Error casting to Response"))?;
@@ -300,7 +304,7 @@ pub fn from_local_multiordermap(
         // We accept only ".fits" files so splitting on "." should be safe.
         let (name, ext) = unsafe { file_name.rsplit_once('.').unchecked_unwrap() };
         let res = match ext {
-          "fits" => from_multitordermap_fits_file(
+          "fits" => from_multiordermap_fits_file(
             name, &file_content, from_threshold, to_threshold, 
             asc, not_strict, split, revese_recursive_descent
           ),
@@ -363,8 +367,8 @@ pub fn from_fits(name: &str, data: &[u8]) -> Result<(), JsValue> {
 /// * `not_strict`: Cells overlapping with the upper or the lower cumulative bounds are not rejected (often = false).
 /// * `split`: Split recursively the cells overlapping the upper or the lower cumulative bounds (often = false).
 /// * `revese_recursive_descent`: Perform the recursive descent from the highest to the lowest sub-cell, only with option 'split' (set both flags to be compatibile with Aladin)
-#[wasm_bindgen(js_name = "fromFitsMulitOrderMap", catch)]
-pub fn from_multitordermap_fits_file(
+#[wasm_bindgen(js_name = "fromFitsMultiOrderMap", catch)]
+pub fn from_multiordermap_fits_file(
   name: &str, 
   data: &[u8],
   from_threshold: f64,
@@ -406,16 +410,42 @@ pub fn from_mutlitordermap_fits_file_std(
   store::add(name, InternalMoc::Space(moc))
 }*/
 
-/// WARNING: if this is not working, check e.g. with `wget -v -S ${url}` the the content type is
-/// `Content-Type: application/fits`.
+/// # Args
+/// * `name`: name used to store the loaded MOC
+/// * `url`: URL of the FITS file
+/// * `accept_mime_types`: use `None` (Rust) or `null` (Javascript) to use the default `application/fits`
+/// # WARNING
+///   If this is not working, check e.g. with `wget -v -S ${url}` the the content type is
+///   `Content-Type: application/fits`.
+///   Else use the `accept_mime_types` option to set the `Accept` HTTP request parameter, with e.g:
+///   * `application/fits` (default value)
+///   * `application/fits, application/octet-stream`
+//   * "*/*"
 #[wasm_bindgen(js_name = "fromFitsUrl")]
-pub async fn from_fits_url(name: String, url: String) -> Result<(), JsValue> {
-  from_url(name, url, "application/fits", Box::new(from_fits)).await
+pub async fn from_fits_url(
+  name: String, 
+  url: String,
+  accept_mime_types: Option<String>
+) -> Result<(), JsValue> {
+  match accept_mime_types {
+    None =>             from_url(name, url, "application/fits", Box::new(from_fits)).await,
+    Some(mime_types) => from_url(name, url, &mime_types, Box::new(from_fits)).await,
+  }
 }
 
 
-/// WARNING: if this is not working, check e.g. with `wget -v -S ${url}` the the content type is
-/// `Content-Type: application/fits`.
+/// # Args
+/// * `name`: name used to store the loaded MOC
+/// * `url`: URL of the FITS file
+/// * `...`: same paramters as `fromFitsMultiOrderMap`
+/// * `accept_mime_types`: use `None` (Rust) or `null` (Javascript) to use the default `application/fits`
+/// # WARNING
+///   If this is not working, check e.g. with `wget -v -S ${url}` the the content type is
+///   `Content-Type: application/fits`.
+///   Else use the `accept_mime_types` option to set the `Accept` HTTP request parameter, with e.g:
+///   * `application/fits` (default value)
+///   * `application/fits, application/octet-stream`
+//   * "*/*"
  #[wasm_bindgen(js_name = "fromMultiOrderMapFitsUrl")]
 pub async fn from_multiordermap_url(
   name: String,
@@ -426,9 +456,10 @@ pub async fn from_multiordermap_url(
   not_strict: bool,
   split: bool,
   revese_recursive_descent: bool,
+  accept_mime_types: Option<String>
 ) -> Result<(), JsValue>
 {
-  let func = move |name: &str, data: &[u8]| from_multitordermap_fits_file(
+  let func = move |name: &str, data: &[u8]| from_multiordermap_fits_file(
     name, 
     data,
     from_threshold,
@@ -438,7 +469,10 @@ pub async fn from_multiordermap_url(
     split,
     revese_recursive_descent
   );
-  from_url(name, url, "application/fits", Box::new(func)).await
+  match accept_mime_types {
+    None =>             from_url(name, url, "application/fits", Box::new(func)).await,
+    Some(mime_types) => from_url(name, url, &mime_types, Box::new(func)).await,
+  }
 }
 
 /*
@@ -629,11 +663,12 @@ fn to_file(
   }
   // Put data in a blob
   let data: Uint8Array = data.as_ref().into();
+  let bytes = Array::new();
+  bytes.push(&data);
   let mut blob_prop = BlobPropertyBag::new();
   blob_prop.type_(mime);
-  // let url_data = Array::new();
-  // url_data.push(&data);
-  let blob = Blob::new_with_u8_array_sequence_and_options(&data, &blob_prop)?;
+
+  let blob = Blob::new_with_u8_array_sequence_and_options(&bytes, &blob_prop)?;
   
   // Generate the URL with the attached data
   let url = Url::create_object_url_with_blob(&blob)?;
