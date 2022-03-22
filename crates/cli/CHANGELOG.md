@@ -1,5 +1,12 @@
 # `moc-cli` Change Log
 
+## 0.3.2
+
+Realeased 2022-03-22
+
+* No change, new release because of MOCwasm, moc-lib updated
+
+
 ## 0.3.1
 
 Realeased 2022-02-07

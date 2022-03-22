@@ -1,6 +1,6 @@
 [package]
 name = "moc-cli"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = """
 moc is a command-line to create and manipulate HEALPix
