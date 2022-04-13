@@ -27,7 +27,7 @@ use crate::elemset::{
   range::MocRanges,
   cell::{MocCells, Cells}
 };
-use crate::ranges::SNORanges;
+use crate::ranges::{SNORanges, BorrowedRanges};
 use crate::moc::{
   HasMaxDepth, ZSorted, NonOverlapping, MOCProperties,
   RangeMOCIterator, RangeMOCIntoIterator,
@@ -44,7 +44,8 @@ use crate::moc::{
     or::{or, OrRangeIter},
     minus::{minus, MinusRangeIter},
     and::{and, AndRangeIter},
-    xor::xor
+    xor::xor,
+    multi_op::kway_or
   }
 };
 use crate::deser::ascii::AsciiError;
@@ -507,6 +508,64 @@ impl RangeMOC<u64, Hpx<u64>> {
     Self::from(cone_coverage_approx_custom(depth, delta_depth, lon, lat, radius))
   }
 
+
+  /// Create a MOC from a not too large list of relatively large cones (i.e. cones containing a lot
+  /// of cells).
+  /// For a large list of small cones (i.e. cones containing only a few cells), see 
+  /// [from_small_cones](#from_small_cones)
+  /// 
+  /// # Input
+  /// - `depth`: the MOC depth
+  /// - `delta_depth` the difference between the MOC depth and the depth at which the computations
+  ///   are made (should remain quite small).
+  /// - `Iterator of (lon, lat, radius)`, in (radians, radians, radians)
+  ///
+  /// # Panics
+  /// If this layer depth + `delta_depth` > the max depth (i.e. 29)
+  pub fn from_large_cones<I: Iterator<Item=(f64, f64, f64)>>(
+    depth: u8, 
+    delta_depth: u8, 
+    coo_it: I
+  ) -> Self {
+    kway_or(
+      coo_it.map(|(lon, lat, radius)| Self::from_cone(lon, lat, radius, depth, delta_depth).into_range_moc_iter())
+    )
+  }
+
+  /// Create a MOC from a possibly large list of relatively small cones 
+  /// (i.e. cones containing a few cells).
+  /// For a small list of large cones (i.e. cones containing a lot of cells), see 
+  /// [from_large_cones](#from_large_cones)
+  /// 
+  /// See also [best_starting_depth](https://docs.rs/cdshealpix/latest/cdshealpix/fn.best_starting_depth.html)
+  /// to help you in choosing a depth.
+  ///
+  /// # Input
+  /// - `depth`: the MOC depth
+  /// - `delta_depth` the difference between the MOC depth and the depth at which the computations
+  ///   are made (should remain quite small).
+  /// - `Iterator of (lon, lat, radius)`, in (radians, radians, radians)
+  /// - `buf_capacity`: optional capacity of the internal builder buffer (number of cells at depth)
+  ///
+  /// # Panics
+  /// If this layer depth + `delta_depth` > the max depth (i.e. 29)
+  pub fn from_small_cones<I: Iterator<Item=(f64, f64, f64)>>(
+    depth: u8, 
+    delta_depth: u8,
+    cone_it: I, 
+    buf_capacity: Option<usize>
+  ) -> Self {
+    Self::from_fixed_depth_cells(
+      depth,
+      cone_it.map(move |(lon_rad, lat_rad, radius_rad)|
+        cone_coverage_approx_custom(depth, delta_depth, lon_rad, lat_rad, radius_rad)
+          .into_flat_iter()
+      ).flatten(),
+      buf_capacity
+    )
+  }
+  
+
   /// # Input
   /// - `lon` the longitude of the center of the elliptical cone, in radians
   /// - `lat` the latitude of the center of the elliptical cone, in radians
@@ -785,6 +844,28 @@ impl<'a, T: Idx, Q: MocQty<T>> RangeMOCIntoIterator<T> for &'a RangeMOC<T, Q> {
     RangeRefMocIter {
       depth_max: self.depth_max,
       iter: self.ranges.iter(),
+      last,
+      _qty: PhantomData
+    }
+  }
+}
+
+impl<'a, T: Idx, Q: MocQty<T>> RangeRefMocIter<'a, T, Q> {
+  /// # Warning
+  /// Unsafe because:
+  /// * we do not check that the quantity is the right one
+  /// * we do not check that the ranges are sorted (they must be!), ...
+  /// * we do not check that each range bounds is a cell not deeper than the given depth
+  pub fn from_borrowed_ranges_unsafe(depth_max: u8, ranges: BorrowedRanges<'a, T>) -> Self {
+    let l = ranges.0.len();
+    let last: Option<Range<T>> = if l > 0 {
+      Some(ranges.0[l - 1].clone())
+    } else {
+      None
+    };
+    Self {
+      depth_max,
+      iter: ranges.0.iter(),
       last,
       _qty: PhantomData
     }

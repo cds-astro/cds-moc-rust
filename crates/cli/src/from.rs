@@ -11,18 +11,28 @@ use structopt::StructOpt;
 
 use healpix::nested::Layer;
 
-use moclib::qty::{MocQty, Hpx, Time};
-use moclib::elem::valuedcell::valued_cells_to_moc_with_opt;
-use moclib::elemset::range::HpxRanges;
-use moclib::moc::RangeMOCIntoIterator;
-use moclib::moc::range::RangeMOC;
-use moclib::moc2d::{
-  RangeMOC2IntoIterator,
-  range::RangeMOC2
+use moclib::{
+  qty::{MocQty, Hpx, Time},
+  elem::valuedcell::valued_cells_to_moc_with_opt,
+  elemset::range::HpxRanges,
+  moc::{
+    RangeMOCIntoIterator,
+    range::{
+      RangeMOC,
+      op::multi_op::kway_or
+    }
+  },
+  moc2d::{
+    RangeMOC2IntoIterator,
+    range::RangeMOC2
+  },
+  deser::fits::{
+    multiordermap::from_fits_multiordermap,
+    skymap::from_fits_skymap
+  }
 };
 
-use super::InputTime;
-use super::output::OutputFormat;
+use super::{InputTime, output::OutputFormat};
 
 const HALF_PI: f64 = 0.5 * std::f64::consts::PI;
 const PI: f64 = std::f64::consts::PI;
@@ -54,6 +64,50 @@ impl FromStr for Vertices {
   }
 }
 
+#[derive(StructOpt, Clone, Debug)]
+/// Multi-order map input file format
+pub enum MultiOrderInputFormat {
+  #[structopt(name = "multires")]
+  /// Possibly gzipped Fits file supporting (a so far limited sub-set of) the multi-resolution format
+  FitsMultiRes {
+    #[structopt(parse(from_os_str))]
+    /// The input multi-order-map FITS file
+    input: PathBuf,
+    #[structopt(subcommand)]
+    out: OutputFormat
+  },
+  #[structopt(name = "skymap")]
+  /// Possibly gzipped Fits file supporting (a so far limited sub-set of) the skymap format.
+  FitsSkymap {
+    #[structopt(short = "s", long = "skip", default_value = "0.0")]
+    /// Skip cells having values lower or equals to the provided value
+    skip_vals_le_than: f64,
+    #[structopt(parse(from_os_str))]
+    /// The input multi-order-map FITS file
+    input: PathBuf,
+    #[structopt(subcommand)]
+    out: OutputFormat
+  },
+  #[structopt(name = "ascii")]
+  /// ASCII input containing a list of (non-overlapping) uniq cells associated with values (uniq first, then value).
+  Ascii {
+    /// Depth of the created MOC, in `[0, 29]`. Must be >= largest input cells depth.
+    depth: u8,
+    #[structopt(short = "d", long = "density")]
+    /// Input values are densities, i.e. they are not proportional to the area of their associated cells.
+    density: bool,
+    #[structopt(parse(from_os_str))]
+    /// The input file, use '-' for stdin
+    input: PathBuf,
+    #[structopt(short = "s", long = "separator", default_value = " ")]
+    /// Separator between both coordinates, if ascii (default = ' ')
+    separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat
+  },
+}
+
+
 #[derive(StructOpt, Debug)]
 pub enum From {
   #[structopt(name = "cone")]
@@ -70,6 +124,24 @@ pub enum From {
     #[structopt(subcommand)]
     out: OutputFormat
     // add option: inside / overallaping / partially_in / centers_in 
+  },
+  #[structopt(name = "cones")]
+  /// Create a Spatial MOC from a list of cones with centers and radius in decimal degrees 
+  /// (one pair per line, format: longitude_deg,latitude_deg,radius_deg).
+  MultiCone {
+    /// Depth of the created MOC, in `[0, 29]`.
+    depth: u8,
+    #[structopt(short = "m", long = "small")]
+    /// Use the lots of small cones (few cells each) algo instead of few large cones
+    small: bool,
+    #[structopt(parse(from_os_str))]
+    /// The input file containing one cone per line, use '-' for stdin
+    input: PathBuf,
+    #[structopt(short = "s", long = "separator", default_value = " ")]
+    /// File separator (default = ' ')
+    separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat,
   },
   #[structopt(name = "ring")]
   /// Create a Spatial MOC from the given ring
@@ -152,6 +224,26 @@ pub enum From {
     #[structopt(subcommand)]
     out: OutputFormat
   },
+  #[structopt(name = "multi")]
+  /// Create a Spatial MOC from regions in a CSV input. One region per input line. Format:
+  /// * cone,center_lon_deg,center_lat_deg,radius_deg
+  /// * ellipse,center_lon_deg,center_lat_deg,semi_maj_axis_deg,semi_min_axis_deg,position_angle_deg
+  /// * ring,center_lon_deg,center_lat_deg,internal_radius_deg,external_radius_deg
+  /// * box,center_lon_deg,center_lat_deg,semi_maj_axis_deg,semi_min_axis_deg,position_angle_deg
+  /// * zone,lon_min_deg,lat_min_deg,lon_max_deg,lat_max_deg
+  /// * polygon(,complement),vertex_lon_deg_1,vertex_lat_deg_1,vertex_lon_deg_2,vertex_lat_deg_2,...,vertex_lon_deg_n,vertex_lat_deg_n
+  MultiRegion {
+    /// Depth of the created MOC, in `[0, 29]`.
+    depth: u8,
+    #[structopt(parse(from_os_str))]
+    /// The input file containing one cone per line, use '-' for stdin
+    input: PathBuf,
+    #[structopt(short = "s", long = "separator", default_value = " ")]
+    /// File separator (default = ' ')
+    separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat,
+  },
   #[structopt(name = "pos")]
   /// Create a Spatial MOC from a list of positions in decimal degrees (one pair per line, longitude first, then latitude).
   Positions {
@@ -166,15 +258,9 @@ pub enum From {
     #[structopt(subcommand)]
     out: OutputFormat
   },
-  #[structopt(name = "vuniq")]
-  /// Create a Spatial MOC from a list of (non-overlapping) uniq cells associated with values (uniq first, then value),
-  /// i.e. from a multi-resolution map, putting completeness constraints.
+  #[structopt(name = "vcells")]
+  /// Create a Spatial MOC from list of (cell, value) tuples
   ValuedCells {
-    /// Depth of the created MOC, in `[0, 29]`. Must be >= largest input cells depth.
-    depth: u8,
-    #[structopt(short = "d", long = "density")]
-    /// Input values are densities, i.e. they are not proportional to the area of their associated cells.
-    density: bool,
     #[structopt(short = "f", long = "from", default_value = "0")]
     /// Cumulative value at which we start putting cells in he MOC.
     from_threshold: String,
@@ -192,16 +278,10 @@ pub enum From {
     split: bool,
     #[structopt(short = "r", long = "rev-descent")]
     /// Perform the recursive descent from the highest to the lowest sub-cell, only with option 'split' 
-    /// (set both flags to be compatibile with Aladin) 
+    /// (set both flags to be compatible with Aladin) 
     revese_recursive_descent: bool,
-    #[structopt(parse(from_os_str))]
-    /// The input file, use '-' for stdin
-    input: PathBuf,
-    #[structopt(short = "s", long = "separator", default_value = " ")]
-    /// Separator between both coordinates (default = ' ')
-    separator: String,
     #[structopt(subcommand)]
-    out: OutputFormat
+    input_type: MultiOrderInputFormat,
   },
   #[structopt(name = "timestamp")]
   /// Create a Time MOC from a list of timestamp (one per line).
@@ -295,15 +375,58 @@ impl From {
         r_deg,
         out
       } => {
-        let lon = lon_deg2rad(lon_deg)?;
-        let lat = lat_deg2rad(lat_deg)?;
-        let r = r_deg.to_radians();
-        if r <= 0.0 || PI <= r {
-          Err(String::from("Radius must be in ]0, pi[").into())
-        } else {
-          let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_cone(lon, lat, r, depth, 2);
-          out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
+        let moc = cone2moc(depth, lon_deg, lat_deg, r_deg)?;
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
+      },
+      From::MultiCone {
+        depth,
+        small,
+        input,
+        separator,
+        out,
+      } => {
+        fn line2cone_params(separator: &str, line: std::io::Result<String>) -> Result<(f64, f64, f64), Box<dyn Error>> {
+          let line = line?;
+          let (pos, radius) = line.trim()
+            .rsplit_once(separator)
+            .ok_or_else(|| String::from("rsplit to separate position from radius failed."))?;
+          let (lon_deg, lat_deg) = pos.trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("split to separate position components failed."))?;
+          let lon_deg = lon_deg.parse::<f64>()?;
+          let lat_deg = lat_deg.parse::<f64>()?;
+          let radius = radius.parse::<f64>()?;
+          let lon = lon_deg2rad(lon_deg)?;
+          let lat = lat_deg2rad(lat_deg)?;
+          let radius = radius.to_radians();
+          Ok((lon, lat, radius))
         }
+        let line2cone = move |line: std::io::Result<String>| {
+          match line2cone_params(&separator, line) {
+            Ok(lonlatrad) => Some(lonlatrad),
+            Err(e) => {
+              eprintln!("Error reading or parsing line: {:?}", e);
+              None
+            }
+          }
+        };
+        let moc: RangeMOC<u64, Hpx<u64>> = if input == PathBuf::from(r"-") {
+          let stdin = std::io::stdin();
+          if small {
+            RangeMOC::from_small_cones(depth, 2, stdin.lock().lines().filter_map(line2cone), None)
+          } else {
+            RangeMOC::from_large_cones(depth, 2, stdin.lock().lines().filter_map(line2cone))
+          }
+        } else {
+          let f = File::open(input)?;
+          let reader = BufReader::new(f);
+          if small {
+            RangeMOC::from_small_cones(depth, 2, reader.lines().filter_map(line2cone), None)
+          } else {
+            RangeMOC::from_large_cones(depth, 2, reader.lines().filter_map(line2cone))
+          }
+        };
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
       From::Ring {
         depth,
@@ -313,20 +436,8 @@ impl From {
         r_ext_deg,
         out
       } => {
-        let lon = lon_deg2rad(lon_deg)?;
-        let lat = lat_deg2rad(lat_deg)?;
-        let r_int = r_int_deg.to_radians();
-        let r_ext = r_ext_deg.to_radians();
-        if r_int <= 0.0 || PI <= r_int {
-          Err(String::from("Internal radius must be in ]0, pi[").into())
-        } else if r_ext <= 0.0 || PI <= r_ext {
-          Err(String::from("External radius must be in ]0, pi[").into())
-        } else if r_ext <= r_int {
-          Err(String::from("External radius must be larger than the internal radius").into())
-        } else {
-          let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_ring(lon, lat, r_int, r_ext, depth, 2);
-          out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
-        }
+        let moc = ring2moc(depth, lon_deg, lat_deg, r_int_deg, r_ext_deg)?;
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
       From::EllipticalCone {
         depth,
@@ -337,21 +448,8 @@ impl From {
         pa_deg,
         out
       } => {
-        let lon = lon_deg2rad(lon_deg)?;
-        let lat = lat_deg2rad(lat_deg)?;
-        let a = a_deg.to_radians();
-        let b = b_deg.to_radians();
-        let pa = pa_deg.to_radians();
-        if a <= 0.0 || HALF_PI <= a {
-          Err(String::from("Semi-major axis must be in ]0, pi/2]").into())
-        } else if b <= 0.0 || a <= b {
-          Err(String::from("Semi-minor axis must be in ]0, a[").into())
-        } else if pa <= 0.0 || HALF_PI <= pa {
-          Err(String::from("Position angle must be in [0, pi[").into())
-        } else {
-          let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth, 2);
-          out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
-        }
+        let moc = ellipse2moc(depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)?;
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
       From::Zone {
         depth,
@@ -361,11 +459,7 @@ impl From {
         lat_deg_max,
         out
       } => {
-        let lon_min = lon_deg2rad(lon_deg_min)?;
-        let lat_min = lat_deg2rad(lat_deg_min)?;
-        let lon_max = lon_deg2rad(lon_deg_max)?;
-        let lat_max = lat_deg2rad(lat_deg_max)?;
-        let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_zone(lon_min, lat_min, lon_max, lat_max, depth);
+        let moc = zone2moc(depth, lon_deg_min, lat_deg_min, lon_deg_max, lat_deg_max)?;
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
       From::Box {
@@ -377,21 +471,8 @@ impl From {
         pa_deg,
         out
       } => {
-        let lon = lon_deg2rad(lon_deg)?;
-        let lat = lat_deg2rad(lat_deg)?;
-        let a = a_deg.to_radians();
-        let b = b_deg.to_radians();
-        let pa = pa_deg.to_radians();
-        if a <= 0.0 || HALF_PI <= a {
-          Err(String::from("Semi-major axis must be in ]0, pi/2]").into())
-        } else if b <= 0.0 || a <= b {
-          Err(String::from("Semi-minor axis must be in ]0, a[").into())
-        } else if pa < 0.0 || PI <= pa {
-          Err(String::from("Position angle must be in [0, pi[").into())
-        } else {
-          let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_box(lon, lat, a, b, pa, depth);
-          out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
-        }
+        let moc = box2moc(depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)?;
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
       From::Polygon {
         depth,
@@ -406,6 +487,108 @@ impl From {
             Ok((lon, lat))
           }).collect::<Result<Vec<(f64, f64)>, Box<dyn Error>>>()?;
         let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_polygon(&vertices, complement, depth);
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
+      },
+      From::MultiRegion {
+        depth,
+        input,
+        separator,
+        out,
+      } => {
+        fn line2m(depth: u8, separator: &str, line: std::io::Result<String>) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
+          let line = line?;
+          let (geom, params) = line.trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("Fail to split on geom."))?;
+          let params: Vec<&str> = params.trim().split(separator).map(|s| s.trim()).collect();
+          match geom.trim() {
+            "cone" | "CONE" => { // center_lon_deg,center_lat_deg,radius_deg
+              if params.len() != 3 {
+                return Err(format!("Wrong params. Expected: 3 (lon_deg,lat_deg,radius_deg); Actual: {}.", params.len()).into());
+              }
+              let lon_deg = params[0].parse::<f64>()?;
+              let lat_deg = params[1].parse::<f64>()?;
+              let radius_deg = params[2].parse::<f64>()?;
+              cone2moc(depth, lon_deg, lat_deg, radius_deg)
+            },
+            "ellipse" | "ELLIPSE" => { // center_lon_deg,center_lat_deg,semi_maj_axis_deg,semi_min_axis_deg,position_angle_deg
+              if params.len() != 5 {
+                return Err(format!("Wrong params. Expected: 5 (lon_deg,lat_deg,a_deg,b_deg,pa_deg); Actual: {}.", params.len()).into());
+              }
+              let lon_deg = params[0].parse::<f64>()?;
+              let lat_deg = params[1].parse::<f64>()?;
+              let a_deg = params[2].parse::<f64>()?;
+              let b_deg = params[3].parse::<f64>()?;
+              let pa_deg = params[4].parse::<f64>()?;
+              ellipse2moc(depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)
+            },
+            "ring" | "RING" => { // center_lon_deg,center_lat_deg,internal_radius_deg,external_radius_deg
+              if params.len() != 4 {
+                return Err(format!("Wrong params. Expected: 5 (lon_deg,lat_deg,rint_deg,b_deg,rext_deg); Actual: {}.", params.len()).into());
+              }
+              let lon_deg = params[0].parse::<f64>()?;
+              let lat_deg = params[1].parse::<f64>()?;
+              let r_int_deg = params[2].parse::<f64>()?;
+              let r_ext_deg = params[3].parse::<f64>()?;
+              ring2moc(depth, lon_deg, lat_deg, r_int_deg, r_ext_deg)
+            },
+            "box" | "BOX" => { // center_lon_deg,center_lat_deg,semi_maj_axis_deg,semi_min_axis_deg,position_angle_deg
+              if params.len() != 5 {
+                return Err(format!("Wrong params. Expected: 5 (lon_deg,lat_deg,a_deg,b_deg,pa_deg); Actual: {}.", params.len()).into());
+              }
+              let lon_deg = params[0].parse::<f64>()?;
+              let lat_deg = params[1].parse::<f64>()?;
+              let a_deg = params[2].parse::<f64>()?;
+              let b_deg = params[3].parse::<f64>()?;
+              let pa_deg = params[4].parse::<f64>()?;
+              box2moc(depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)
+            },
+            "zone" | "ZONE" => { // lon_min_deg,lat_min_deg,lon_max_deg,lat_max_deg
+              if params.len() != 4 {
+                return Err(format!("Wrong params. Expected: 5 (lon_min_deg,lat_min_deg,lon_max_deg,lat_max_deg); Actual: {}.", params.len()).into());
+              }
+              let lon_min_deg = params[0].parse::<f64>()?;
+              let lat_min_deg = params[1].parse::<f64>()?;
+              let lon_max_deg = params[2].parse::<f64>()?;
+              let lat_max_deg = params[3].parse::<f64>()?;
+              zone2moc(depth, lon_min_deg, lat_min_deg, lon_max_deg, lat_max_deg)
+            } ,
+            "polygon" | "POLYGON" => { //,vertex_lon_deg_1,vertex_lat_deg_1,vertex_lon_deg_2,vertex_lat_deg_2,...,vertex_lon_deg_n,vertex_lat_deg_n,
+              let complement = params.len() > 1 && params[0] == "complement";
+              if ((params.len() & 1) == 1) != complement {
+                return Err(format!("Wrong params. Expected: even value (two coo per vertex); Actual: {}.", params.len()).into());
+              }
+              let vertices_deg: Vec<f64> = params.iter()
+                .map(|p| p.parse::<f64>())
+                .collect::<Result<Vec<f64>, ParseFloatError>>()?;
+              let vertices = vertices_deg.iter().step_by(2).zip(vertices_deg.iter().skip(1).step_by(2))
+                .map(|(lon_deg, lat_deg)| {
+                  let lon = lon_deg2rad(*lon_deg)?;
+                  let lat = lat_deg2rad(*lat_deg)?;
+                  Ok((lon, lat))
+                }).collect::<Result<Vec<(f64, f64)>, Box<dyn Error>>>()?;
+              Ok(RangeMOC::from_polygon(&vertices, complement, depth))
+            }
+            _ => Err(format!("Unrecognized geometry {}.Expected: cone, ellipse, rng, box, zone  oe polygon", geom).into())
+          }
+        }
+        let line2moc = move |line: std::io::Result<String>| {
+          match line2m(depth, &separator, line) {
+            Ok(moc) => Some(moc),
+            Err(e) => {
+              eprintln!("Error reading or parsing line: {:?}", e);
+              None
+            }
+          }
+        };
+        let moc: RangeMOC<u64, Hpx<u64>> = if input == PathBuf::from(r"-") {
+          let stdin = std::io::stdin();
+          kway_or(stdin.lock().lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
+        } else {
+          let f = File::open(input)?;
+          let reader = BufReader::new(f);
+          kway_or(reader.lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
+        };
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
       From::Positions {
@@ -445,17 +628,19 @@ impl From {
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
       From::ValuedCells {
-        depth,
-        density,
         from_threshold,
         to_threshold,
         asc,
         not_strict,
         split,
         revese_recursive_descent,
-        input,
-        separator,
-        out
+        input_type: MultiOrderInputFormat::Ascii {
+          depth,
+          density,
+          input,
+          separator,
+          out
+        },
       } => {
         let from_threshold = from_threshold.parse::<f64>()?;
         let to_threshold = to_threshold.parse::<f64>()?;
@@ -499,7 +684,7 @@ impl From {
               }
             }
           };
-         valued_cells_to_moc_with_opt::<u64, f64>(
+          valued_cells_to_moc_with_opt::<u64, f64>(
             depth,
             if input == PathBuf::from(r"-") {
               let stdin = std::io::stdin();
@@ -535,6 +720,55 @@ impl From {
           )
         };
         let moc = RangeMOC::new(depth, ranges);
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
+      },
+      From::ValuedCells {
+        from_threshold,
+        to_threshold,
+        asc,
+        not_strict,
+        split,
+        revese_recursive_descent,
+        input_type: MultiOrderInputFormat::FitsMultiRes { input, out },
+      } => {
+        let from_threshold = from_threshold.parse::<f64>()?;
+        let to_threshold = to_threshold.parse::<f64>()?;
+        let f = File::open(input)?;
+        let reader = BufReader::new(f);
+        let moc = from_fits_multiordermap(
+          reader,
+          from_threshold,
+          to_threshold,
+          asc,
+          !not_strict,
+          split,
+          revese_recursive_descent
+        )?;
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
+      },
+      From::ValuedCells {
+        from_threshold,
+        to_threshold,
+        asc,
+        not_strict,
+        split,
+        revese_recursive_descent,
+        input_type: MultiOrderInputFormat::FitsSkymap { skip_vals_le_than , input, out },
+      } => {
+        let from_threshold = from_threshold.parse::<f64>()?;
+        let to_threshold = to_threshold.parse::<f64>()?;
+        let f = File::open(input)?;
+        let reader = BufReader::new(f);
+        let moc = from_fits_skymap(
+          reader,
+          skip_vals_le_than,
+          from_threshold,
+          to_threshold,
+          asc,
+          !not_strict,
+          split,
+          revese_recursive_descent
+        )?;
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
       From::Timestamp {
@@ -743,15 +977,117 @@ fn lat_deg2rad(lat_deg: f64) -> Result<f64, Box<dyn Error>> {
 }
 
 
+fn cone2moc(
+  depth: u8,
+  lon_deg: f64,
+  lat_deg: f64,
+  radius_deg: f64
+) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
+  let lon = lon_deg2rad(lon_deg)?;
+  let lat = lat_deg2rad(lat_deg)?;
+  let r = radius_deg.to_radians();
+  if r <= 0.0 || PI <= r {
+    Err(format!("Radius must be in ]0, pi[. Actual: {}.", r).into())
+  } else {
+    Ok(RangeMOC::<u64, Hpx<u64>>::from_cone(lon, lat, r, depth, 2))
+  }
+}
+
+fn ellipse2moc(
+  depth: u8, 
+  lon_deg: f64, 
+  lat_deg: f64, 
+  a_deg: f64, 
+  b_deg: f64, 
+  pa_deg: f64
+) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
+  let lon = lon_deg2rad(lon_deg)?;
+  let lat = lat_deg2rad(lat_deg)?;
+  let a = a_deg.to_radians();
+  let b = b_deg.to_radians();
+  let pa = pa_deg.to_radians();
+  if a <= 0.0 || HALF_PI <= a {
+    Err(String::from("Semi-major axis must be in ]0, pi/2]").into())
+  } else if b <= 0.0 || a <= b {
+    Err(String::from("Semi-minor axis must be in ]0, a[").into())
+  } else if pa <= 0.0 || HALF_PI <= pa {
+    Err(String::from("Position angle must be in [0, pi[").into())
+  } else {
+    Ok(RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth, 2))
+  }
+}
+
+fn ring2moc(
+  depth: u8,
+  lon_deg: f64,
+  lat_deg: f64,
+  r_int_deg: f64,
+  r_ext_deg: f64
+) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
+  let lon = lon_deg2rad(lon_deg)?;
+  let lat = lat_deg2rad(lat_deg)?;
+  let r_int = r_int_deg.to_radians();
+  let r_ext = r_ext_deg.to_radians();
+  if r_int <= 0.0 || PI <= r_int {
+    Err(String::from("Internal radius must be in ]0, pi[").into())
+  } else if r_ext <= 0.0 || PI <= r_ext {
+    Err(String::from("External radius must be in ]0, pi[").into())
+  } else if r_ext <= r_int {
+    Err(String::from("External radius must be larger than the internal radius").into())
+  } else {
+    Ok(RangeMOC::from_ring(lon, lat, r_int, r_ext, depth, 2))
+  }
+}
+
+fn box2moc(
+  depth: u8,
+  lon_deg: f64,
+  lat_deg: f64,
+  a_deg: f64,
+  b_deg: f64,
+  pa_deg: f64
+) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
+  let lon = lon_deg2rad(lon_deg)?;
+  let lat = lat_deg2rad(lat_deg)?;
+  let a = a_deg.to_radians();
+  let b = b_deg.to_radians();
+  let pa = pa_deg.to_radians();
+  if a <= 0.0 || HALF_PI <= a {
+    Err(String::from("Semi-major axis must be in ]0, pi/2]").into())
+  } else if b <= 0.0 || a <= b {
+    Err(String::from("Semi-minor axis must be in ]0, a[").into())
+  } else if pa < 0.0 || PI <= pa {
+    Err(String::from("Position angle must be in [0, pi[").into())
+  } else {
+    Ok(RangeMOC::from_box(lon, lat, a, b, pa, depth))
+  }
+}
+
+fn zone2moc(
+  depth: u8,
+  lon_min_deg: f64,
+  lat_min_deg: f64,
+  lon_max_deg: f64,
+  lat_max_deg: f64,
+) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
+  let lon_min = lon_deg2rad(lon_min_deg)?;
+  let lat_min = lat_deg2rad(lat_min_deg)?;
+  let lon_max = lon_deg2rad(lon_max_deg)?;
+  let lat_max = lat_deg2rad(lat_max_deg)?;
+  Ok(RangeMOC::from_zone(lon_min, lat_min, lon_max, lat_max, depth))
+}
+
 #[cfg(test)]
 mod tests {
 
   use std::fs;
   use std::path::PathBuf;
   
-  use crate::from::From;
-  use crate::output::OutputFormat;
-  use crate::InputTime;
+  use crate::{
+    InputTime,
+    from::{From, MultiOrderInputFormat},
+    output::OutputFormat,
+  };
 
   // Yes, I could have mad a single function with different parameters... 
 
@@ -783,21 +1119,23 @@ mod tests {
     let expected = "test/resources/gw190425z_skymap.default.expected.txt";
     let actual = "test/resources/gw190425z_skymap.default.actual.txt";
     let from = From::ValuedCells {
-      depth: 8,
-      density: true,
       from_threshold: String::from("0"),
       to_threshold: String::from("0.9"),
       asc: false,
       not_strict: true,
       split: true,
       revese_recursive_descent: false,
-      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
-      separator: String::from(","),
-      out: OutputFormat::Ascii {
-        fold: Some(80),
-        range_len: false,
-        opt_file: Some(actual.into()),
-      }
+      input_type: MultiOrderInputFormat::Ascii {
+        depth: 8,
+        density: true,
+        input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+        separator: String::from(","),
+        out: OutputFormat::Ascii {
+          fold: Some(80),
+          range_len: false,
+          opt_file: Some(actual.into()),
+        }
+      },
     };
     from.exec().unwrap();
     // Check results
@@ -811,21 +1149,23 @@ mod tests {
     let expected = "test/resources/gw190425z_skymap.rrd.expected.txt";
     let actual = "test/resources/gw190425z_skymap.rrd.actual.txt";
     let from = From::ValuedCells {
-      depth: 8,
-      density: true,
       from_threshold: String::from("0"),
       to_threshold: String::from("0.9"),
       asc: false,
       not_strict: true,
       split: true,
       revese_recursive_descent: true,
-      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
-      separator: String::from(","),
-      out: OutputFormat::Ascii {
-        fold: Some(80),
-        range_len: false,
-        opt_file: Some(actual.into()),
-      }
+      input_type: MultiOrderInputFormat::Ascii {
+        depth: 8,
+        density: true,
+        input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+        separator: String::from(","),
+        out: OutputFormat::Ascii {
+          fold: Some(80),
+          range_len: false,
+          opt_file: Some(actual.into()),
+        }
+      },
     };
     from.exec().unwrap();
     // Check results
@@ -839,21 +1179,23 @@ mod tests {
     let expected = "test/resources/gw190425z_skymap.strict.expected.txt";
     let actual = "test/resources/gw190425z_skymap.strict.actual.txt";
     let from = From::ValuedCells {
-      depth: 8,
-      density: true,
       from_threshold: String::from("0"),
       to_threshold: String::from("0.9"),
       asc: false,
       not_strict: false,
       split: true,
       revese_recursive_descent: false,
-      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
-      separator: String::from(","),
-      out: OutputFormat::Ascii {
-        fold: Some(80),
-        range_len: false,
-        opt_file:  Some(actual.into()),
-      }
+      input_type: MultiOrderInputFormat::Ascii {
+        depth: 8,
+        density: true,
+        input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+        separator: String::from(","),
+        out: OutputFormat::Ascii {
+          fold: Some(80),
+          range_len: false,
+          opt_file: Some(actual.into()),
+        }
+      },
     };
     from.exec().unwrap();
     // Check results
@@ -867,21 +1209,23 @@ mod tests {
     let expected = "test/resources/gw190425z_skymap.strict.rrd.expected.txt";
     let actual = "test/resources/gw190425z_skymap.strict.rrd.actual.txt";
     let from = From::ValuedCells {
-      depth: 8,
-      density: true,
       from_threshold: String::from("0"),
       to_threshold: String::from("0.9"),
       asc: false,
       not_strict: false,
       split: true,
       revese_recursive_descent: true,
-      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
-      separator: String::from(","),
-      out: OutputFormat::Ascii {
-        fold: Some(80),
-        range_len: false,
-        opt_file:  Some(actual.into()),
-      }
+      input_type: MultiOrderInputFormat::Ascii {
+        depth: 8,
+        density: true,
+        input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+        separator: String::from(","),
+        out: OutputFormat::Ascii {
+          fold: Some(80),
+          range_len: false,
+          opt_file: Some(actual.into()),
+        }
+      },
     };
     from.exec().unwrap();
     // Check results
@@ -895,21 +1239,23 @@ mod tests {
     let expected = "test/resources/gw190425z_skymap.strict.nosplit.expected.txt";
     let actual = "test/resources/gw190425z_skymap.strict.nosplit.actual.txt";
     let from = From::ValuedCells {
-      depth: 8,
-      density: true,
       from_threshold: String::from("0"),
       to_threshold: String::from("0.9"),
       asc: false,
       not_strict: false,
       split: false,
       revese_recursive_descent: false,
-      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
-      separator: String::from(","),
-      out: OutputFormat::Ascii {
-        fold: Some(80),
-        range_len: false,
-        opt_file:  Some(actual.into()),
-      }
+      input_type: MultiOrderInputFormat::Ascii {
+        depth: 8,
+        density: true,
+        input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+        separator: String::from(","),
+        out: OutputFormat::Ascii {
+          fold: Some(80),
+          range_len: false,
+          opt_file: Some(actual.into()),
+        }
+      },
     };
     from.exec().unwrap();
     // Check results
@@ -923,21 +1269,23 @@ mod tests {
     let expected = "test/resources/gw190425z_skymap.nosplit.expected.txt";
     let actual = "test/resources/gw190425z_skymap.nosplit.actual.txt";
     let from = From::ValuedCells {
-      depth: 8,
-      density: true,
       from_threshold: String::from("0"),
       to_threshold: String::from("0.9"),
       asc: false,
       not_strict: true,
       split: false,
       revese_recursive_descent: false,
-      input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
-      separator: String::from(","),
-      out: OutputFormat::Ascii {
-        fold: Some(80),
-        range_len: false,
-        opt_file:  Some(actual.into()),
-      }
+      input_type: MultiOrderInputFormat::Ascii {
+        depth: 8,
+        density: true,
+        input: PathBuf::from("test/resources/gw190425z_skymap.multiorder.csv"),
+        separator: String::from(","),
+        out: OutputFormat::Ascii {
+          fold: Some(80),
+          range_len: false,
+          opt_file: Some(actual.into()),
+        }
+      },
     };
     from.exec().unwrap();
     // Check results

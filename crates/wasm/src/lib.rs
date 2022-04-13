@@ -2,7 +2,7 @@ extern crate console_error_panic_hook;
 
 use std::panic;
 use std::str::{from_utf8, from_utf8_unchecked};
-use std::io::Cursor;
+use std::io::{Cursor, BufReader};
 
 use unreachable::{UncheckedOptionExt, UncheckedResultExt};
 
@@ -38,7 +38,8 @@ use moclib::deser::{
   json::{from_json_aladin, cellmoc2d_from_json_aladin},
   fits::{
     from_fits_ivoa, MocIdxType,
-    multiordermap::from_fits_multiordermap
+    multiordermap::from_fits_multiordermap,
+    skymap::from_fits_skymap
   }
 };
 
@@ -304,8 +305,85 @@ pub fn from_local_multiordermap(
         // We accept only ".fits" files so splitting on "." should be safe.
         let (name, ext) = unsafe { file_name.rsplit_once('.').unchecked_unwrap() };
         let res = match ext {
-          "fits" => from_multiordermap_fits_file(
+          "fits" | "gz" => from_multiordermap_fits_file(
             name, &file_content, from_threshold, to_threshold, 
+            asc, not_strict, split, revese_recursive_descent
+          ),
+          _ => unreachable!(), // since file_input.set_attribute("accept", ".fits");
+        };
+        match res {
+          Err(e) => log(&e.as_string().unwrap_or_else(|| String::from("Error parsing file"))),
+          _ => { },
+        };
+      }) as Box<dyn FnMut(_)>);
+      file_reader.set_onload(Some(file_onload.as_ref().unchecked_ref()));
+      file_onload.forget();
+    }
+  }) as Box<dyn FnMut(_)>);
+
+  // Create a temporary input file and click on it
+  // - get the body
+  let window = web_sys::window().expect("no global `window` exists");
+  // This could be used but not yet in web_sys: https://developer.mozilla.org/en-US/docs/Web/API/Window/showOpenFilePicker
+  let document = window.document().expect("should have a document on window");
+  let body = document.body().expect("document should have a body");
+  // - create the input
+  let file_input: HtmlInputElement = unsafe { document.create_element("input").unchecked_unwrap_ok().dyn_into()? };
+  file_input.set_type("file");
+  unsafe {
+    file_input.set_attribute("multiple", "").unchecked_unwrap_ok();
+    file_input.set_attribute("hidden", "").unchecked_unwrap_ok();
+    file_input.set_attribute("accept", ".fits").unchecked_unwrap_ok();
+  }
+  file_input.add_event_listener_with_callback("change", file_input_action.as_ref().unchecked_ref())?;
+  file_input_action.forget();
+  // - attach the input
+  body.append_child(&file_input)?;
+  // - simulate a click
+  file_input.click();
+  // - remove the input
+  body.remove_child(&file_input)?;
+  Ok(())
+}
+
+/// Open the file selection dialog and load the skymap fits file 
+/// (for security reasons, we cannot simply provide a path on the client machine).
+/// # Warning
+/// Because of security restriction, the call to this method
+/// **"needs to be triggered within a code block that was the handler of a user-initiated event"**
+#[wasm_bindgen(js_name = "fromLocalSkymap", catch)]
+pub fn from_local_skymap(
+  skip_values_le: f64,
+  from_threshold: f64,
+  to_threshold: f64,
+  asc: bool,
+  not_strict: bool,
+  split: bool,
+  revese_recursive_descent: bool,
+) -> Result<(), JsValue> {
+  // Create the file input action that will be fired by the event 'change'
+  let file_input_action = Closure::wrap(Box::new(move |event: Event| {
+    let element = unsafe { event.target().unchecked_unwrap().dyn_into::<HtmlInputElement>().unchecked_unwrap_ok() };
+    let filelist = unsafe {  element.files().unchecked_unwrap() };
+    for i in 0..filelist.length() {
+      let file = unsafe {  filelist.get(i).unchecked_unwrap() };
+      let file_name = file.name();
+      let file_reader = unsafe {  FileReader::new().unchecked_unwrap_ok() };
+      // There is a stream method, but I am not sure how to use it. I am so far going the easy way.
+      match file_reader.read_as_array_buffer(&file) {
+        Err(_) => log("Error reading file content"),
+        _ => { },
+      };
+      let file_onload = Closure::wrap(Box::new(move |event: Event| {
+        let file_reader: FileReader = unsafe { event.target().unchecked_unwrap().dyn_into().unchecked_unwrap_ok() };
+        let file_content = unsafe { file_reader.result().unchecked_unwrap_ok() };
+        let file_content: Vec<u8> = js_sys::Uint8Array::new(&file_content).to_vec();
+        // log(&format!("File len {:?}", file_content.len()));
+        // We accept only ".fits" files so splitting on "." should be safe.
+        let (name, ext) = unsafe { file_name.rsplit_once('.').unchecked_unwrap() };
+        let res = match ext {
+          "fits" | "gz" => from_skymap_fits_file(
+            name, &file_content, skip_values_le, from_threshold, to_threshold,
             asc, not_strict, split, revese_recursive_descent
           ),
           _ => unreachable!(), // since file_input.set_attribute("accept", ".fits");
@@ -360,7 +438,7 @@ pub fn from_fits(name: &str, data: &[u8]) -> Result<(), JsValue> {
   store::add(name, moc)
 }
 
-/// Create o S-MOC from a FITS multi-prder map plus other parameters.
+/// Create o S-MOC from a FITS multi-order map plus other parameters.
 /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
 /// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
 /// * `asc`: Compute cumulative value from ascending density values instead of descending (often = false).
@@ -379,7 +457,7 @@ pub fn from_multiordermap_fits_file(
   revese_recursive_descent: bool,
 ) -> Result<(), JsValue> {
   let moc = from_fits_multiordermap(
-    Cursor::new(data),
+    BufReader::new(Cursor::new(data)),
     from_threshold,
     to_threshold,
     asc,
@@ -391,24 +469,39 @@ pub fn from_multiordermap_fits_file(
   store::add(name, InternalMoc::Space(moc))
 }
 
-/*
-#[wasm_bindgen(js_name = "fromFitsMulitOrderMapStd", catch)]
-pub fn from_mutlitordermap_fits_file_std(
+/// Create o S-MOC from a FITS skymap plus other parameters.
+/// * `skip_values_le`: skip cells associated to values lower or equal to the given value 
+/// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
+/// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
+/// * `asc`: Compute cumulative value from ascending density values instead of descending (often = false).
+/// * `not_strict`: Cells overlapping with the upper or the lower cumulative bounds are not rejected (often = false).
+/// * `split`: Split recursively the cells overlapping the upper or the lower cumulative bounds (often = false).
+/// * `revese_recursive_descent`: Perform the recursive descent from the highest to the lowest sub-cell, only with option 'split' (set both flags to be compatibile with Aladin)
+#[wasm_bindgen(js_name = "fromFitsSkymap", catch)]
+pub fn from_skymap_fits_file(
   name: &str,
   data: &[u8],
+  skip_values_le: f64,
+  from_threshold: f64,
+  to_threshold: f64,
+  asc: bool,
+  not_strict: bool,
+  split: bool,
+  revese_recursive_descent: bool,
 ) -> Result<(), JsValue> {
-  let moc = from_fits_multiordermap(
-    Cursor::new(data),
-    0.0,
-    0.9,
-    false,
-    true,
-    false,
-    false
+  let moc = from_fits_skymap(
+    BufReader::new(Cursor::new(data)),
+    skip_values_le,
+    from_threshold,
+    to_threshold,
+    asc,
+    !not_strict,
+    split,
+    revese_recursive_descent
   ).map_err(|e| JsValue::from_str(&e.to_string()))?;
   // Add it to the store
   store::add(name, InternalMoc::Space(moc))
-}*/
+}
 
 /// # Args
 /// * `name`: name used to store the loaded MOC
@@ -475,14 +568,48 @@ pub async fn from_multiordermap_url(
   }
 }
 
-/*
-/// WARNING: if this is not working, check e.g. with `wget -v -S ${url}` the the content type is
-/// `Content-Type: application/fits`.
-#[wasm_bindgen(js_name = "fromMultiOrderMapFitsUrlStd")]
-pub async fn from_multiordermap_url_std(name: String, url: String) -> Result<(), JsValue> {
-  console_error_panic_hook::set_once();
-  from_url(name, url, "application/fits", Box::new(from_mutlitordermap_fits_file_std)).await
-}*/
+/// # Args
+/// * `name`: name used to store the loaded MOC
+/// * `url`: URL of the FITS file
+/// * `...`: same paramters as `fromFitsMultiOrderMap`
+/// * `accept_mime_types`: use `None` (Rust) or `null` (Javascript) to use the default `application/fits`
+/// # WARNING
+///   If this is not working, check e.g. with `wget -v -S ${url}` the the content type is
+///   `Content-Type: application/fits`.
+///   Else use the `accept_mime_types` option to set the `Accept` HTTP request parameter, with e.g:
+///   * `application/fits` (default value)
+///   * `application/fits, application/octet-stream`
+//   * "*/*"
+#[wasm_bindgen(js_name = "fromSkymapFitsUrl")]
+pub async fn from_skymap_url(
+  name: String,
+  url: String,
+  skip_values_le: f64,
+  from_threshold: f64,
+  to_threshold: f64,
+  asc: bool,
+  not_strict: bool,
+  split: bool,
+  revese_recursive_descent: bool,
+  accept_mime_types: Option<String>
+) -> Result<(), JsValue>
+{
+  let func = move |name: &str, data: &[u8]| from_skymap_fits_file(
+    name,
+    data,
+    skip_values_le,
+    from_threshold,
+    to_threshold,
+    asc,
+    not_strict,
+    split,
+    revese_recursive_descent
+  );
+  match accept_mime_types {
+    None =>             from_url(name, url, "application/fits", Box::new(func)).await,
+    Some(mime_types) => from_url(name, url, &mime_types, Box::new(func)).await,
+  }
+}
 
 // - from ASCII
 
@@ -827,7 +954,7 @@ pub fn from_coo(
   coos_deg: Box<[f64]>,
 ) ->  Result<(), JsValue> {
   // An other solution would be to go unsafe to transmute coos_deg in Box<[[f64; 2]]> ...
-  let moc: RangeMOC<u64, Hpx<u64>> =  RangeMOC::from_coos(
+  let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_coos(
     depth,
     coos_deg.iter().step_by(2).zip(coos_deg.iter().skip(1).step_by(2))
       .filter_map(|(lon_deg, lat_deg)| {
@@ -842,6 +969,61 @@ pub fn from_coo(
   );
   store::add(name, InternalMoc::Space(moc))
 }
+
+/// Create a new MOC from the given list of cone centers and radii
+/// Adapted for a large number of small cones (a few cells each).
+/// # Params
+/// * `name`: the name to be given to the MOC
+/// * `depth`: MOC maximum depth in `[0, 29]`
+/// * `coos_and_radius_deg`: list of coordinates adn radii in degrees
+///   `[lon_1, lat_1, rad_1, lon_2, lat_2, rad_2, ..., lon_n, lat_n, rad_n]` 
+#[wasm_bindgen(js_name = "fromSmallCones", catch)]
+pub fn from_small_cones(
+  name: &str, depth: u8,
+  coos_and_radius_deg: Box<[f64]>,
+) ->  Result<(), JsValue> {
+  let coos_rad = coos_and_radius_deg.iter().step_by(3).zip(
+    coos_and_radius_deg.iter().skip(1).step_by(3)).zip(
+    coos_and_radius_deg.iter().skip(2).step_by(3)
+  ).filter_map(|((lon_deg, lat_deg), radius_deg) | {
+      let lon = lon_deg2rad(*lon_deg).ok();
+      let lat = lat_deg2rad(*lat_deg).ok();
+      match (lon, lat) {
+        (Some(lon), Some(lat)) => Some((lon, lat, (*radius_deg).to_radians())),
+        _ => None,
+      }
+    });
+  let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_small_cones(depth, 2, coos_rad, None);
+  store::add(name, InternalMoc::Space(moc))
+}
+
+/// Create a new MOC from the given list of cone centers and radii
+/// Adapted for a reasonable number of possibly large cones.
+/// # Params
+/// * `name`: the name to be given to the MOC
+/// * `depth`: MOC maximum depth in `[0, 29]`
+/// * `coos_and_radius_deg`: list of coordinates adn radii in degrees
+///   `[lon_1, lat_1, rad_1, lon_2, lat_2, rad_2, ..., lon_n, lat_n, rad_n]` 
+#[wasm_bindgen(js_name = "fromLargeCones", catch)]
+pub fn from_large_cones(
+  name: &str, depth: u8,
+  coos_and_radius_deg: Box<[f64]>,
+) ->  Result<(), JsValue> {
+  let coos_rad = coos_and_radius_deg.iter().step_by(3).zip(
+    coos_and_radius_deg.iter().skip(1).step_by(3)).zip(
+    coos_and_radius_deg.iter().skip(2).step_by(3)
+  ).filter_map(|((lon_deg, lat_deg), radius_deg) | {
+    let lon = lon_deg2rad(*lon_deg).ok();
+    let lat = lat_deg2rad(*lat_deg).ok();
+    match (lon, lat) {
+      (Some(lon), Some(lat)) => Some((lon, lat, (*radius_deg).to_radians())),
+      _ => None,
+    }
+  });
+  let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_large_cones(depth, 2, coos_rad);
+  store::add(name, InternalMoc::Space(moc))
+}
+
 
 /// Create a new T-MOC from the given list of decimal Julian Days (JD) times.
 /// # Params

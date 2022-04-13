@@ -79,6 +79,12 @@ impl<T: Idx, Q: MocQty<T>> From<&MocCell<T, Q>> for Cell<T> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct MocCell<T: Idx, Q: MocQty<T>>(pub Cell<T>, PhantomData<Q>);
 
+impl<T: Idx, Q: MocQty<T>> MocCell<T, Q> {
+  pub fn depth(&self) -> u8 {
+    self.0.depth  
+  }
+}
+
 impl<T: Idx, Q: MocQty<T>> Ord for MocCell<T, Q> {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.0.depth.cmp(&other.0.depth) {

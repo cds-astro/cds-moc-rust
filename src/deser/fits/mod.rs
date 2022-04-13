@@ -9,14 +9,18 @@ use byteorder::BigEndian;
 
 use crate::idx::Idx;
 use crate::qty::{MocQty, Hpx, Time, MocableQty};
-use crate::deser::fits::error::FitsError;
-use crate::deser::fits::common::{
-  consume_primary_hdu, next_36_chunks_of_80_bytes, check_keyword_and_val,
-  check_keyword_and_parse_uint_val, write_primary_hdu, write_uint_mandatory_keyword_record
-};
-use crate::deser::fits::keywords::{
-  MocKeywordsMap, MocKeywords, MocVers, MocDim, Ordering, FitsCard, MocOrder, TForm1,
-  MocOrdS, MocOrdT, TimeSys, MocId, MocTool, CoordSys, TType1
+use crate::deser::{
+  fits::{
+    error::FitsError,
+    common::{
+      consume_primary_hdu, next_36_chunks_of_80_bytes, check_keyword_and_val,
+      check_keyword_and_parse_uint_val, write_primary_hdu, write_uint_mandatory_keyword_record
+    },
+    keywords::{
+      MocKeywordsMap, MocKeywords, MocVers, MocDim, Ordering, FitsCard, MocOrder, TForm1,
+      MocOrdS, MocOrdT, TimeSys, MocId, MocTool, CoordSys, TType1
+    }
+  }
 };
 use crate::elem::cell::Cell;
 use crate::elemset::{
@@ -39,6 +43,8 @@ pub mod common;
 pub mod error;
 pub mod keywords;
 pub mod multiordermap;
+pub mod skymap;
+
 
 #[derive(Debug)]
 pub enum MocIdxType<R: BufRead> {
@@ -486,6 +492,7 @@ fn build_range_moc2d_keywords<T: Idx>(
 
 // FROM FITS
 
+// We do not support compressed MOCs
 pub fn from_fits_ivoa<R: BufRead>(mut reader: R) -> Result<MocIdxType<R>, FitsError> {
   let mut header_block = [b' '; 2880];
   consume_primary_hdu(&mut reader,  &mut header_block)?;
@@ -539,6 +546,7 @@ pub fn from_fits_ivoa<R: BufRead>(mut reader: R) -> Result<MocIdxType<R>, FitsEr
             Some(MocKeywords::MOCOrdS(MocOrdS { depth })) => *depth,
             _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
           };
+          moc_kws.check_coordsys()?;
           match moc_kws.get(PhantomData::<Ordering>) {
             Some(MocKeywords::Ordering(Ordering::Nuniq)) => load_s_moc_nuniq(reader, n_bytes, n_elems, depth_max, &moc_kws),
             Some(MocKeywords::Ordering(Ordering::Range)) => load_s_moc_range(reader, n_bytes, n_elems, depth_max, &moc_kws),
@@ -1204,7 +1212,7 @@ mod tests {
         assert_eq!(moc.next(), Some(Range { start: 1073741824, end: 2684354560}));
         assert_eq!(moc.next(), None);
       },
-      //Err(e) => println!("{}", e),
+      // Err(e) => println!("{}", e),
       _ => assert!(false),
     }
   }

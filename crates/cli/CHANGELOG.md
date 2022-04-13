@@ -1,5 +1,15 @@
 # `moc-cli` Change Log
 
+## 0.4.0
+
+Realeased 2022-04-13
+
+* Add `from multi` to build a MOC from muliple regions at once
+* Add `from cones` to build a MOC from multiple cones (possibly a lot of small cones) at once
+* Accept (possibly gzipped) multi-resolution fits files
+* Accept (possibly gzipped) skymap fits files
+
+
 ## 0.3.2
 
 Realeased 2022-03-22

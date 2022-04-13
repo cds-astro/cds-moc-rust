@@ -1,5 +1,17 @@
 # `moc` Change Log
 
+## 0.8.0
+
+Released 2022-04-13
+
+### Added
+
+* Add the multi `or` operation
+* Add MOC from mulitple cones (a lot of small cones or a resonnable number of large cones)
+* Add support for specific FITS skymaps (possibly gzipped)
+* Add gzip support for FITS Multi-Order Map
+
+
 ## 0.7.1
 
 Released 2022-03-22 (not a bug fix)

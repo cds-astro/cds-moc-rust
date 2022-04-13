@@ -11,3 +11,5 @@ pub mod and;   // <=> intersection
 pub mod or;    // <=> union
 pub mod minus; // <=> mocpy difference = Aladin Soustracction
 pub mod xor;   // <=> Aladin Difference
+
+pub mod multi_op;

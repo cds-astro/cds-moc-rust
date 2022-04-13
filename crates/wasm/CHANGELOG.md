@@ -1,5 +1,13 @@
 # `moc-wasm` Change Log
 
+## 0.4.0
+
+Realeased 2022-04-13
+
+* Add support for (possibly gzipped) skymaps of fixed format
+* Add gzip support for multi-resolution maps
+
+
 ## 0.3.2
 
 Realeased 2022-03-22

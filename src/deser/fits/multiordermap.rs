@@ -1,7 +1,7 @@
 
-use std::marker::PhantomData;
-use std::io::BufRead;
+use std::io::{Read, Seek, BufRead, BufReader};
 use std::f64::consts::PI;
+use std::marker::PhantomData;
 
 use byteorder::{ReadBytesExt, BigEndian};
 
@@ -9,12 +9,20 @@ use crate::idx::Idx;
 use crate::qty::Hpx;
 use crate::elem::valuedcell::valued_cells_to_moc_with_opt;
 use crate::moc::range::RangeMOC;
-use crate::deser::fits::error::FitsError;
-use crate::deser::fits::common::{
-  consume_primary_hdu, next_36_chunks_of_80_bytes, check_keyword_and_val,
-  check_keyword_and_parse_uint_val
+use crate::deser::{
+  gz::{is_gz, uncompress},
+  fits::{
+    error::FitsError,
+    keywords::{
+      MocKeywordsMap, MocKeywords, FitsCard,
+      Ordering, MocOrder
+    },
+    common::{
+      consume_primary_hdu, next_36_chunks_of_80_bytes, check_keyword_and_val,
+      check_keyword_and_parse_uint_val
+    }
+  }
 };
-use crate::deser::fits::keywords::{MocKeywordsMap, MocKeywords, Ordering, FitsCard, MocOrder};
 
 
 /// We expect the FITS file to be a BINTABLE containing a multi-order map.
@@ -24,7 +32,7 @@ use crate::deser::fits::keywords::{MocKeywordsMap, MocKeywords, Ordering, FitsCa
 /// XTENSION= 'BINTABLE'           / binary table extension                         
 /// BITPIX  =                    8 / array data type                                
 /// NAXIS   =                    2 / number of array dimensions 
-/// AXIS1  =                    ?? / length of dimension 1                          
+/// NAXIS1  =                    ?? / length of dimension 1                          
 /// NAXIS2  =                   ?? / length of dimension 2                          
 /// PCOUNT  =                    0 / number of group parameters                     
 /// GCOUNT  =                    1 / number of groups                               
@@ -52,7 +60,28 @@ use crate::deser::fits::keywords::{MocKeywordsMap, MocKeywords, Ordering, FitsCa
 /// * `strict`: (sub-)cells overlapping the `cumul_from` or `cumul_to` values are not added
 /// * `no_split`: cells overlapping the `cumul_from` or `cumul_to` values are not recursively split
 /// * `reverse_decent`: perform the recursive decent from the highest cell number to the lowest (to be compatible with Aladin)
-pub fn from_fits_multiordermap<R: BufRead>(
+/// 
+/// # Info
+///   Supports gz input stream
+/// 
+pub fn from_fits_multiordermap<R: Read + Seek>(
+  mut reader: BufReader<R>,
+  cumul_from: f64,
+  cumul_to: f64,
+  asc: bool,
+  strict: bool,
+  no_split: bool,
+  reverse_decent: bool,
+) -> Result<RangeMOC<u64, Hpx::<u64>>, FitsError> {
+  if is_gz(&mut reader)? {
+    let reader = uncompress(reader);
+    from_fits_multiordermap_internal(reader,cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
+  } else {
+    from_fits_multiordermap_internal(reader, cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
+  }
+}
+
+fn from_fits_multiordermap_internal<R: BufRead>(
   mut reader: R,
   cumul_from: f64,
   cumul_to: f64,
@@ -102,21 +131,14 @@ pub fn from_fits_multiordermap<R: BufRead>(
     it80 = next_36_chunks_of_80_bytes(&mut reader, &mut header_block)?;
   }
   // Check header params
+  moc_kws.check_pixtype()?;
+  moc_kws.check_ordering(Ordering::Nuniq)?;
+  moc_kws.check_coordsys()?;
   // - get MOC depth
   let depth_max = match moc_kws.get(PhantomData::<MocOrder>) {
     Some(MocKeywords::MOCOrder(MocOrder { depth })) => *depth,
     _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
   };
-  // - ensure ordering is uniq
-  match moc_kws.get(PhantomData::<Ordering>) {
-    Some(MocKeywords::Ordering(Ordering::Nuniq)) => Ok(()),
-    Some(MocKeywords::Ordering(ordering)) => Err(FitsError::UnexpectedValue(
-      Ordering::keyword_string(),       // keyword
-      Ordering::Nuniq.to_fits_value(),  // expected
-      ordering.to_fits_value()          // actual
-    )),
-    _ => Ok(()), // We don't care if we do not find it or if its not the good one...
-  }?;
   // Read data
   let n_byte_skip = (n_bytes_per_row - 16) as usize;
   let mut sink = vec![0; n_byte_skip];

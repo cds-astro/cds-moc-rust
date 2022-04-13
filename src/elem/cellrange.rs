@@ -17,7 +17,10 @@ pub struct CellRange<T: Idx> {
 }
 impl<T: Idx> CellRange<T> {
     pub fn new(depth: u8, start: T, end: T) -> Self {
-        CellRange { depth, range: Range{ start, end}}
+        CellRange::from_depth_range(depth, start..end)
+    }
+    pub fn from_depth_range(depth: u8, range: Range<T>) -> Self {
+        CellRange { depth, range }
     }
     /// Comparison independent from the hierarchy, i.e. like a deepest level comparison.
     pub fn flat_cmp<Q: MocQty<T>>(&self, other: &Self) -> Ordering {

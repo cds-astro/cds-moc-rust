@@ -1,6 +1,6 @@
 [package]
 name = "moc-wasm"
-version = "0.3.2"
+version = "0.4.0"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = """
 WASM library to create and manipulate HEALPix
@@ -22,7 +22,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 moclib = { package = "moc", path = "../.." }
-healpix = { package = "cdshealpix", version = "0.6.0" }
+healpix = { package = "cdshealpix", version = "0.6.3" }
 serde = { version = "1.0.80", features = ["derive"] }
 wasm-bindgen = { version = "0.2.78", features = ["serde-serialize"]  }
 wasm-bindgen-futures = "0.4.28"
