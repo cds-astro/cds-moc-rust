@@ -20,7 +20,9 @@ documentation = "https://docs.rs/moc"
 homepage = "https://github.com/cds-astro/cds-moc-rust/"
 repository = "https://github.com/cds-astro/cds-moc-rust/"
 edition = "2018"
-
+exclude = [
+  "resources",
+]
 
 [lib]
 name = "moc"
