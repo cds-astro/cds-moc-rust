@@ -49,9 +49,11 @@ WARNING: using this method, the command line name is `moc-cli` instead of `moc` 
 Download the last `moc-vxx_yyy.tar.gz` corresponding to your architecture 
 from the [github release page](https://github.com/cds-astro/cds-moc-rust/releases).
 You probably want ot use:
-* Linux: `moc-vxx-x86_64-unknown-linux-gnu.tar.gz`
+* Linux: `moc-vxx-x86_64-unknown-linux-musl.tar.gz`
 * MacOS: `moc-vxx-x86_64-apple-darwin.tar.gz`
 * Windows: `moc-vxx-.zip`
+
+WARNING: for linux, use [`musl`](https://en.wikipedia.org/wiki/Musl) instead of `gnu` (high chances of uncompatibility in the latter case)
 
 The tar contains a single executable binary file.
 ```bash
