@@ -774,8 +774,9 @@ pub fn to_fits_file(name: &str) -> Result<(), JsValue> {
 }
 
 /// # Params
+/// * name: name of the file
 /// * ext: `.fits` , `.ascii` or `.json`
-/// * mime: `application/fits`, `text/plain` or `application/json`
+/// * mime: `application/fits`, `text/plain`, `application/json`, ...
 /// * data: file content
 fn to_file(
   name: &str,

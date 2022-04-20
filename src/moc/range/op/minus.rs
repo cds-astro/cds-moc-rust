@@ -226,7 +226,7 @@ mod tests {
                 );
                 moc
             },
-            _ => unreachable!(false),
+            _ => unreachable!(),
         }
     }
 

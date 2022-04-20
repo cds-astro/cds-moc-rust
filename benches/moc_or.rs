@@ -32,7 +32,7 @@ fn load_moc(filename: &str) -> RangeMOC<u32, Hpx<u32>> {
             );
             moc
         },
-        _ => unreachable!(false),
+        _ => unreachable!("Type not supposed to be != from U32"),
     }
 }
 

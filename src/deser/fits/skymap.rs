@@ -224,6 +224,8 @@ fn from_fits_skymap_internam<R: BufRead>(
   Ok(RangeMOC::new(depth_max, ranges))
 }
 
+
+/*
 #[cfg(test)]
 mod tests {
 
@@ -233,7 +235,7 @@ mod tests {
   use super::from_fits_skymap;
 
   // Perform only in release mode (else slow: the decompresse fits files is 1.6GB large)!
-  /*#[test]
+  #[test]
   fn test_skymap() {
     let path_buf1 = PathBuf::from("resources/Skymap/bayestar.fits.gz");
     let path_buf2 = PathBuf::from("../resources/Skymap/bayestar.fits.gz");
@@ -251,6 +253,6 @@ mod tests {
         assert!(false)
       },
     }
-  }*/
+  }
 
-}
+}*/
