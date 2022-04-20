@@ -583,11 +583,13 @@ impl From {
         };
         let moc: RangeMOC<u64, Hpx<u64>> = if input == PathBuf::from(r"-") {
           let stdin = std::io::stdin();
-          kway_or(stdin.lock().lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
+          // kway_or_it(stdin.lock().lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
+          kway_or(Box::new(stdin.lock().lines().filter_map(line2moc)))
         } else {
           let f = File::open(input)?;
           let reader = BufReader::new(f);
-          kway_or(reader.lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
+          // kway_or_it(reader.lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
+          kway_or(Box::new(reader.lines().filter_map(line2moc)))
         };
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },

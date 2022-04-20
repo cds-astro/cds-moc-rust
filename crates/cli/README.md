@@ -211,11 +211,11 @@ Excerpt of the `xmmdr11_obs_center.17arcmin.csv` file:
 Create the MOC
 
 ```bash
-> time moc from cones -s , 12 resources/xmmdr11_obs_center.17arcmin.csv fits --force-u64 xmm.moc.fits
+> time moc from cones -s , 12 ../../resources/xmmdr11_obs_center.17arcmin.csv fits --force-u64 xmm.moc.fits
 
-real	0m4,766s
-user	0m3,880s
-sys	0m0,884s
+real	0m2,852s
+user	0m2,812s
+sys	0m0,028s
 
 > moc info xmm.moc.fits
 MOC type: SPACE
@@ -252,9 +252,9 @@ time moc from multi 12 ../../resources/polygon_list.txt fits --force-u64 test.mo
 ```bash
 > time moc from multi 12 resources/polygon_list.txt fits --force-u64 test.moc.fits
 
-real	0m5,839s
-user	0m5,781s
-sys	0m0,020s
+real	0m5,891s
+user	0m5,852s
+sys	0m0,008s
 
 > moc info test.moc.fits
 MOC type: SPACE

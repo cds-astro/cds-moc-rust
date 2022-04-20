@@ -22,7 +22,7 @@ impl<T, Q> Bounded<T> for Q where T: Idx, Q: MocQty<T> {
 
 /// Generic constants defining a quantity that can be put in a MOC,
 /// independently of it the precise integer type used to represent it.
-pub trait MocableQty: PartialEq + Eq + Send + Sync + Clone + Debug{
+pub trait MocableQty: 'static + PartialEq + Eq + Send + Sync + Clone + Debug{
     /// A simple str to identify the quantity (e.g. in ASCII serialisation)
     const NAME: &'static str;
     /// A simple char prefix to identify the quantity (e.g. in ASCII serialisation)

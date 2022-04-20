@@ -1,4 +1,5 @@
-
+use std::iter::Chain;
+use std::option::IntoIter;
 use std::ops::Range;
 
 use crate::idx::Idx;
@@ -27,11 +28,34 @@ pub struct OrRangeIter<T, Q, I1, I2>
     I1: RangeMOCIterator<T, Qty=Q>,
     I2: RangeMOCIterator<T, Qty=Q>
 {
+  depth: u8,
   last: Option<Range<T>>,
-  left_it: I1,
+  strategy: Strategy<T, Q, I1, I2>
+  /*left_it: I1,
   right_it: I2,
   left: Option<Range<T>>,
-  right: Option<Range<T>>,
+  right: Option<Range<T>>,*/
+}
+
+enum Strategy<T, Q, I1, I2>
+  where
+    T: Idx,
+    Q: MocQty<T>,
+    I1: RangeMOCIterator<T, Qty=Q>,
+    I2: RangeMOCIterator<T, Qty=Q>
+{
+  DisjointLeftFirst {
+    it: Chain<Chain<IntoIter<Range<T>>, I1>, Chain<IntoIter<Range<T>>, I2>>
+  },
+  DisjointRightFirst {
+    it: Chain<Chain<IntoIter<Range<T>>, I2>, Chain<IntoIter<Range<T>>, I1>>
+  },
+  Regular {
+    left_it: I1,
+    right_it: I2,
+    left: Option<Range<T>>,
+    right: Option<Range<T>>,
+  }
 }
 
 impl <T, Q, I1, I2> OrRangeIter<T, Q, I1, I2>
@@ -43,7 +67,10 @@ impl <T, Q, I1, I2> OrRangeIter<T, Q, I1, I2>
 {
 
   fn new(mut left_it: I1, mut right_it: I2) -> OrRangeIter<T, Q, I1, I2> {
-    let last = if let (Some(range1), Some(range2)) = (left_it.peek_last(), right_it.peek_last()) {
+    let depth = u8::max(left_it.depth_max(), right_it.depth_max());
+    let last_left = left_it.peek_last().cloned();
+    let last_right = right_it.peek_last().cloned();
+    let last = if let (Some(range1), Some(range2)) = (last_left.as_ref(), last_right.as_ref()) {
       if range2.end < range1.start { // |--2--| |--1--|
         Some(range1.clone())
       } else if range1.end < range2.start { // |--1--| |--2--|
@@ -58,13 +85,38 @@ impl <T, Q, I1, I2> OrRangeIter<T, Q, I1, I2>
     };
     let left = left_it.next();
     let right = right_it.next();
+    if let (Some(last_right), Some(first_left)) = (last_right.as_ref(), left.as_ref()) {
+      if last_right.end < first_left.start {
+        return  OrRangeIter {
+          depth,
+          last,
+          strategy: Strategy::DisjointRightFirst {
+            it: right.into_iter().chain(right_it).chain(left.into_iter().chain(left_it))
+          }
+        }
+      }
+    }
+    if let (Some(last_right), Some(first_left)) = (last_right.as_ref(), left.as_ref()) {
+      if last_right.end < first_left.start {
+        return OrRangeIter {
+          depth,
+          last,
+          strategy: Strategy::DisjointLeftFirst {
+            it: left.into_iter().chain(left_it).chain(right.into_iter().chain(right_it))
+          }
+        }
+      }
+    }
     // Normal behaviour
-    OrRangeIter {
+    return OrRangeIter {
+      depth,
       last,
-      left_it,
-      right_it,
-      left,
-      right,
+      strategy: Strategy::Regular {
+        left_it,
+        right_it,
+        left,
+        right,
+      }
     }
   }
 }
@@ -77,7 +129,7 @@ impl<T, Q, I1, I2> HasMaxDepth for  OrRangeIter<T, Q, I1, I2>
     I2: RangeMOCIterator<T, Qty=Q>
 {
   fn depth_max(&self) -> u8 {
-    u8::max(self.left_it.depth_max(), self.right_it.depth_max())
+    self.depth
   }
 }
 impl<T, Q, I1, I2> ZSorted for  OrRangeIter<T, Q, I1, I2>
@@ -112,33 +164,63 @@ impl<T, Q, I1, I2> Iterator for OrRangeIter<T, Q, I1, I2>
   type Item = Range<T>;
 
   fn next(&mut self) -> Option<Self::Item> {
+    /*
     loop {
-      match (&mut self.left, &mut self.right) {
-        (Some(ref mut l), Some(ref mut r)) =>
-          if l.end < r.start {        // L--L R--R
-            return std::mem::replace(&mut self.left, self.left_it.next());
-          } else if r.end < l.start { // R--R L--L
-            return std::mem::replace(&mut self.right, self.right_it.next());
-          } else if l.end <= r.end {  //    R--L--L--R
-            if l.start < r.start {    // or L--R--L--R
-              r.start = l.start;
-            }
-            self.left = consume_while_end_lower_than(&mut self.left_it, r.end);
-          } else {                    //    L--R--R--L
-            if r.start < l.start {    // or R--L--R--L
-              l.start = r.start;
-            }
-            self.right = consume_while_end_lower_than(&mut self.right_it, l.end);
-          },
-        (Some(_), None) => return std::mem::replace(&mut self.left, self.left_it.next()),
-        (None, Some(_)) => return std::mem::replace(&mut self.right, self.right_it.next()),
-        (None, None) => return None,
-      }
+          match (&mut self.left, &mut self.right) {
+            (Some(ref mut l), Some(ref mut r)) =>
+              if l.end < r.start {        // L--L R--R
+                return std::mem::replace(&mut self.left, self.left_it.next());
+              } else if r.end < l.start { // R--R L--L
+                return std::mem::replace(&mut self.right, self.right_it.next());
+              } else if l.end <= r.end {  //    R--L--L--R
+                if l.start < r.start {    // or L--R--L--R
+                  r.start = l.start;
+                }
+                self.left = consume_while_end_lower_than(&mut self.left_it, r.end);
+              } else {                    //    L--R--R--L
+                if r.start < l.start {    // or R--L--R--L
+                  l.start = r.start;
+                }
+                self.right = consume_while_end_lower_than(&mut self.right_it, l.end);
+              },
+            (Some(_), None) => return std::mem::replace(&mut self.left, self.left_it.next()),
+            (None, Some(_)) => return std::mem::replace(&mut self.right, self.right_it.next()),
+            (None, None) => return None,
+          }
+        }
+     */
+    match &mut self.strategy {
+      Strategy::DisjointRightFirst { it } => it.next(),
+      Strategy::DisjointLeftFirst { it } => it.next(),
+      Strategy::Regular { left_it, right_it, left,  right  } =>
+        loop {
+          match (left.as_mut(), right.as_mut()) {
+            (Some(ref mut l), Some(ref mut r)) =>
+              if l.end < r.start {        // L--L R--R
+                return std::mem::replace(left, left_it.next());
+              } else if r.end < l.start { // R--R L--L
+                return std::mem::replace(right, right_it.next());
+              } else if l.end <= r.end {  //    R--L--L--R
+                if l.start < r.start {    // or L--R--L--R
+                  r.start = l.start;
+                }
+                std::mem::replace(left, consume_while_end_lower_than(left_it, r.end)).unwrap();
+              } else {                    //    L--R--R--L
+                if r.start < l.start {    // or R--L--R--L
+                  l.start = r.start;
+                }
+                std::mem::replace(right, consume_while_end_lower_than(right_it, l.end)).unwrap();
+              },
+            (Some(_), None) => return std::mem::replace(left, left_it.next()),
+            (None, Some(_)) => return std::mem::replace(right, right_it.next()),
+            (None, None) => return None,
+          }
+        }
     }
   }
 
   fn size_hint(&self) -> (usize, Option<usize>) {
-    let size_hint_l = self.left_it.size_hint();
+    /*let size_hint_l = self.left_it.size_hint();
     let size_hint_r = self.right_it.size_hint();
     if let (Some(n1), Some(n2)) = (size_hint_l.1, size_hint_r.1) {
       // Worse case:
@@ -147,6 +229,22 @@ impl<T, Q, I1, I2> Iterator for OrRangeIter<T, Q, I1, I2>
       (0, Some(1 + n1 + n2))
     } else {
       (0, None)
+    }*/
+    match &self.strategy {
+      Strategy::DisjointRightFirst { it } => it.size_hint(),
+      Strategy::DisjointLeftFirst { it } => it.size_hint(),
+      Strategy::Regular { left_it, right_it, left: _, right: _ } => {
+        let size_hint_l = left_it.size_hint();
+        let size_hint_r = right_it.size_hint();
+        if let (Some(n1), Some(n2)) = (size_hint_l.1, size_hint_r.1) {
+          // Worse case:
+          // * 1 range of T1 contains (n2-1) T2 ranges
+          // * and 1 range of T2 contains the remaining (n1-1) cells of T1
+          (0, Some(1 + n1 + n2))
+        } else {
+          (0, None)
+        }
+      }
     }
   }
 
@@ -220,7 +318,7 @@ mod tests {
         );
         moc
       },
-      _ => unreachable!(false),
+      _ => unreachable!(),
     }
   }
 

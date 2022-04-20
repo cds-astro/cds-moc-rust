@@ -515,9 +515,16 @@ impl<'a, T: Idx> SNORanges<'a, T> for BorrowedRanges<'a, T> {
         } else if r.is_empty() {
             return Ranges(l.to_vec().into_boxed_slice());
         }
+        // Trivial case (simple concatenation)
+        // - unwrap is safe here, because we test l.is_empty() and r.ie_empty() before
+        if l.last().unwrap().end < r.first().unwrap().start {
+            return Ranges::new_unchecked(l.iter().cloned().chain(r.iter().cloned()).collect());
+        } else if r.last().unwrap().end < l.first().unwrap().start {
+            return Ranges::new_unchecked(r.iter().cloned().chain(l.iter().cloned()).collect());
+        }
         // Init result
         let mut res = Vec::with_capacity(l.len() + r.len());
-        // Use binary search to find the starting indices (and starts with a simple array copy)
+        // Else, Use binary search to find the starting indices (and starts with a simple array copy)
         let (il, ir) = if l[0].end < r[0].start {
             let il = match l.binary_search_by(|l_range| l_range.end.cmp(&r[0].start)) {
                 Ok(i) => i,

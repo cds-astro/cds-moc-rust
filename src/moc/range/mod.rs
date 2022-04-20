@@ -527,9 +527,11 @@ impl RangeMOC<u64, Hpx<u64>> {
     delta_depth: u8, 
     coo_it: I
   ) -> Self {
-    kway_or(
+    /*kway_or_it(
       coo_it.map(|(lon, lat, radius)| Self::from_cone(lon, lat, radius, depth, delta_depth).into_range_moc_iter())
-    )
+    )*/
+    let it = coo_it.map(move |(lon, lat, radius)| Self::from_cone(lon, lat, radius, depth, delta_depth));
+    kway_or(Box::new(it))
   }
 
   /// Create a MOC from a possibly large list of relatively small cones 
