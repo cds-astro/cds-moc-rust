@@ -1,6 +1,8 @@
 
 use std::fs;
+use std::error::Error;
 use std::path::PathBuf;
+use std::num::ParseFloatError;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
@@ -572,207 +574,6 @@ pub fn kway2_or_it<'a, T, Q, I>(
   }
 }
 
-/*
-pub fn kway4_or_it_v2<T, Q, I1, I2>(
-  mut it_of_its: I2,
-) -> RangeMOC<T, Q>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: Iterator<Item=I1>,
-{
-  struct KWay4<'a, T1, Q1, I1>
-    where
-      T1: Idx,
-      Q1: MocQty<T1>,
-      I1: Iterator<Item=Box<dyn RangeMOCIterator<T1, Qty=Q1> + 'a>>,
-  {
-    cur_moc: Option<RangeMOC<T1, Q1>>,
-    it: Box<dyn Iterator<Item=RangeMOC<T1, Q1>> + 'a>
-  }
-  impl<'a, T1, Q1, I1> Iterator for KWay4<'a, T1, Q1, I1>
-    where
-      T1: Idx,
-      Q1: MocQty<T1>,
-  {
-    type Item = RangeMOC<T1, Q1>;
-    fn next(&mut self) -> Option<Self::Item> {
-      match (
-        self.it.next(),
-        self.it.next(),
-        self.it.next(),
-        self.it.next())
-      {
-        (Some(i1), Some(i2), Some(i3), Some(i4)) =>
-          self.cur_moc.replace(( i1.or(&i2) ).or( &i3.or(&i4) )),
-        (Some(i1), Some(i2), Some(i3), None) =>
-          self.cur_moc.replace(( i1.or(&i2) ).or( &i3 )),
-        (Some(i1), Some(i2), None, _) =>
-          self.cur_moc.replace(i1.or(&i2)),
-        (Some(i1), None, _, _) =>
-          self.cur_moc.replace(i1),
-        (None, _, _, _) =>
-          self.cur_moc.take()
-      }
-    }
-  }
-  match (
-    it.next(),
-    it.next(),
-    it.next(),
-    it.next())
-  {
-    (Some(i1), Some(i2), Some(i3), Some(i4)) => {
-      let cur_moc = Some(  ( i1.or(&i2) ).or( &i3.or(&i4) )  );
-      kway4_or_it_boxdyn_v2(KWay4 { cur_moc, it })
-    },
-    (Some(i1), Some(i2), Some(i3), None, _, _, _, _) =>
-      ( i1.or(&i2) ).or( &i3 ),
-    (Some(i1), Some(i2), None, _, _, _, _, _) =>
-      i1.or(&i2),
-    (Some(i1), None, _, _, _, _, _, _) =>
-      i1,
-    (None, _, _, _, _, _, _, _) =>
-      RangeMOC::new(0, MocRanges::default())
-  }
-}
-
-pub fn kway2_or_it_v2<T, Q, I1, I2>(
-  mut it_of_its: I2,
-) -> RangeMOC<T, Q>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: Iterator<Item=I1>,
-{
-  struct KWay2<'a, T1, Q1, I1>
-    where
-      T1: Idx,
-      Q1: MocQty<T1>,
-      I1: Iterator<Item=Box<dyn RangeMOCIterator<T1, Qty=Q1> + 'a>>,
-  {
-    cur_moc: Option<RangeMOC<T1, Q1>>,
-    it: Box<dyn Iterator<Item=RangeMOC<T1, Q1>> + 'a>
-  }
-  impl<'a, T1, Q1, I1> Iterator for KWay2<'a, T1, Q1, I1>
-    where
-      T1: Idx,
-      Q1: MocQty<T1>,
-  {
-    type Item = RangeMOC<T1, Q1>;
-    fn next(&mut self) -> Option<Self::Item> {
-      match (self.it.next(), self.it.next())
-      {
-        (Some(i1), Some(i2)) =>
-          self.cur_moc.replace(i1.or(&i2)),
-        (Some(i1), None) =>
-          self.cur_moc.replace(i1),
-        (None, _) =>
-          self.cur_moc.take()
-      }
-    }
-  }
-  match (
-    it.next(),
-    it.next())
-  {
-    (Some(i1), Some(i2)) => {
-      let cur_moc = Some(i1.or(&i2));
-      kway2_or_it_boxdyn_v2(KWay2 { cur_moc, it })
-    },
-    (Some(i1), None) =>
-      i1,
-    (None, _) =>
-      RangeMOC::new(0, MocRanges::default())
-  }
-}
-
-
-pub fn kway4_or_it<T, Q, I1, I2>(
-  mut it_of_its: I2,
-) -> RangeMOC<T, Q>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: Iterator<Item=I1>,
-{
-  let mut moc = match (
-    it_of_its.next(),
-    it_of_its.next(),
-    it_of_its.next(),
-    it_of_its.next())
-  {
-    (Some(i1), Some(i2), Some(i3), Some(i4)) =>
-      or(or(i1, i2), or(i3, i4)).into_range_moc(),
-    (Some(i1), Some(i2), Some(i3), None) =>
-      return or(or(i1, i2), i3).into_range_moc(),
-    (Some(i1), Some(i2), None, _) =>
-      return or(i1, i2).into_range_moc(),
-    (Some(i1), None, _, _) =>
-      return i1.into_range_moc(),
-    (None, _, _, _) =>
-      return RangeMOC::new(0, MocRanges::default()),
-  };
-  loop {
-    moc = match (
-      it_of_its.next(),
-      it_of_its.next(),
-      it_of_its.next(),
-      it_of_its.next())
-    {
-      (Some(i1), Some(i2), Some(i3), Some(i4)) =>
-        moc.or(&or(or(i1, i2), or(i3, i4)).into_range_moc()),
-      (Some(i1), Some(i2), Some(i3), None) =>
-        return moc.or(&or(or(i1, i2), i3).into_range_moc()),
-      (Some(i1), Some(i2), None, _) =>
-        return moc.or(&or(i1, i2).into_range_moc()),
-      (Some(i1), None, _, _) =>
-        return moc.or(&i1.into_range_moc()),
-      (None, _, _, _) =>
-        return moc,
-    };
-  }
-}
-
-pub fn kway2_or_it<T, Q, I1, I2>(
-  mut it_of_its: I2,
-) -> RangeMOC<T, Q>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: Iterator<Item=I1>,
-{
-  let mut moc = match (
-    it_of_its.next(),
-    it_of_its.next())
-  {
-    (Some(i1), Some(i2)) =>
-      or(i1, i2).into_range_moc(),
-    (Some(i1), None) =>
-      return i1.into_range_moc(),
-    (None, _) =>
-      return RangeMOC::new(0, MocRanges::default()),
-  };
-  loop {
-    moc = match (
-      it_of_its.next(),
-      it_of_its.next())
-    {
-      (Some(i1), Some(i2)) =>
-        moc.or(&or(i1, i2).into_range_moc()),
-      (Some(i1), None) =>
-        return moc.or(&i1.into_range_moc()),
-      (None, _) =>
-        return moc,
-    };
-  }
-}
-*/
-/// polygon_list.txt
 
 fn create_cones_mocs() -> Vec<RangeMOC<u64, Hpx<u64>>> {
   let filename = "xmmdr11_obs_center.17arcmin.csv";
@@ -794,47 +595,118 @@ fn create_cones_mocs() -> Vec<RangeMOC<u64, Hpx<u64>>> {
     }).collect()
 }
 
+fn create_polygones_mocs() -> Vec<RangeMOC<u64, Hpx<u64>>> {
+  let filename = "polygon_list.txt";
+  let path_buf = PathBuf::from(format!("resources/{}", filename));
+  fs::read_to_string(path_buf)
+    .unwrap()
+    .lines()
+    .map(|line| {
+      let fields: Vec<&str> = line.split(' ').collect();
+      let vertices_deg: Vec<f64> = fields.iter()
+        .skip(1) // First col = POLYGON
+        .map(|p| p.parse::<f64>())
+        .collect::<Result<Vec<f64>, ParseFloatError>>()
+        .unwrap();
+      let vertices = vertices_deg.iter().step_by(2).zip(vertices_deg.iter().skip(1).step_by(2))
+        .map(|(lon_deg, lat_deg)| {
+          let lon = lon_deg.to_radians();
+          let lat = lat_deg.to_radians();
+          Ok((lon, lat))
+        }).collect::<Result<Vec<(f64, f64)>, Box<dyn Error>>>()
+        .unwrap();
+      RangeMOC::from_polygon(&vertices, false, 12)
+    }).collect()
+}
+
 fn bench_multi_or(c: &mut Criterion) {
   // https://bheisler.github.io/criterion.rs/book/user_guide/comparing_functions.html
   let mut group = c.benchmark_group("multi_or");
   let mocs = create_cones_mocs();
   group.sample_size(10);
-  group.bench_function("multi_or_naive",
-      |b| b.iter(|| multi_or_naive(Box::new(mocs.iter().cloned())))
+  group.bench_function(
+    "multi_or_naive",
+    |b| b.iter(|| multi_or_naive(Box::new(mocs.iter().cloned())))
   );
-  group.bench_function("multi_or_it",
-      |b| b.iter(|| multi_or_it(mocs.iter().map(|moc| moc.into_range_moc_iter())))
+  group.bench_function(
+    "multi_or_it",
+    |b| b.iter(|| multi_or_it(mocs.iter().map(|moc| moc.into_range_moc_iter())))
    );
-  group.bench_function("multi_or_it_boxdyn",
-      |b| b.iter(|| multi_or_it_boxdyn(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
+  group.bench_function(
+    "multi_or_it_boxdyn",
+    |b| b.iter(|| multi_or_it_boxdyn(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
   );
-  group.bench_function("kway8_or",
-      |b| b.iter(|| kway8_or(Box::new(mocs.iter().cloned())))
+  group.bench_function(
+    "kway8_or",
+    |b| b.iter(|| kway8_or(Box::new(mocs.iter().cloned())))
   );
-  group.bench_function("kway4_or",
-                       |b| b.iter(|| kway4_or(Box::new(mocs.iter().cloned())))
+  group.bench_function(
+    "kway4_or",
+    |b| b.iter(|| kway4_or(Box::new(mocs.iter().cloned())))
   );
-  group.bench_function("kway2_or",
-                       |b| b.iter(|| kway2_or(Box::new(mocs.iter().cloned())))
+  group.bench_function(
+    "kway2_or",
+    |b| b.iter(|| kway2_or(Box::new(mocs.iter().cloned())))
   );
-  group.bench_function("kway2_or_it",
-                       |b| b.iter(|| kway2_or_it(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
+  group.bench_function(
+    "kway2_or_it",
+    |b| b.iter(|| kway2_or_it(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
   );
-  group.bench_function("kway4_or_it",
-                       |b| b.iter(|| kway4_or_it(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
+  group.bench_function(
+    "kway4_or_it",
+    |b| b.iter(|| kway4_or_it(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
   );
-  group.bench_function("kway8_or_it",
-                       |b| b.iter(|| kway8_or_it(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
+  group.bench_function(
+    "kway8_or_it",
+    |b| b.iter(|| kway8_or_it(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
   );
-  /*
-  group.bench_function("kway4_or_it_boxdyn_v2",
-                       |b| b.iter(|| kway4_or_it_boxdyn_v2(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
-  );
-  group.bench_function("kway2_or_it_boxdyn_v2",
-                       |b| b.iter(|| kway2_or_it_boxdyn_v2(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
-  );*/
   group.finish();
 }
 
-criterion_group!(benches, bench_multi_or);
+fn bench_multi_or_poly(c: &mut Criterion) {
+  // https://bheisler.github.io/criterion.rs/book/user_guide/comparing_functions.html
+  let mut group = c.benchmark_group("multi_or_poly");
+  let mocs = create_polygones_mocs();
+  group.sample_size(10);
+  group.bench_function(
+    "multi_or_naive_poly", 
+    |b| b.iter(|| multi_or_naive(Box::new(mocs.iter().cloned())))
+  );
+  group.bench_function(
+    "multi_or_it_poly",
+    |b| b.iter(|| multi_or_it(mocs.iter().map(|moc| moc.into_range_moc_iter())))
+  );
+  group.bench_function(
+    "multi_or_it_boxdyn_poly",
+    |b| b.iter(|| multi_or_it_boxdyn(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
+  );
+  group.bench_function(
+    "kway8_or_poly",
+    |b| b.iter(|| kway8_or(Box::new(mocs.iter().cloned())))
+  );
+  group.bench_function(
+    "kway4_or_poly",
+    |b| b.iter(|| kway4_or(Box::new(mocs.iter().cloned())))
+  );
+  group.bench_function(
+    "kway2_or_poly",
+    |b| b.iter(|| kway2_or(Box::new(mocs.iter().cloned())))
+  );
+  group.bench_function(
+    "kway2_or_it_poly",
+    |b| b.iter(|| kway2_or_it(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
+  );
+  group.bench_function(
+    "kway4_or_it_poly",
+    |b| b.iter(|| kway4_or_it(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
+  );
+  group.bench_function(
+    "kway8_or_it_poly",
+    |b| b.iter(|| kway8_or_it(Box::new(mocs.iter().map(|moc| moc.into_range_moc_iter()))))
+  );
+  group.finish();
+}
+
+// criterion_group!(benches, bench_multi_or);
+criterion_group!(benches, bench_multi_or, bench_multi_or_poly);
 criterion_main!(benches);
