@@ -1,0 +1,63 @@
+{
+    "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+    "@type": "SoftwareSourceCode",
+    "license": "https://spdx.org/licenses/MIT",
+    "codeRepository": "https://github.com/cds-astro/cds-moc-rust",
+    "contIntegration": "https://github.com/cds-astro/cds-moc-rust/actions",
+    "dateCreated": "2021-08-16",
+    "datePublished": "2021-10-18",
+    "dateModified": "2022-04-13",
+    "downloadUrl": "https://github.com/cds-astro/cds-moc-rust/releases",
+    "issueTracker": "https://github.com/cds-astro/cds-moc-rust/issues",
+    "name": "MOC Lib Rust, MOCCLi, MOCWasm",
+    "version": "0.4.0",
+    "description": "Rust implementation of the IVOA MOC standard (MOC Lib Rust); \nassociated command line tool (MOCCli) and\nJavascript/WebAssembly wrapper to manipulate MOCs in Web Browsers (MOCWasm).",
+    "applicationCategory": "Astronomy",
+    "releaseNotes": "https://github.com/cds-astro/cds-moc-rust/blob/main/CHANGELOG.md",
+    "funding": "ESCAPE, European Union’s Horizon 2020, Grant Agreement no. 824064",
+    "developmentStatus": "active",
+    "funder": {
+        "@type": "Organization",
+        "name": "Université de Strasbourg"
+    },
+    "keywords": [
+        "astronomy",
+        "IVOA",
+        "MOC",
+        "HEALPix"
+    ],
+    "programmingLanguage": [
+        "Rust"
+    ],
+    "operatingSystem": [
+        "Linux",
+        "Mac",
+        "Windows"
+    ],
+    "author": [
+        {
+            "@type": "Person",
+            "@id": "http://orcid.org/0000-0002-2335-4499",
+            "givenName": "François-Xavier",
+            "familyName": "Pineau",
+            "email": "francois-xavier.pineau@astro.unistra.fr",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Université de Strasbourg, CNRS, Observatoire astronomique de Strasbourg, UMR7550"
+            }
+        }
+    ],
+    "contributor": [
+        {
+            "@type": "Person",
+            "givenName": "Matthieu",
+            "familyName": "Baumann",
+            "email": "matthieu.baumann@astro.unistra.fr",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Université de Strasbourg, CNRS, Observatoire astronomique de Strasbourg, UMR7550"
+            }
+        }
+    ]
+}
+
