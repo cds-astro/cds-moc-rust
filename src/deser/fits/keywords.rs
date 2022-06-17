@@ -58,7 +58,8 @@ pub trait FitsCard: Sized {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum MocVers {
   V1_1,
-  V2_0
+  V2_0,
+  // V2_0_Freq,
 }
 impl FitsCard for MocVers {
   const KEYWORD: &'static [u8; 8] = b"MOCVERS ";
@@ -67,7 +68,13 @@ impl FitsCard for MocVers {
     match get_str_val_no_quote(keyword_record)? {
       b"1.1" => Ok(MocVers::V1_1),
       b"2.0" => Ok(MocVers::V2_0),
-      parsed_val => Err(Self::predefine_val_err(parsed_val, &[b"1.1", b"2.0"])),
+      // b"2.0-freq" => Ok(MocVers::V2_0_Freq),
+      parsed_val => Err(
+        Self::predefine_val_err(
+          parsed_val, 
+          &[b"1.1", b"2.0", /* b"2.0-freq" */]
+        )
+      ),
     }
   }
 
@@ -75,6 +82,7 @@ impl FitsCard for MocVers {
     String::from(match self {
       MocVers::V1_1 => "'1.1'",
       MocVers::V2_0 => "'2.0'",
+      // MocVers::V2_0_Freq => "'2.0-freq'",
     })
   }
 }
@@ -84,6 +92,8 @@ pub enum MocDim {
   Space,
   Time,
   TimeSpace,
+  Frequency,
+  FrequencySpace,
 }
 impl FitsCard for MocDim {
   const KEYWORD: &'static [u8; 8] = b"MOCDIM  ";
@@ -93,7 +103,14 @@ impl FitsCard for MocDim {
       b"TIME" => Ok(MocDim::Time),
       b"SPACE" => Ok(MocDim::Space),
       b"TIME.SPACE" => Ok(MocDim::TimeSpace),
-      parsed_val => Err(Self::predefine_val_err(parsed_val, &[b"TIME", b"SPACE", b"TIME.SPACE"])),
+      b"FREQUENCY" => Ok(MocDim::Frequency),
+      b"FREQUENCY.SPACE" => Ok(MocDim::FrequencySpace),
+      parsed_val => Err(
+        Self::predefine_val_err(
+          parsed_val, 
+          &[b"TIME", b"SPACE", b"TIME.SPACE", b"FREQUENCY", b"FREQUENCY.SPACE"]
+        )
+      ),
     }
   }
 
@@ -102,6 +119,8 @@ impl FitsCard for MocDim {
       MocDim::Time => "'TIME'",
       MocDim::Space => "'SPACE'",
       MocDim::TimeSpace => "'TIME.SPACE'",
+      MocDim::Frequency => "'FREQUENCY'",
+      MocDim::FrequencySpace => "'FREQUENCY.SPACE'",
     })
   }
 }
@@ -319,6 +338,22 @@ impl FitsCard for MocOrdT {
   }
 }
 
+#[derive(Debug)]
+pub struct MocOrdF {
+  pub depth: u8,
+}
+impl FitsCard for MocOrdF {
+  const KEYWORD: &'static [u8; 8] = b"MOCORD_F";
+
+  fn specific_parse_value(keyword_record: &[u8]) -> Result<Self, FitsError> {
+    parse_uint_val::<u8>(keyword_record).map(|depth| MocOrdF { depth })
+  }
+
+  fn to_fits_value(&self) -> String {
+    format!("{}", &self.depth)
+  }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TForm1 {
   OneB, // for u8
@@ -440,17 +475,18 @@ impl MocCard for TForm1      { const INDEX: u8 = 12; }
 impl MocCard for TType1      { const INDEX: u8 = 13; }
 impl MocCard for Nside       { const INDEX: u8 = 14; }
 impl MocCard for IndexSchema { const INDEX: u8 = 15; }
+impl MocCard for MocOrdF     { const INDEX: u8 = 16; }
 
 #[derive(Debug)]
 pub(super) struct MocKeywordsMap {
-  entries: [Option<MocKeywords>; 16],
+  entries: [Option<MocKeywords>; 17],
 }
 impl MocKeywordsMap {
   pub(super) fn new() -> MocKeywordsMap {
     Self {
       entries: [
         None, None, None, None, None, None, None, None, None, None, 
-        None, None, None, None, None, None]
+        None, None, None, None, None, None, None]
     }
   }
 
@@ -528,6 +564,7 @@ pub enum MocKeywords {
   MOCType(MocType),   // v1.1 v2.0, opt
   MOCOrdS(MocOrdS),   //      v2.0
   MOCOrdT(MocOrdT),   //      v2.0
+  MOCOrdF(MocOrdF),   //            v3.0?
   MOCOrder(MocOrder), // v1.1
   PixType(PixType),   // v1.1
   // BINTABLE specific
@@ -556,6 +593,7 @@ impl MocKeywords  {
       b"MOCORD_1" => Some(MocOrdS::parse_value(keyword_record).map(MocKeywords::MOCOrdS)), // To support pre v2 ST-MOC
       b"TORDER  " => Some(MocOrdT::parse_value(keyword_record).map(MocKeywords::MOCOrdT)), // To support pre v2 ST-MOC
       b"MOCORD_T" => Some(MocOrdT::parse_value(keyword_record).map(MocKeywords::MOCOrdT)),
+      b"MOCORD_F" => Some(MocOrdF::parse_value(keyword_record).map(MocKeywords::MOCOrdF)),
       b"MOCORDER" => Some(MocOrder::parse_value(keyword_record).map(MocKeywords::MOCOrder)),
       b"PIXTYPE " => Some(PixType::parse_value(keyword_record).map(MocKeywords::PixType)),
       // BINTABLE
@@ -580,6 +618,7 @@ impl MocKeywords  {
       MocKeywords::MOCType(_) => MocType::INDEX,
       MocKeywords::MOCOrdS(_) => MocOrdS::INDEX,
       MocKeywords::MOCOrdT(_) => MocOrdT::INDEX,
+      MocKeywords::MOCOrdF(_) => MocOrdF::INDEX,
       MocKeywords::MOCOrder(_) => MocOrder::INDEX,
       MocKeywords::PixType(_) => PixType::INDEX,
       // BINTABLE
@@ -603,6 +642,7 @@ impl MocKeywords  {
       MocKeywords::MOCType(_) => MocType::KEYWORD,
       MocKeywords::MOCOrdS(_) => MocOrdS::KEYWORD,
       MocKeywords::MOCOrdT(_) => MocOrdT::KEYWORD,
+      MocKeywords::MOCOrdF(_) => MocOrdF::KEYWORD,
       MocKeywords::MOCOrder(_) => MocOrder::KEYWORD,
       MocKeywords::PixType(_) => PixType::KEYWORD,
       // BINTABLE
@@ -630,6 +670,7 @@ impl MocKeywords  {
       MocKeywords::MOCType(kw) => kw.write_keyword_record(keyword_record),
       MocKeywords::MOCOrdS(kw) => kw.write_keyword_record(keyword_record),
       MocKeywords::MOCOrdT(kw) => kw.write_keyword_record(keyword_record),
+      MocKeywords::MOCOrdF(kw) => kw.write_keyword_record(keyword_record),
       MocKeywords::MOCOrder(kw) => kw.write_keyword_record(keyword_record),
       MocKeywords::PixType(kw) => kw.write_keyword_record(keyword_record),
       // BINTABLE

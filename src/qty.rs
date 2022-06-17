@@ -7,9 +7,6 @@ use std::marker::PhantomData;
 use crate::idx::Idx;
 use crate::deser::fits::keywords::MocDim;
 
-/// Number of bits reserved to code the quantity type
-const N_RESERVED_BITS: u8 = 2;
-
 pub trait Bounded<T> {
     fn upper_bound_exclusive() -> T;
 }
@@ -23,6 +20,8 @@ impl<T, Q> Bounded<T> for Q where T: Idx, Q: MocQty<T> {
 /// Generic constants defining a quantity that can be put in a MOC,
 /// independently of it the precise integer type used to represent it.
 pub trait MocableQty: 'static + PartialEq + Eq + Send + Sync + Clone + Debug{
+    /// Number of bits reserved to code the quantity type
+    const N_RESERVED_BITS: u8 = 2;
     /// A simple str to identify the quantity (e.g. in ASCII serialisation)
     const NAME: &'static str;
     /// A simple char prefix to identify the quantity (e.g. in ASCII serialisation)
@@ -46,6 +45,8 @@ pub trait MocableQty: 'static + PartialEq + Eq + Send + Sync + Clone + Debug{
     const HAS_COOSYS: bool;
     /// For FITS serialization (TODO: find a better approach)
     const HAS_TIMESYS: bool;
+    /// For FITS serialization (TODO: find a better approach)
+    const HAS_FREQSYS: bool;
 
     /// `v * Self::DIM`, generic so that for:
     /// * `DIM=1` this is a no operation,
@@ -77,7 +78,7 @@ const fn n_bits_to_code_from_0_to_n_exclusive(n: u8) -> u8 {
 /// A quantity with its exact integer representation.
 pub trait MocQty<T>: MocableQty where T: Idx
 {
-    const MAX_DEPTH: u8 = (T::N_BITS - (N_RESERVED_BITS + Self::N_D0_BITS)) / Self::DIM;
+    const MAX_DEPTH: u8 = (T::N_BITS - (Self::N_RESERVED_BITS + Self::N_D0_BITS)) / Self::DIM;
     const MAX_SHIFT: u32 = (Self::DIM * Self::MAX_DEPTH) as u32;
     // const MAX_VALUE : T = Self::N_D0_CELLS).into().unsigned_shl((Self::DIM * Self::MAX_DEPTH) as u32);
 
@@ -213,6 +214,7 @@ impl<T: Idx> MocableQty for Hpx<T> {
     const MOC_DIM: MocDim = MocDim::Space;
     const HAS_COOSYS: bool = true;
     const HAS_TIMESYS: bool = false;
+    const HAS_FREQSYS: bool = false;
     #[inline(always)]
     fn mult_by_dim<U: Idx>(v: U) -> U {
         v << 1
@@ -273,6 +275,7 @@ impl<T: Idx> MocableQty for Time<T> {
     const MOC_DIM: MocDim = MocDim::Time;
     const HAS_COOSYS: bool = false;
     const HAS_TIMESYS: bool = true;
+    const HAS_FREQSYS: bool = false;
     #[inline(always)]
     fn mult_by_dim<U: Idx>(v: U) -> U {
         v
@@ -285,9 +288,107 @@ impl<T: Idx> MocableQty for Time<T> {
 impl<T> MocQty<T> for Time<T> where T: Idx { }
 
 
+/// Mask to keep only the f64 sign
+pub const F64_SIGN_BIT_MASK: u64 = 0x8000000000000000;
+/// Equals !F64_SIGN_BIT_MASK (the inverse of the f64 sign mask)
+pub const F64_BUT_SIGN_BIT_MASK: u64 = 0x7FFFFFFFFFFFFFFF;
+/// Mask to keep only the f64 exponent part
+pub const F64_EXPONENT_BIT_MASK: u64 = 0x7FF << 52;
+/// Inverse of the f64 exponent mask
+pub const F64_BUT_EXPONENT_BIT_MASK: u64 = !F64_EXPONENT_BIT_MASK;
+/// Mask to keep only the f64 mantissa part
+pub const F64_MANTISSA_BIT_MASK: u64 = !(0xFFF << 52);
+/// Inverse of the f64 mantissa mask
+pub const F64_BUT_MANTISSA_BIT_MASK: u64 = 0xFFF << 52;
+
+/// Frequency index (from 5.048709793414476e-29 to 5.846006549323611e+48 Hz)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Frequency<T: Idx> (PhantomData<T>);
+impl<T: Idx> MocableQty for Frequency<T> {
+    const N_RESERVED_BITS: u8 = 4; // 64 - 52 - 8
+    const NAME: &'static str = "FREQUENCY";
+    const PREFIX: char = 'f';
+    const DIM: u8 = 1;
+    const N_D0_CELLS: u8 = 2;
+    // FITS specific
+    const MOC_DIM: MocDim = MocDim::Frequency;
+    const HAS_COOSYS: bool = false;
+    const HAS_TIMESYS: bool = false;
+    const HAS_FREQSYS: bool = true;
+    #[inline(always)]
+    fn mult_by_dim<U: Idx>(v: U) -> U {
+        v
+    }
+    #[inline(always)]
+    fn div_by_dim<U: Idx>(v: U) -> U {
+        v
+    }
+}
+impl<T> MocQty<T> for Frequency<T> where T: Idx { }
+impl<T: Idx> Frequency<T> {
+
+    /*fn freq2hash_single(freq: f32) -> T {
+        // f32: 1 sign bit + 8 exponent bits + 23 fraction bits
+        // value = (-1)^sign * 2^(exponent - 127) * (1 + fraction/2^24)
+        // * assert bit sign == 0
+        // * exponent ...
+        // * leave mantissa unchanged
+    }*/
+    // Starts first with f64 only, gen we may generalize to f32 making a Float trait ?
+
+    // For floats: 
+    //    + min: 10^-18 = 2^(expo - 1023) => -18 * ln(10) / ln(2) + 1023 = expo => expo =  963
+    //    + max: 10^+38 = 2^(expo - 1023) => +38 * ln(10) / ln(2) + 1023 = expo => expo = 1150
+    //    + => ensure expo range is  at least 1163 -- 963 (= 187) => 8 bits
+    //    + We choose to keep the 8 bits float exponent ranging from 10^-38 to 10^38
+    //        - min expo = -126 + 1023 = 897
+    //        - max expo =  127 + 1023 = 1150
+    //        -     expo = -127 + 1023 = 896  => reserved for the 0.0 value on a float
+    //        -     expo =  128 + 1023 = 1151 => reserved for the NaN on a float
+    
+    
+    /// Transforms a frequency, in herts, into its hash value of giben depth.
+    /// # Panics
+    /// * if `freq` not in `[5.048709793414476e-29, 5.846006549323611e+48[`.
+    pub fn freq2hash(freq: f64) -> T {
+        const FREQ_MIN: f64 = 5.048709793414476e-29; // f64::from_bits(929_u64 << 52);
+        const FREQ_MAX: f64 = 5.846006549323611e+48; // f64::from_bits((1184_u64 << 52) | F64_MANTISSA_BIT_MASK);
+        assert!(FREQ_MIN <= freq, "Wrong frequency in Hz. Expected: >= {}. Actual: {}", FREQ_MIN, freq);
+        assert!(freq < FREQ_MAX, "Wrong frequency in Hz. Expected: < {}. Actual: {}", FREQ_MAX, freq);
+        // f64: 1 sign bit + 11 exponent bits + 52 fraction bits
+        // value = (-1)^sign * 2^(exponent - 1023) * (1 + fraction/2^53)
+        // * assert bit sign == 0
+        // * exponent
+        //    + min: 10^-18 = 2^(expo - 1023) => -18 * ln(10) / ln(2) + 1023 = expo => expo = 963
+        //    + max: 10^+42 = 2^(expo - 1023) => +42 * ln(10) / ln(2) + 1023 = expo => expo = 1163
+        //    + => ensure expo range is  at least 1163 -- 963 (= 200) => 8 bits  for 256 (0 to 255) values
+        //    + We choose:
+        //        - min expo = 929
+        //        - max expo = 929 + 255 = 1184
+        // * leave mantissa unchanged
+        let freq_bits = freq.to_bits();
+        assert_eq!(freq_bits & F64_SIGN_BIT_MASK, 0); // We already checked that freq is positive, but...
+        let exponent = (freq_bits & F64_EXPONENT_BIT_MASK) >> 52;
+        assert!(929 <= exponent && exponent <= 1184, "Exponent: {}", exponent); // Should be ok since we already tested freq range values
+        let exponent = (exponent - 929) << 52;
+        let freq_hash_dmax = (freq_bits & F64_BUT_EXPONENT_BIT_MASK) | exponent;
+        T::from_u64_idx(freq_hash_dmax)
+    }
+
+    pub fn hash2freq(hash: T) -> f64 {
+        let freq_hash = hash.to_u64_idx();
+        let exponent = (freq_hash & F64_EXPONENT_BIT_MASK) >> 52;
+        // Warning, only case = 256 is range upper bound (exclusive)
+        assert!(exponent <= 256, "Exponent: {}. Hash: {}. Hash bits: {:064b}", exponent, freq_hash, freq_hash);
+        let exponent = (exponent + 929) << 52;
+        let freq_bits = (freq_hash & F64_BUT_EXPONENT_BIT_MASK) | exponent;
+        f64::from_bits(freq_bits)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::qty::{MocableQty, MocQty, Time, Hpx};
+    use crate::qty::{MocableQty, MocQty, Time, Hpx, Frequency};
 
 
     #[test]
@@ -361,5 +462,31 @@ mod tests {
         assert_eq!(Time::<u64>::MAX_DEPTH, 61);
         assert_eq!(Time::<u64>::MAX_SHIFT, 61);
         assert_eq!(Time::<u64>::n_cells_max(), 2_u64.pow(62));
+    }
+
+    #[test]
+    fn test_freq() {
+        // Independent of T
+        assert_eq!(Frequency::<u64>::DIM, 1);
+        assert_eq!(Frequency::<u64>::N_D0_CELLS, 2);
+        assert_eq!(Frequency::<u64>::N_D0_BITS, 1);
+        assert_eq!(Frequency::<u64>::LEVEL_MASK, 1);
+        assert_eq!(Frequency::<u64>::shift(1), 1);
+        assert_eq!(Frequency::<u64>::shift(10), 10);
+        // Depends on T
+        assert_eq!(Frequency::<u64>::MAX_DEPTH, 59);
+        assert_eq!(Frequency::<u64>::MAX_SHIFT, 59);
+        assert_eq!(Frequency::<u64>::n_cells_max(), 2_u64.pow(60));
+        // Test trasnformations
+        let freq_hz = 0.1;
+        assert_eq!(Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)), freq_hz);
+        let freq_hz = 1.125697115656943e-18;
+        assert_eq!(Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)), freq_hz);
+        let freq_hz = 1.12569711565245e+44;
+        assert_eq!(Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)), freq_hz);
+        let freq_hz = 5.048709793414476e-29;
+        assert_eq!(Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)), freq_hz);
+        let freq_hz =  5.846006549323610e+48;
+        assert_eq!(Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)), freq_hz);
     }
 }

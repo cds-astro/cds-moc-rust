@@ -51,6 +51,7 @@ fn print_info_qty<T: Idx>(idx_type: &str, moc: MocQtyType<T, BufReader<File>>) -
     MocQtyType::Hpx(moc) => print_moc_info_type(idx_type, "SPACE", moc),
     MocQtyType::Time(moc) => print_moc_info_type(idx_type, "TIME", moc),
     MocQtyType::TimeHpx(moc) => print_moc2_info_type(idx_type, "TIME-SPACE", moc),
+    MocQtyType::Freq(moc) => print_moc_info_type(idx_type, "FREQUENCY", moc),
   }
 }
 

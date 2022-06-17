@@ -8,7 +8,7 @@ use std::io::{BufRead, Write, Cursor};
 use byteorder::BigEndian;
 
 use crate::idx::Idx;
-use crate::qty::{MocQty, Hpx, Time, MocableQty};
+use crate::qty::{MocQty, Hpx, Time, MocableQty, Frequency};
 use crate::deser::{
   fits::{
     error::FitsError,
@@ -18,7 +18,7 @@ use crate::deser::{
     },
     keywords::{
       MocKeywordsMap, MocKeywords, MocVers, MocDim, Ordering, FitsCard, MocOrder, TForm1,
-      MocOrdS, MocOrdT, TimeSys, MocId, MocTool, CoordSys, TType1
+      MocOrdS, MocOrdT, MocOrdF, TimeSys, MocId, MocTool, CoordSys, TType1
     }
   }
 };
@@ -71,6 +71,7 @@ pub enum MocQtyType<T: Idx, R: BufRead> {
   Hpx(MocType<T, Hpx<T>, R>),
   Time(MocType<T, Time<T>, R>),
   TimeHpx(STMocType<T, R>),
+  Freq(MocType<T, Frequency<T>, R>),
 }
 impl<T: Idx, R: BufRead> MocQtyType<T, R> {
   pub fn to_fits_ivoa<W: Write>(self, write: W) -> Result<(), FitsError> {
@@ -78,6 +79,7 @@ impl<T: Idx, R: BufRead> MocQtyType<T, R> {
       MocQtyType::Hpx(moc_type) => moc_type.to_fits_ivoa(write),
       MocQtyType::Time(moc_type) => moc_type.to_fits_ivoa(write),
       MocQtyType::TimeHpx(moc_type) => moc_type.to_fits_ivoa(write),
+      MocQtyType::Freq(moc_type) => moc_type.to_fits_ivoa(write),
     }
   }
 }
@@ -308,11 +310,13 @@ fn build_range_moc_keywords<T: Idx, Q: MocQty<T>>(
   depth_max: u8,
   moc_id: Option<String>,
   moc_type: Option<keywords::MocType>,
+  // moc_version: MocVers,
   _t_type: PhantomData<T>,
   _q_type: PhantomData<Q>,
 ) -> MocKeywordsMap {
   let mut moc_kws = MocKeywordsMap::new();
   moc_kws.insert(MocKeywords::MOCVers(MocVers::V2_0));
+  // moc_kws.insert(MocKeywords::MOCVers(moc_version));
   moc_kws.insert(MocKeywords::MOCDim(Q::MOC_DIM));
   moc_kws.insert(MocKeywords::Ordering(Ordering::Range));
   if Q::HAS_COOSYS {
@@ -322,7 +326,9 @@ fn build_range_moc_keywords<T: Idx, Q: MocQty<T>>(
   if Q::HAS_TIMESYS {
     moc_kws.insert(MocKeywords::TimeSys(TimeSys::TCB));
     moc_kws.insert(MocKeywords::MOCOrdT(MocOrdT{depth: depth_max}));
-
+  }
+  if Q::HAS_FREQSYS {
+    moc_kws.insert(MocKeywords::MOCOrdF(MocOrdF{depth: depth_max}));
   }
   if let Some(id) = moc_id {
     moc_kws.insert(MocKeywords::MOCId(MocId{id}));
@@ -567,7 +573,7 @@ pub fn from_fits_ivoa<R: BufRead>(mut reader: R) -> Result<MocIdxType<R>, FitsEr
               String::from("MOCDIM  = 'TIME'"), String::from("ORDERING= 'NUNIQ'"))),
             Some(MocKeywords::Ordering(Ordering::Range)) => load_t_moc_range(reader, n_bytes, n_elems, depth_max, &moc_kws),
             Some(MocKeywords::Ordering(Ordering::Range29)) => Err(FitsError::UncompatibleKeywordContent(
-              String::from("ORDERING  = 'RABGE29'"), String::from("MOCVERS= '2.0'"))
+              String::from("ORDERING  = 'RANGE29'"), String::from("MOCVERS= '2.0'"))
             ),
             // ADD GUNIQ? RUNIQ? RMIXED?
             _ => Err(FitsError::MissingKeyword(Ordering::keyword_string())),
@@ -589,7 +595,23 @@ pub fn from_fits_ivoa<R: BufRead>(mut reader: R) -> Result<MocIdxType<R>, FitsEr
               load_st_moc_range(reader, n_bytes, n_elems, depth_max_time, depth_max_hpx, &moc_kws)
             },
             Some(MocKeywords::Ordering(Ordering::Range29)) => Err(FitsError::UncompatibleKeywordContent(
-              String::from("ORDERING  = 'RABGE29'"), String::from("MOCVERS= '2.0'"))
+              String::from("ORDERING  = 'RANGE29'"), String::from("MOCVERS= '2.0'"))
+            ),
+            // ADD GUNIQ? RUNIQ? RMIXED?
+            _ => Err(FitsError::MissingKeyword(Ordering::keyword_string())),
+          }
+        },
+        Some(MocKeywords::MOCDim(MocDim::Frequency)) => {
+          let depth_max = match moc_kws.get(PhantomData::<MocOrdF>) {
+            Some(MocKeywords::MOCOrdF(MocOrdF { depth })) => *depth,
+            _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
+          };
+          match moc_kws.get(PhantomData::<Ordering>) {
+            Some(MocKeywords::Ordering(Ordering::Nuniq)) => Err(FitsError::UncompatibleKeywordContent(
+              String::from("MOCDIM  = 'FREQUENCY'"), String::from("ORDERING= 'NUNIQ'"))),
+            Some(MocKeywords::Ordering(Ordering::Range)) => load_f_moc_range(reader, n_bytes, n_elems, depth_max, &moc_kws),
+            Some(MocKeywords::Ordering(Ordering::Range29)) => Err(FitsError::UncompatibleKeywordContent(
+              String::from("ORDERING  = 'RANGE29'"), String::from("MOCVERS= '2.0'"))
             ),
             // ADD GUNIQ? RUNIQ? RMIXED?
             _ => Err(FitsError::MissingKeyword(Ordering::keyword_string())),
@@ -702,6 +724,43 @@ fn load_t_moc_range<R: BufRead>(
     (Some(MocKeywords::TForm1(TForm1::OneK)), u64::N_BYTES) =>
       Ok(MocIdxType::U64(MocQtyType::Time(MocType::Ranges(
         from_fits_range::<u64, Time::<u64>, R>(reader, depth_max, n_ranges)?
+      )))),
+    /*(Some(MocKeywords::TForm1(TForm1::OneB)), u8::N_BYTES) =>
+      Ok(MocIdxType::U8(MocQtyType::Time(MocType::Ranges(
+        from_fits_range::<u8, Time::<u8>, R>(reader, depth_max, n_ranges)?
+      )))),
+    (Some(MocKeywords::TForm1(TForm1::TwoK)), u128::N_BYTES) =>
+      Ok(MocIdxType::U128(MocQtyType::Time(MocType::Ranges(
+        from_fits_range::<u128, Time::<u128>, R>(reader, depth_max, n_ranges)?
+      )))),*/
+    (Some(MocKeywords::TForm1(tform)), nb) =>
+      Err(FitsError::UncompatibleKeywordContent(format!("NAXIS1  = {}", nb), tform.to_string())),
+    (None, _) => Err(FitsError::MissingKeyword(TForm1::keyword_string())),
+    _ => unreachable!(),
+  }
+}
+
+fn load_f_moc_range<R: BufRead>(
+  reader: R,
+  n_bytes: u8,
+  n_elems: u64,
+  depth_max: u8,
+  moc_kws: &MocKeywordsMap
+) -> Result<MocIdxType<R>, FitsError>
+{
+  let n_ranges = n_elems >> 1;
+  match (moc_kws.get(PhantomData::<TForm1>), n_bytes) {
+    (Some(MocKeywords::TForm1(TForm1::OneI)), u16::N_BYTES) =>
+      Ok(MocIdxType::U16(MocQtyType::Freq(MocType::Ranges(
+        from_fits_range::<u16, Frequency::<u16>, R>(reader, depth_max, n_ranges)?
+      )))),
+    (Some(MocKeywords::TForm1(TForm1::OneJ)), u32::N_BYTES) =>
+      Ok(MocIdxType::U32(MocQtyType::Freq(MocType::Ranges(
+        from_fits_range::<u32, Frequency::<u32>, R>(reader, depth_max, n_ranges)?
+      )))),
+    (Some(MocKeywords::TForm1(TForm1::OneK)), u64::N_BYTES) =>
+      Ok(MocIdxType::U64(MocQtyType::Freq(MocType::Ranges(
+        from_fits_range::<u64, Frequency::<u64>, R>(reader, depth_max, n_ranges)?
       )))),
     /*(Some(MocKeywords::TForm1(TForm1::OneB)), u8::N_BYTES) =>
       Ok(MocIdxType::U8(MocQtyType::Time(MocType::Ranges(

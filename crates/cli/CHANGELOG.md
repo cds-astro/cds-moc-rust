@@ -1,5 +1,13 @@
 # `moc-cli` Change Log
 
+## 0.5.0-alpha
+
+Realeased 2022-06-17
+
+* Add support for frequency MOCs
+* Add 'hprint' (human print) command for time and frequency
+
+
 ## 0.4.0
 
 Realeased 2022-04-13

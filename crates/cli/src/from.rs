@@ -12,7 +12,7 @@ use structopt::StructOpt;
 use healpix::nested::Layer;
 
 use moclib::{
-  qty::{MocQty, Hpx, Time},
+  qty::{MocQty, Hpx, Time, Frequency},
   elem::valuedcell::valued_cells_to_moc_with_opt,
   elemset::range::HpxRanges,
   moc::{
@@ -353,6 +353,31 @@ pub enum From {
     /// 'isorfc' (Gregorian date-time, Rfc3339, WARNING: no conversion to TCB),
     /// or 'isosimple' (Gregorian date, 'YYYY-MM-DDTHH:MM:SS' WARNING: no conversion to TCB)
     time: InputTime,
+    #[structopt(parse(from_os_str))]
+    /// The input file, use '-' for stdin
+    input: PathBuf,
+    #[structopt(short = "s", long = "separator", default_value = " ")]
+    /// Separator between time lower and upper bounds (default = ' ')
+    separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat
+  },
+  #[structopt(name = "freqval")]
+  /// Create a Frequency MOC from a list of frequency (in Hz, one per line).
+  FreqValue {
+    /// Depth of the created MOC, in `[0, 57]`.
+    depth: u8,
+    #[structopt(parse(from_os_str))]
+    /// The input file, use '-' for stdin
+    input: PathBuf,
+    #[structopt(subcommand)]
+    out: OutputFormat
+  },
+  #[structopt(name = "freqrange")]
+  /// Create a Time MOC from a list of frequency range (in Hz, one range per line, lower bound first, then upper bound).
+  FreqRange {
+    /// Depth of the created MOC, in `[0, 61]`.
+    depth: u8,
     #[structopt(parse(from_os_str))]
     /// The input file, use '-' for stdin
     input: PathBuf,
@@ -952,7 +977,83 @@ impl From {
           RangeMOC2::from_ranges_and_fixed_depth_cells(tdepth, sdepth, reader.lines().filter_map(line2trpos), None)
         };
         out.write_stmoc(moc2.into_range_moc2_iter())
-      }
+      },
+      From::FreqValue {
+        depth,
+        input,
+        out
+      } => {
+        let line2freq = move |line: std::io::Result<String>| {
+          match line.map(|s| s.parse::<f64>()) {
+            Ok(Ok(f)) => Some(f),
+            Ok(Err(e)) => {
+              eprintln!("Error reading or parsing line: {:?}", e);
+              None
+            }
+            Err(e) => {
+              eprintln!("Error reading or parsing line: {:?}", e);
+              None
+            }
+          }
+        };
+        if input == PathBuf::from(r"-") {
+          let stdin = std::io::stdin();
+          out.write_fmoc_possibly_auto_converting_from_u64(
+            RangeMOC::<u64, Frequency::<u64>>::from_freq_in_hz(
+              depth, stdin.lock().lines().filter_map(line2freq), None
+            ).into_range_moc_iter()
+          )
+        } else {
+          let f = File::open(input)?;
+          let reader = BufReader::new(f);
+          out.write_fmoc_possibly_auto_converting_from_u64(
+            RangeMOC::<u64, Frequency::<u64>>::from_freq_in_hz(
+              depth, reader.lines().filter_map(line2freq), None
+            ).into_range_moc_iter()
+          )
+        }
+      },
+      From::FreqRange {
+        depth,
+        input,
+        separator,
+        out
+      } => {
+        fn line2tr(separator: &str, line: std::io::Result<String>) -> Result<Range<f64>, Box<dyn Error>> {
+          let line = line?;
+          let (fmin, fmax) = line.trim()
+            .split_once(&separator)
+            .ok_or_else(|| String::from("split on space failed."))?;
+          let fmin = fmin.parse::<f64>()?;
+          let fmax = fmax.parse::<f64>()?;
+          Ok(fmin..fmax)
+        }
+        let line2trange = move |line: std::io::Result<String>| {
+          match line2tr(&separator, line) {
+            Ok(trange) => Some(trange),
+            Err(e) => {
+              eprintln!("Error reading or parsing line: {:?}", e);
+              None
+            }
+          }
+        };
+        if input == PathBuf::from(r"-") {
+          let stdin = std::io::stdin();
+          out.write_fmoc_possibly_auto_converting_from_u64(
+            RangeMOC::<u64, Frequency::<u64>>::from_freq_ranges_in_hz(
+              depth, stdin.lock().lines().filter_map(line2trange), None
+            ).into_range_moc_iter()
+          )
+        } else {
+          let f = File::open(input)?;
+          let reader = BufReader::new(f);
+          out.write_fmoc_possibly_auto_converting_from_u64(
+            RangeMOC::<u64, Frequency::<u64>>::from_freq_ranges_in_hz(
+              depth, reader.lines().filter_map(line2trange), None
+            ).into_range_moc_iter()
+          )
+        }
+      },
       // ST-MOC from t-moc + s-moc (we can then create a complex ST-MOC by union of elementary ST-MOCs)
       // - e.g. multiple observation of the same area of the sky
       // - XMM ST-MOC (from list of observations)?

@@ -7,7 +7,7 @@ use std::error::Error;
 
 use structopt::StructOpt;
 
-use moclib::qty::{Hpx, Time};
+use moclib::qty::{Frequency, Hpx, Time};
 use moclib::deser::json::{from_json_aladin, cellmoc2d_from_json_aladin};
 use moclib::deser::ascii::{from_ascii_ivoa, from_ascii_stream, moc2d_from_ascii_ivoa};
 use moclib::deser::fits::{
@@ -30,7 +30,8 @@ use super::input::{InputFormat, fmt_from_extension};
 pub enum MocType {
   SMOC,
   TMOC,
-  STMOC
+  STMOC,
+  FMOC,
 }
 impl FromStr for MocType {
   type Err = String;
@@ -40,7 +41,8 @@ impl FromStr for MocType {
       "moc" | "smoc" => Ok(MocType::SMOC),
       "tmoc" => Ok(MocType::TMOC),
       "stmoc" => Ok(MocType::STMOC),
-      _ => Err(format!("Unrecognized moc type. Actual: '{}'. Expected: 'moc (or smoc), 'tmoc' or 'stmoc'", s)),
+      "fmoc" => Ok(MocType::FMOC),
+      _ => Err(format!("Unrecognized moc type. Actual: '{}'. Expected: 'moc (or smoc), 'tmoc', 'fmoc' or 'stmoc'", s)),
     }
   }
 }
@@ -51,7 +53,7 @@ pub struct Convert {
   /// Path of the input MOC file (or stdin if equals "-")
   input: PathBuf,
   #[structopt(short = "t", long = "type")]
-  /// Input MOC type ('smoc', 'tmoc' or 'stmoc') required for 'ascii', 'json' ans 'stream' inputs; ignored for 'fits'
+  /// Input MOC type ('smoc', 'tmoc', 'fmoc' or 'stmoc') required for 'ascii', 'json' ans 'stream' inputs; ignored for 'fits'
   moc_type: Option<MocType>,
   #[structopt(short = "f", long = "format")]
   /// Format of the input MOC ('ascii', 'json', 'fits' or 'stream') [default: guess from the file extension]
@@ -124,6 +126,23 @@ pub fn exec<R: BufRead>(
       let cellrange_it = from_ascii_stream::<u64, Time::<u64>, _>(input)?;
       output.write_tmoc_possibly_auto_converting_from_u64(cellrange_it.ranges())
     },
+    // FMOC
+    (Some(MocType::FMOC), InputFormat::Ascii) => {
+      let mut input_str = String::new();
+      input.read_to_string(&mut input_str)?;
+      let cellcellranges = from_ascii_ivoa::<u64, Frequency::<u64>>(&input_str)?;
+      output.write_fmoc_possibly_auto_converting_from_u64(cellcellranges.into_cellcellrange_moc_iter().ranges())
+    },
+    (Some(MocType::FMOC), InputFormat::Json) => {
+      let mut input_str = String::new();
+      input.read_to_string(&mut input_str)?;
+      let cells = from_json_aladin::<u64, Frequency::<u64>>(&input_str)?;
+      output.write_fmoc_possibly_auto_converting_from_u64(cells.into_cell_moc_iter().ranges())
+    },
+    (Some(MocType::FMOC), InputFormat::Stream) => {
+      let cellrange_it = from_ascii_stream::<u64, Frequency::<u64>, _>(input)?;
+      output.write_fmoc_possibly_auto_converting_from_u64(cellrange_it.ranges())
+    },
     // ST-MOC
     (Some(MocType::STMOC), InputFormat::Ascii) => {
       let mut input_str = String::new();
@@ -140,7 +159,7 @@ pub fn exec<R: BufRead>(
     (Some(MocType::STMOC), InputFormat::Stream) => {
       Err(String::from("No stream format for ST-MOCs yet.").into())
     },
-    // FITS file (SMOC or TMOC or ST-MOC)
+    // FITS file (SMOC or TMOC or FMOC, or ST-MOC)
     (_, InputFormat::Fits) => {
       let fits_res = from_fits_ivoa(input)?;
       match fits_res {
@@ -161,6 +180,11 @@ pub fn exec<R: BufRead>(
                 STMocType::V2(moc) => output.write_stmoc(moc),
                 STMocType::PreV2(moc) => output.write_stmoc(moc),
               },
+            MocQtyType::Freq(moc) =>
+              match moc {
+                RMocType::Ranges(moc) => output.write_fmoc_possibly_converting_to_u64(moc),
+                RMocType::Cells(moc) => output.write_fmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
+              },
           },
         MocIdxType::U32(moc) =>
           match moc {
@@ -179,6 +203,11 @@ pub fn exec<R: BufRead>(
                 STMocType::V2(moc) => output.write_stmoc(moc),
                 STMocType::PreV2(moc) => output.write_stmoc(moc),
               },
+            MocQtyType::Freq(moc) =>
+              match moc {
+                RMocType::Ranges(moc) => output.write_fmoc_possibly_converting_to_u64(moc),
+                RMocType::Cells(moc) => output.write_fmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
+              },
           },
         MocIdxType::U64(moc) =>
           match moc {
@@ -196,6 +225,11 @@ pub fn exec<R: BufRead>(
               match moc {
                 STMocType::V2(moc) => output.write_stmoc(moc),
                 STMocType::PreV2(moc) => output.write_stmoc(moc),
+              },
+            MocQtyType::Freq(moc) =>
+              match moc {
+                RMocType::Ranges(moc) => output.write_fmoc_possibly_converting_to_u64(moc),
+                RMocType::Cells(moc) => output.write_fmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
               },
           },
       }

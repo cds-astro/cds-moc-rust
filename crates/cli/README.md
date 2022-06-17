@@ -178,6 +178,30 @@ moc info my_res.fits
 moc from cone 11 0.0 +0.0 0.1 ascii --fold 50 my_cone.ascii
 moc convert -t smoc my_cone.ascii fits -f my_cone.fits
 moc from ring 10 13.158329 -72.80028  5.64323 10.0 ascii --fold 80
+
+## Frequency MOCs
+echo "0/0 8/" | moc hprint --type fmoc --format ascii -
+echo "0/0-1 8/" | moc convert --type smoc --format ascii - fits moc.d8.allfreq.fits
+moc info moc.d8.allfreq.fits
+moc hprint moc.d8.allfreq.fits
+
+for f in {0..63}; do echo "5/$f" | moc hprint --type fmoc --format ascii - --no-header; done
+for f in {0..511}; do echo "8/$f" | moc hprint --type fmoc --format ascii - --no-header; done
+for f in {0..1023}; do echo "9/$f" | moc hprint --type fmoc --format ascii - --no-header; done
+
+for f in {0..8191}; do echo "12/$f" | moc hprint --type fmoc --format ascii - --no-header; done
+for f in {0..65536}; do echo "15/$f" | moc hprint --type fmoc --format ascii - --no-header; done
+
+echo "0.125
+0.2569
+0.1478
+0.9985
+1.5983
+20.256
+3500" | \
+moc from freqval 9 - ascii | \
+moc hprint --type fmoc --format ascii -
+
 ```
 
 Building a MOC from the [Hipparcos](https://vizier.u-strasbg.fr/viz-bin/VizieR-3?-source=I/239/hip_main&-out.max=50&-out.form=HTML%20Table&-out.add=_r&-out.add=_RAJ,_DEJ&-sort=_r&-oc.form=sexa)
@@ -222,6 +246,14 @@ MOC type: SPACE
 MOC index type: u64
 MOC depth: 12
 MOC coverage:   3.962597748 %
+
+# Count the number of disjoint regions from the 12210 FOVs
+> time moc op split --count /home/pineau/Eclipse/ARCHES/scriptsNoSync/xmm.moc.fits ascii
+4414
+
+real	0m2,617s
+user	0m2,604s
+sys	0m0,005s
 ```
 
 ![XMM MOC allsky](img/xmmmoc.png)
@@ -319,6 +351,8 @@ time moc filter position SMOC_GLIMPSE_u32.fits kids_dr2.csv --has-header --lon R
 
 ## To-do list
 
+* [ ] MOC from cells (simpler than MOC from pos)
+* [ ] MOC from vcells with a simple constraint? 
 * [ ] Contact [gnuastro](https://www.gnu.org/software/gnuastro) ?
 * [ ] Add filter on ST-MOCs
 * [ ] Add ST-MOC 'intersection' and 'folds' in streaming mode (for a low memory footprint)

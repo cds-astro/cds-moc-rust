@@ -21,7 +21,7 @@ use healpix::nested::{
 use healpix::sph_geom::ContainsSouthPoleMethod;
 
 use crate::idx::Idx;
-use crate::qty::{MocQty, Hpx, Time, Bounded};
+use crate::qty::{MocQty, Hpx, Time, Bounded, Frequency};
 use crate::elem::cell::Cell;
 use crate::elemset::{
   range::MocRanges,
@@ -731,6 +731,33 @@ impl<T: Idx> RangeMOC<T, Time<T>> {
     let mut builder = RangeMocBuilder::new(depth, buf_capacity);
     for range in it {
       builder.push(T::from_u64_idx(range.start)..T::from_u64_idx(range.end));
+    }
+    builder.into_moc()
+  }
+
+}
+
+impl<T: Idx> RangeMOC<T, Frequency<T>> {
+
+  pub fn from_freq_in_hz<I>(depth: u8, it: I, buf_capacity: Option<usize>) -> Self
+    where
+      I: Iterator<Item=f64>
+  {
+    let shift = Frequency::<T>::shift_from_depth_max(depth) as u32;
+    let mut builder = FixedDepthMocBuilder::new(depth, buf_capacity);
+    for hz in it {
+      builder.push(Frequency::<T>::freq2hash(hz).unsigned_shr(shift));
+    }
+    builder.into_moc()
+  }
+
+  pub fn from_freq_ranges_in_hz<I>(depth: u8, it: I, buf_capacity: Option<usize>) -> Self
+    where
+      I: Iterator<Item=Range<f64>>
+  {
+    let mut builder = RangeMocBuilder::new(depth, buf_capacity);
+    for range in it {
+      builder.push(Frequency::<T>::freq2hash(range.start)..Frequency::<T>::freq2hash(range.end));
     }
     builder.into_moc()
   }

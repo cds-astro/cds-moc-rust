@@ -1,5 +1,14 @@
 # `moc` Change Log
 
+## 0.9.0-alpha
+
+Released 2022-06-17
+
+### Added
+
+* Add Frequency MOCs
+
+
 ## 0.8.0
 
 Released 2022-04-13

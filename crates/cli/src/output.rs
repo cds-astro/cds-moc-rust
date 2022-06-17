@@ -7,7 +7,7 @@ use std::error::Error;
 use structopt::StructOpt;
 
 use moclib::idx::Idx;
-use moclib::qty::{MocQty, Hpx, Time};
+use moclib::qty::{MocQty, Hpx, Time, Frequency};
 use moclib::deser::fits;
 use moclib::moc::{
   RangeMOCIterator, CellMOCIterator,
@@ -64,7 +64,7 @@ pub enum OutputFormat {
     file: PathBuf
   },
   #[structopt(name = "stream")]
-  /// Output a streamed MOC
+  /// Output a streamed MOC (not yet implemented!)
   Stream,
 }
 
@@ -159,6 +159,35 @@ impl OutputFormat {
   {
     if self.is_fits_forced_to_u64() {
       self.write_moc(convert_to_u64::<T, Time<T>, _, Time<u64>>(it))
+    } else {
+      self.write_moc(it)
+    }
+  }
+
+  pub fn write_fmoc_possibly_auto_converting_from_u64<I>(self, it: I) -> Result<(), Box<dyn Error>>
+    where
+      I: RangeMOCIterator<u64, Qty=Frequency<u64>>
+  {
+    if self.is_fits_not_forced_to_u64() {
+      let depth = it.depth_max();
+      if depth <= Time::<u16>::MAX_DEPTH {
+        self.write_moc(convert_from_u64::<Frequency<u64>, u16, Frequency<u16>, _>(it))
+      } else if depth <= Time::<u32>::MAX_DEPTH {
+        self.write_moc(convert_from_u64::<Frequency<u64>, u32, Frequency<u32>, _>(it))
+      } else {
+        self.write_moc(it)
+      }
+    } else {
+      self.write_moc(it)
+    }
+  }
+
+  pub fn write_fmoc_possibly_converting_to_u64<T: Idx, I>(self, it: I) -> Result<(), Box<dyn Error>>
+    where
+      I: RangeMOCIterator<T, Qty=Frequency<T>>
+  {
+    if self.is_fits_forced_to_u64() {
+      self.write_moc(convert_to_u64::<T, Frequency<T>, _, Frequency<u64>>(it))
     } else {
       self.write_moc(it)
     }

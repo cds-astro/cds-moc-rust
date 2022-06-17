@@ -65,7 +65,7 @@ impl CsvArgs {
 pub enum Filter {
   /// Filter a file containing equatorial coordinates using a Space MOC
   Position(PositionFilter), // hpx sort (flag to filter on streaming mode?)
-  /// Filter a file containing a time using a Time MOC (NOT YET IMPLEMETNED)
+  /// Filter a file containing a time using a Time MOC (NOT YET IMPLEMENTED)
   Time(TimeFilter),
   // SpaceTime(SpaceTime) // TODO
 }

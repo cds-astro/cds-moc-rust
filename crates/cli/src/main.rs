@@ -10,6 +10,7 @@ use moc_cli::from::From;
 use moc_cli::op::Op;
 use moc_cli::filter::Filter;
 use moc_cli::convert::Convert;
+use moc_cli::hprint::HumanPrint;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "moc", global_settings = &[AppSettings::ColoredHelp, AppSettings::AllowNegativeNumbers])]
@@ -29,15 +30,15 @@ enum Args {
   #[structopt(name = "from")]
   /// Create a MOC from given parameters
   From(From),
-  // #[structopt(flatten)]
   #[structopt(name = "op")]
   /// Perform operations on MOCs
   Op(Op),
   #[structopt(name = "filter")]
   /// Filter file rows using a MOC
-  Filter(Filter)
-  // Add a notify with email and msg to tell us you are using this cli?
-  // And/Or add a register to a mailing list?
+  Filter(Filter),
+  #[structopt(name = "hprint")]
+  /// Print a MOC to a human readable form
+  HumanPrint(HumanPrint)
 }
 
 impl Args {
@@ -49,6 +50,7 @@ impl Args {
       Args::From(from) => from.exec(),
       Args::Op(op) => op.exec(),
       Args::Filter(filter) => filter.exec(),
+      Args::HumanPrint(hprint) => hprint.exec(),
     }
   }
 }

@@ -33,7 +33,6 @@ use crate::deser::{
 /// [Here](https://gamma-astro-data-formats.readthedocs.io/en/latest/skymaps/healpix/index.html) 
 /// a description of the format.
 /// We so far implemented a subset of the format only: 
-/// * `ORDERING= 'NESTED  '`
 /// * `INDXSCHM= 'IMPLICIT'`
 /// * `ORDERING= 'NESTED  '` 
 /// To be fast (in execution and development), we start by a non-flexible approach in which we

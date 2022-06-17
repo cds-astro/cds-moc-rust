@@ -14,6 +14,7 @@ pub mod from;
 pub mod op;
 pub mod filter;
 pub mod output;
+pub mod hprint;
 
 // See https://www.ivoa.net/rdf/timescale/2019-03-15/timescale.html
 

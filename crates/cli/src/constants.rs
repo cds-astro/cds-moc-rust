@@ -3,16 +3,19 @@ use std::error::Error;
 
 use structopt::StructOpt;
 
-use moclib::qty::{MocQty, Hpx, Time};
+use moclib::qty::{MocQty, Hpx, Time, Frequency};
 
 #[derive(StructOpt, Debug)]
 pub enum Constants {
   #[structopt(name = "space")]
-  /// Provides iformation on HEALPix (used in Space MOCs)
+  /// Provides information on HEALPix (used in Space MOCs)
   Space,
   #[structopt(name = "time")]
-  /// Provides iformation on HEALPix (used in Space MOCs)
+  /// Provides information on time MOCs
   Time,
+  #[structopt(name = "freq")]
+  /// Provides information on frequency MOCs
+  Frequency,
 }
 
 impl Constants {
@@ -20,6 +23,7 @@ impl Constants {
     match self {
       Constants::Space => print_hpx_info(),
       Constants::Time => print_time_info(),
+      Constants::Frequency => print_freq_info(),
     }
     Ok(())
   }
@@ -71,3 +75,19 @@ fn print_time_info() {
     println!("   {:2} {:20}", depth, Time::<u64>::n_cells(depth as u8));
   }
 }
+
+fn print_freq_info() {
+  println!("Frequency MOCs");
+  println!();
+  println!("Index types:");
+  println!("- u16 (short), depth max = {}", Frequency::<u16>::MAX_DEPTH);
+  println!("- u32   (int), depth max = {}", Frequency::<u32>::MAX_DEPTH);
+  println!("- u64  (long), depth max = {}", Frequency::<u64>::MAX_DEPTH);
+  println!();
+  println!("Layers info:");
+  println!("{:>5} {:>20}",  "depth", "ncells");
+  for depth in 0..=Frequency::<u64>::MAX_DEPTH {
+    println!("   {:2} {:20}", depth, Frequency::<u64>::n_cells(depth as u8));
+  }
+}
+

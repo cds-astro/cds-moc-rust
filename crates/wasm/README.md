@@ -165,7 +165,7 @@ minus(left_name, right_name, out_name)
 timeFold(tmoc_name, st_moc_name, out_smoc_name)
 spaceFold(smoc_name, st_moc_name, out_tmoc_name)
 
-# Filter operations (return arrays containing with 0 (out of the MOC) or 1 (in the MOC))
+# Filter operations (return arrays containing 0 (out of the MOC) or 1 (in the MOC))
 filterCoos(name, coos_deg: Float64Array) -> Uint8Array
 filterJDs(name, jds: Float64Array) -> Uint8Array
 
