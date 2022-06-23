@@ -23,8 +23,11 @@ use crate::deser::{
       Ordering, MocOrder, Nside, IndexSchema
     },
     common::{
-      consume_primary_hdu, next_36_chunks_of_80_bytes, check_keyword_and_val,
-      check_keyword_and_parse_uint_val
+      consume_primary_hdu, 
+      next_36_chunks_of_80_bytes,
+      check_keyword_and_val,
+      check_keyword_and_parse_uint_val,
+      check_keyword_and_get_str_val
     }
   }
 };
@@ -46,8 +49,8 @@ use crate::deser::{
 /// PCOUNT  =                    0 / number of group parameters                     
 /// GCOUNT  =                    1 / number of groups                               
 /// TFIELDS =                   ?? / number of table fields
-/// TTYPE1  = 'PROB    '                                                            
-/// TFORM1  = 'D       '                                                            
+/// TTYPE1  = 'XXX' // MUST STARS WITH 'PROB'                                                            
+/// TFORM1  = 'XXX' // MUST CONTAINS D (f64) or E (f32)                                                            
 /// TUNIT1  = 'pix-1    '
 /// TTYPE2  = ???                                                         
 /// TFORM2  = ???                                                            
@@ -89,13 +92,13 @@ pub fn from_fits_skymap<R: Read + Seek>(
 ) -> Result<RangeMOC<u64, Hpx::<u64>>, FitsError> {
   if is_gz(&mut reader)? {
     let reader = uncompress(reader);
-    from_fits_skymap_internam(reader, skip_value_le_this, cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
+    from_fits_skymap_internal(reader, skip_value_le_this, cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
   } else {
-    from_fits_skymap_internam(reader, skip_value_le_this, cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
+    from_fits_skymap_internal(reader, skip_value_le_this, cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
   }
 }
 
-fn from_fits_skymap_internam<R: BufRead>(
+fn from_fits_skymap_internal<R: BufRead>(
   mut reader: R,
   skip_value_le_this: f64,
   cumul_from: f64,
@@ -118,8 +121,31 @@ fn from_fits_skymap_internam<R: BufRead>(
   check_keyword_and_val(it80.next().unwrap(), b"PCOUNT  ", b"0")?;
   check_keyword_and_val(it80.next().unwrap(), b"GCOUNT  ", b"1")?;
   let _n_cols = check_keyword_and_parse_uint_val::<u64>(it80.next().unwrap(), b"TFIELDS ")?;
-  check_keyword_and_val(it80.next().unwrap(), b"TTYPE1 ", b"'PROB    '")?;
-  check_keyword_and_val(it80.next().unwrap(), b"TFORM1 ", b"'D       '")?; // Accept K also?
+  // check_keyword_and_val(it80.next().unwrap(), b"TTYPE1 ", b"'PROB    '")?;
+  // check_keyword_and_val(it80.next().unwrap(), b"TFORM1 ", b"'D       '")?; // Accept K also?
+  let ttype1 = check_keyword_and_get_str_val(it80.next().unwrap(), b"TTYPE1 ")?;
+  if !ttype1.to_uppercase().starts_with("PROB") {
+    return Err(FitsError::UnexpectedValue(
+      String::from("TTYPE1"),
+      String::from("starts with 'PROB'"), 
+      String::from(ttype1))
+    );
+  }
+  let tform1 = check_keyword_and_get_str_val(it80.next().unwrap(), b"TFORM1 ")?;
+  let is_f64 = if tform1.contains('D') {
+    Ok(true)
+  } else if tform1.contains('E') {
+    Ok(false)
+  } else {
+    Err(
+      FitsError::UnexpectedValue(
+        String::from("TFORM1"),
+        String::from("contains 'D' or 'K'"),
+        String::from(ttype1)
+      )
+    )
+  }?;
+  
   // nbits = |BITPIX|xGCOUNTx(PCOUNT+NAXIS1xNAXIS2x...xNAXISn)
   // In our case (bitpix = 8, GCOUNT = 1, PCOUNT = 0) => nbytes = n_cells * size_of(T)
   // let data_size n_bytes as usize * n_cells as usize; // N_BYTES ok since BITPIX = 8
@@ -160,7 +186,7 @@ fn from_fits_skymap_internam<R: BufRead>(
   };
   // Read data
   // - we so far support only TForm1=D
-  let first_elem_byte_size = size_of::<f64>();
+  let first_elem_byte_size = if is_f64 { size_of::<f64>() } else { size_of::<f32>() };
   let n_byte_skip = n_bytes_per_row as usize - first_elem_byte_size;
   let mut sink = vec![0; n_byte_skip];
   let mut prev_range = 0..0;
@@ -168,8 +194,12 @@ fn from_fits_skymap_internam<R: BufRead>(
   let mut uniq_val_dens: Vec<(u64, f64, f64)> = Vec::with_capacity(10_240);
   let mut cumul_skipped = 0_f64;
   for ipix in 0..n_rows {
-    // - read
-    let val = reader.read_f64::<BigEndian>()?; // per pix
+    // - read (we could increase the perf here by monomorphising the loop to avoid the test at each iteration)
+    let val = if is_f64 { // per pix
+      reader.read_f64::<BigEndian>()? 
+    } else {
+      reader.read_f32::<BigEndian>()? as f64
+    }; 
     reader.read_exact(&mut sink)?;
     // - we skip too low value (e.g. all cells set to 0)
     // - we pack together, in a same range, consecutive cells having the same value
@@ -224,7 +254,6 @@ fn from_fits_skymap_internam<R: BufRead>(
 }
 
 
-/*
 #[cfg(test)]
 mod tests {
 
@@ -234,7 +263,7 @@ mod tests {
   use super::from_fits_skymap;
 
   // Perform only in release mode (else slow: the decompresse fits files is 1.6GB large)!
-  #[test]
+  /*#[test]
   fn test_skymap() {
     let path_buf1 = PathBuf::from("resources/Skymap/bayestar.fits.gz");
     let path_buf2 = PathBuf::from("../resources/Skymap/bayestar.fits.gz");
@@ -252,6 +281,51 @@ mod tests {
         assert!(false)
       },
     }
+  }*/
+
+  #[test]
+  fn test_skymap_v2() {
+    let path_buf1 = PathBuf::from("resources/Skymap/gbuts_healpix_systematic.fits");
+    let path_buf2 = PathBuf::from("../resources/Skymap/gbuts_healpix_systematic.fits");
+
+    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let reader = BufReader::new(file);
+
+    let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
+    match res {
+      Ok(o) => {
+        print!("{:?}", o);
+        assert!(true)
+      },
+      Err(e) => {
+        print!("{:?}", e);
+        assert!(false)
+      },
+    }
   }
 
-}*/
+
+  #[test]
+  fn test_skymap_v3() {
+    let path_buf1 = PathBuf::from("resources/Skymap/gbm_subthresh_514434454.487999_healpix.fits");
+    let path_buf2 = PathBuf::from("../resources/Skymap/gbm_subthresh_514434454.487999_healpix.fits");
+
+    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let reader = BufReader::new(file);
+
+    let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
+    match res {
+      Ok(o) => {
+        print!("{:?}", o);
+        assert!(true)
+      },
+      Err(e) => {
+        print!("{:?}", e);
+        assert!(false)
+      },
+    }
+  }
+
+
+
+}

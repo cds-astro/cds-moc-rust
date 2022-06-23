@@ -123,6 +123,17 @@ pub(super) fn check_keyword_and_parse_uint_val<T>(
   parse_uint_val::<T>(keyword_record)
 }
 
+pub(super) fn check_keyword_and_get_str_val<'a>(
+  keyword_record: &'a [u8],
+  expected_kw: &[u8]
+) -> Result<&'a str, FitsError>
+{
+  check_expected_keyword(keyword_record, expected_kw)?;
+  check_for_value_indicator(keyword_record)?;
+  get_str_val_no_quote(keyword_record) // We go unsafe because FITS not supposed to contains non-ASCII chars 
+    .map(|bytes| unsafe { str::from_utf8_unchecked(bytes) } )
+}
+
 pub(super) fn check_expected_keyword(keyword_record: &[u8], expected: &[u8]) -> Result<(), FitsError> {
   debug_assert!(keyword_record.len() == 80);     // length of a FITS keyword-record
   debug_assert!(expected.len() <= 8); // length of a FITS keyword
@@ -196,7 +207,7 @@ pub(super) fn trim_right(src: &[u8]) -> &[u8] {
 }
 
 /// We know that the expected value does not contains a simple quote.
-/// A trim_end is apply so that the result do not contains leading or trailing spaces.
+/// A trim_end is applied so that the result does not contain leading or trailing spaces.
 pub(super) fn get_str_val_no_quote(
   keyword_record: &[u8]
 ) -> Result<&[u8], FitsError> {
