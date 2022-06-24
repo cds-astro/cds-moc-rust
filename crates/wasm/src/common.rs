@@ -6,7 +6,7 @@ use unreachable::UncheckedResultExt;
 
 use wasm_bindgen::JsValue;
 
-use moclib::qty::{Hpx, Time};
+use moclib::qty::{Hpx, Time, Frequency};
 use moclib::moc::{
   RangeMOCIterator, RangeMOCIntoIterator,
   CellMOCIterator,
@@ -33,6 +33,8 @@ pub(crate) const TWICE_PI: f64 = 2.0 * std::f64::consts::PI;
 pub(crate) type SMOC = RangeMOC<u64, Hpx<u64>>;
 /// Convenient type for Time-MOCs
 pub(crate) type TMOC = RangeMOC<u64, Time<u64>>;
+/// Convenient type for Frequency-MOCs
+pub(crate) type FMOC = RangeMOC<u64, Frequency<u64>>;
 /// Convenient type for SpaceTime-MOCs
 pub(crate) type STMOC = RangeMOC2<u64, Time<u64>, u64, Hpx<u64>>;
 
@@ -40,6 +42,7 @@ pub(crate) type STMOC = RangeMOC2<u64, Time<u64>, u64, Hpx<u64>>;
 pub(crate) enum InternalMoc {
   Space(SMOC),
   Time(TMOC),
+  Frequency(FMOC),
   TimeSpace(STMOC),
 }
 
@@ -49,6 +52,7 @@ impl InternalMoc {
     match self {
       InternalMoc::Space(_) => MocQType::Space,
       InternalMoc::Time(_) => MocQType::Time,
+      InternalMoc::Frequency(_) => MocQType::Frequency,
       InternalMoc::TimeSpace(_) => MocQType::SpaceTime,
     }
   }
@@ -57,6 +61,7 @@ impl InternalMoc {
     match self {
       InternalMoc::Space(moc) => (Some(moc.depth_max()), None),
       InternalMoc::Time(moc) => (None, Some(moc.depth_max())),
+      InternalMoc::Frequency(_) => (None, None),
       InternalMoc::TimeSpace(moc2) => (Some(moc2.depth_max_2()), Some(moc2.depth_max_1())),
     }
   }
@@ -65,6 +70,7 @@ impl InternalMoc {
     match self {
       InternalMoc::Space(moc) => moc.len() as u32,
       InternalMoc::Time(moc) => moc.len() as u32,
+      InternalMoc::Frequency(moc) => moc.len() as u32,
       InternalMoc::TimeSpace(moc2) => moc2.compute_n_ranges() as u32,
     }
   }
@@ -73,6 +79,7 @@ impl InternalMoc {
     match self {
       InternalMoc::Space(moc) => Some(moc.coverage_percentage() * 100.0),
       InternalMoc::Time(moc) => Some(moc.coverage_percentage() * 100.0),
+      InternalMoc::Frequency(moc) => Some(moc.coverage_percentage() * 100.0),
       InternalMoc::TimeSpace(_) => None,
     }
   }
@@ -91,6 +98,12 @@ impl InternalMoc {
             .to_ascii_ivoa(fold, false, &mut buf)
             .unchecked_unwrap_ok(),
         InternalMoc::Time(moc) =>
+          moc.into_range_moc_iter()
+            .cells()
+            .cellranges()
+            .to_ascii_ivoa(fold, false, &mut buf)
+            .unchecked_unwrap_ok(),
+        InternalMoc::Frequency(moc) =>
           moc.into_range_moc_iter()
             .cells()
             .cellranges()
@@ -125,6 +138,11 @@ impl InternalMoc {
             .cells()
             .to_json_aladin(fold, &mut buf)
             .unchecked_unwrap_ok(),
+        InternalMoc::Frequency(moc) =>
+          moc.into_range_moc_iter()
+            .cells()
+            .to_json_aladin(fold, &mut buf)
+            .unchecked_unwrap_ok(),
         InternalMoc::TimeSpace(moc) =>
           moc.into_range_moc2_iter()
             .into_cell_moc2_iter()
@@ -149,6 +167,10 @@ impl InternalMoc {
             .to_fits_ivoa(None, None, &mut buf)
             .unchecked_unwrap_ok(),
         InternalMoc::Time(moc) =>
+          moc.into_range_moc_iter()
+            .to_fits_ivoa(None, None, &mut buf)
+            .unchecked_unwrap_ok(),
+        InternalMoc::Frequency(moc) =>
           moc.into_range_moc_iter()
             .to_fits_ivoa(None, None, &mut buf)
             .unchecked_unwrap_ok(),

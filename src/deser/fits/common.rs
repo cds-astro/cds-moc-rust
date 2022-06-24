@@ -130,7 +130,8 @@ pub(super) fn check_keyword_and_get_str_val<'a>(
 {
   check_expected_keyword(keyword_record, expected_kw)?;
   check_for_value_indicator(keyword_record)?;
-  get_str_val_no_quote(keyword_record) // We go unsafe because FITS not supposed to contains non-ASCII chars 
+  // We go unsafe because FITS headers are not supposed to contain non-ASCII chars
+  get_str_val_no_quote(keyword_record)
     .map(|bytes| unsafe { str::from_utf8_unchecked(bytes) } )
 }
 

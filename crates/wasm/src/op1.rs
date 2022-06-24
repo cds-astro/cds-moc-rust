@@ -4,7 +4,7 @@ use wasm_bindgen::JsValue;
 use moclib::moc::{RangeMOCIterator, CellMOCIterator, CellMOCIntoIterator};
 
 use super::store;
-use super::common::{SMOC, TMOC, STMOC, InternalMoc};
+use super::common::{SMOC, TMOC, FMOC, STMOC, InternalMoc};
 
 #[derive(Copy, Clone)]
 pub(crate) enum Op1 {
@@ -48,6 +48,17 @@ impl Op1 {
       Op1::Split | Op1::SplitIndirect => Err(String::from("Split not implemented for T-MOCs.")),
     }
   }
+  fn perform_op_on_fmoc(self, moc: &FMOC) -> Result<FMOC, String> {
+    match self {
+      Op1::Complement => Ok(moc.not()),
+      Op1::Degrade { new_depth } => Ok(moc.degraded(new_depth)),
+      Op1::Extend => Err(String::from("Extend border not implemented (yet) for F-MOCs.")),
+      Op1::Contract => Err(String::from("Contract border not implemented (yet) for F-MOCs.")),
+      Op1::ExtBorder => Err(String::from("External border not implemented (yet) for F-MOCs.")),
+      Op1::IntBorder => Err(String::from("Internal border not implemented (yet) for F-MOCs.")),
+      Op1::Split | Op1::SplitIndirect => Err(String::from("Split not implemented for F-MOCs.")),
+    }
+  }
   fn perform_op_on_stmoc(self, _moc: &STMOC) -> Result<STMOC, String> {
     match self {
       Op1::Complement => Err(String::from("Complement not implemented (yet) for ST-MOCs.")),
@@ -67,6 +78,7 @@ pub(crate) fn op1_count_split(name: &str, indirect_neigh: bool) -> Result<u32, J
     move |moc| match moc {
       InternalMoc::Space(m) => Ok(m.split_into_joint_mocs(indirect_neigh).len() as u32),
       InternalMoc::Time(_) => Err(String::from("Split not implemented for T-MOCs.")),
+      InternalMoc::Frequency(_) => Err(String::from("Split not implemented for F-MOCs.")),
       InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
     }
   )
@@ -88,6 +100,7 @@ pub(crate) fn op1(name: &str, op: Op1, res_name: &str) -> Result<(), JsValue> {
           )
         },
         InternalMoc::Time(_) => Err(String::from("Split not implemented for T-MOCs.")),
+        InternalMoc::Frequency(_) => Err(String::from("Split not implemented for F-MOCs.")),
         InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
       },
       res_name
@@ -98,6 +111,7 @@ pub(crate) fn op1(name: &str, op: Op1, res_name: &str) -> Result<(), JsValue> {
       move |moc| match moc {
         InternalMoc::Space(m) => op.perform_op_on_smoc(m).map(InternalMoc::Space),
         InternalMoc::Time(m) => op.perform_op_on_tmoc(m).map(InternalMoc::Time),
+        InternalMoc::Frequency(m) => op.perform_op_on_fmoc(m).map(InternalMoc::Frequency),
         InternalMoc::TimeSpace(m) => op.perform_op_on_stmoc(m).map(InternalMoc::TimeSpace),
       },
       res_name

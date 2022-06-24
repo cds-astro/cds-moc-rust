@@ -1,8 +1,11 @@
 extern crate console_error_panic_hook;
 
-use std::panic;
-use std::str::{from_utf8, from_utf8_unchecked};
-use std::io::{Cursor, BufReader};
+use std::{
+  panic,
+  ops::Range,
+  io::{Cursor, BufReader},
+  str::{from_utf8, from_utf8_unchecked}
+};
 
 use unreachable::{UncheckedOptionExt, UncheckedResultExt};
 
@@ -19,7 +22,7 @@ use web_sys::{
 };
 use js_sys::{Array, Uint8Array};
 
-use moclib::qty::{MocQty, Hpx, Time};
+use moclib::qty::{MocQty, Hpx, Time, Frequency};
 use moclib::elem::valuedcell::valued_cells_to_moc_with_opt;
 use moclib::elemset::range::HpxRanges;
 use moclib::moc::{
@@ -85,6 +88,7 @@ pub fn debug_on() {
 pub enum MocQType {
   Space = "space",
   Time = "time",
+  Frequency = "frequence",
   SpaceTime = "space-time",
 }
 
@@ -651,6 +655,25 @@ pub async fn tmoc_from_ascii_url(name: String, url: String) -> Result<(), JsValu
   ).await
 }
 
+#[wasm_bindgen(js_name = "fmocFromAscii", catch)]
+pub fn fmoc_from_ascii(name: &str, data: &str) -> Result<(), JsValue> {
+  let cellcellranges = from_ascii_ivoa::<u64, Frequency::<u64>>(data)
+    .map_err(|e| JsValue::from_str(&e.to_string()))?;
+  let moc = cellcellranges.into_cellcellrange_moc_iter().ranges().into_range_moc();
+  store::add(name, InternalMoc::Frequency(moc))
+}
+
+/// WARNING: if this i not working, check e.g. with `wget -v -S ${url}` the the content type is
+/// `Content-Type: text/plain`.
+#[wasm_bindgen(js_name = "fmocFromAsciiUrl")]
+pub async fn fmoc_from_ascii_url(name: String, url: String) -> Result<(), JsValue> {
+  const ERR: &str = "File content is not valid UTF-8.";
+  from_url(
+    name, url, "text/plain",
+    Box::new(|name, data| fmoc_from_ascii(name, from_utf8(data).unwrap_or(ERR)) )
+  ).await
+}
+
 #[wasm_bindgen(js_name = "stmocFromAscii", catch)]
 pub fn stmoc_from_ascii(name: &str, data: &str) -> Result<(), JsValue> {
   let cellrange2 = moc2d_from_ascii_ivoa::<u64, Time::<u64>, u64, Hpx::<u64>>(data)
@@ -707,6 +730,25 @@ pub async fn tmoc_from_json_url(name: String, url: String) -> Result<(), JsValue
   from_url(
     name, url, "application/json",
     Box::new(|name, data| tmoc_from_json(name, from_utf8(data).unwrap_or(ERR)) )
+  ).await
+}
+
+#[wasm_bindgen(js_name = "fmocFromJson", catch)]
+pub fn fmoc_from_json(name: &str, data: &str) -> Result<(), JsValue> {
+  let cells = from_json_aladin::<u64, Frequency::<u64>>(data)
+    .map_err(|e| JsValue::from_str(&e.to_string()))?;
+  let moc = cells.into_cell_moc_iter().ranges().into_range_moc();
+  store::add(name, InternalMoc::Frequency(moc))
+}
+
+/// WARNING: if this i not working, check e.g. with `wget -v -S ${url}` the the content type is
+/// `Content-Type: application/json`.
+#[wasm_bindgen(js_name = "fmocFromJsonUrl")]
+pub async fn fmoc_from_json_url(name: String, url: String) -> Result<(), JsValue> {
+  const ERR: &str = "File content is not valid UTF-8.";
+  from_url(
+    name, url, "application/json",
+    Box::new(|name, data| fmoc_from_json(name, from_utf8(data).unwrap_or(ERR)) )
   ).await
 }
 
@@ -1056,6 +1098,29 @@ pub fn from_decimal_jd_range(name: &str, depth: u8, jd_ranges: Box<[f64]>) ->  R
     None
   );
   store::add(name, InternalMoc::Time(moc))
+}
+
+
+/// Create a new F-MOC from the given list of frequencies (Hz).
+/// # Params
+/// * `name`: the name to be given to the MOC
+/// * `depth`: T-MOC maximum depth in `[0, 61]`
+/// * `freq`: array of frequencies in Hz (`f64`)
+#[wasm_bindgen(js_name = "fromHz", catch)]
+pub fn from_hz(name: &str, depth: u8, freq: Box<[f64]>) ->  Result<(), JsValue> {
+  let moc = RangeMOC::<u64, Frequency<u64>>::from_freq_in_hz(depth, freq.iter().cloned(), None);
+  store::add(name, InternalMoc::Frequency(moc))
+}
+
+#[wasm_bindgen(js_name = "fromHzRanges", catch)]
+pub fn from_hz_range(name: &str, depth: u8, freq_ranges: Box<[f64]>) ->  Result<(), JsValue> {
+  let moc = RangeMOC::<u64, Frequency<u64>>::from_freq_ranges_in_hz(
+    depth,
+    freq_ranges.iter().step_by(2).zip(freq_ranges.iter().skip(1).step_by(2))
+      .map(|(s, e)| Range{ start: *s, end: *e }),
+    None
+  );
+  store::add(name, InternalMoc::Frequency(moc))
 }
 
 /// Create a new S-MOC from the given lists of UNIQ and Values.

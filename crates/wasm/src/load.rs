@@ -3,14 +3,14 @@ use std::io::Cursor;
 use std::error::Error;
 
 use moclib::idx::Idx;
-use moclib::qty::{Hpx, Time};
+use moclib::qty::{Hpx, Time, Frequency};
 use moclib::moc::{CellMOCIterator, CellMOCIntoIterator, RangeMOCIterator};
 use moclib::moc::range::op::convert::convert_to_u64;
 use moclib::moc2d::HasTwoMaxDepth;
 use moclib::moc2d::range::RangeMOC2;
 use moclib::deser::fits::{MocQtyType, MocType, STMocType};
 
-use super::common::{SMOC, TMOC, STMOC, InternalMoc};
+use super::common::{SMOC, TMOC, FMOC, STMOC, InternalMoc};
 
 /// Returns an `InternalMoc` from fits reading result.
 /// WARNING: do not use to get a ST-MOC (we so far assume that ST-MOCs are on u64 only).
@@ -19,6 +19,7 @@ pub(crate) fn from_fits_gen<T: Idx>(moc: MocQtyType<T, Cursor<&[u8]>>)
   match moc {
     MocQtyType::Hpx(moc) => from_fits_hpx(moc),
     MocQtyType::Time(moc) => from_fits_time(moc),
+    MocQtyType::Freq(moc) => from_fits_freq(moc),
     MocQtyType::TimeHpx(_) => Err(String::from("Only u64 ST-MOCs supported").into()),
   }
 }
@@ -30,6 +31,7 @@ pub(crate)  fn from_fits_u64(moc: MocQtyType<u64, Cursor<&[u8]>>)
   match moc {
     MocQtyType::Hpx(moc) => from_fits_hpx(moc),
     MocQtyType::Time(moc) => from_fits_time(moc),
+    MocQtyType::Freq(moc) => from_fits_freq(moc),
     MocQtyType::TimeHpx(moc2) => from_fits_spacetime(moc2),
   }
 }
@@ -58,6 +60,19 @@ fn from_fits_time<T: Idx>(
     ).into_range_moc(),
   };
   Ok(InternalMoc::Time(moc))
+}
+
+fn from_fits_freq<T: Idx>(
+  moc: MocType<T, Frequency<T>, Cursor<&[u8]>>
+) -> Result<InternalMoc, Box<dyn Error>>
+{
+  let moc: FMOC = match moc {
+    MocType::Ranges(moc) => convert_to_u64::<T, Frequency<T>, _, Frequency<u64>>(moc).into_range_moc(),
+    MocType::Cells(moc) => convert_to_u64::<T, Frequency<T>, _, Frequency<u64>>(
+      moc.into_cell_moc_iter().ranges()
+    ).into_range_moc(),
+  };
+  Ok(InternalMoc::Frequency(moc))
 }
 
 fn from_fits_spacetime(
