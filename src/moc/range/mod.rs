@@ -1,55 +1,62 @@
 
-use std::slice;
-use std::ops::Range;
-use std::vec::IntoIter;
-use std::marker::PhantomData;
-use std::convert::{TryInto, TryFrom};
-use std::num::TryFromIntError;
-
-use healpix::nested::{
-  cone_coverage_approx_custom,
-  ring_coverage_approx_custom,
-  elliptical_cone_coverage_custom,
-  polygon_coverage,
-  custom_polygon_coverage,
-  zone_coverage,
-  box_coverage,
-  append_external_edge,
-  external_edge, external_edge_struct,
-  bmoc::BMOC,
+use std::{
+  slice,
+  ops::Range,
+  vec::IntoIter,
+  marker::PhantomData,
+  convert::{TryInto, TryFrom},
+  num::TryFromIntError,
 };
-use healpix::sph_geom::ContainsSouthPoleMethod;
 
-use crate::idx::Idx;
-use crate::qty::{MocQty, Hpx, Time, Bounded, Frequency};
-use crate::elem::cell::Cell;
-use crate::elemset::{
-  range::MocRanges,
-  cell::{MocCells, Cells}
-};
-use crate::ranges::{SNORanges, BorrowedRanges};
-use crate::moc::{
-  HasMaxDepth, ZSorted, NonOverlapping, MOCProperties,
-  RangeMOCIterator, RangeMOCIntoIterator,
-  CellMOCIterator, CellOrCellRangeMOCIterator,
-  cell::CellMOC,
-  builder::{
-    fixed_depth::{
-      FixedDepthMocBuilder,
-      OwnedOrderedFixedDepthCellsToRangesFromU64
-    },
-    maxdepth_range::RangeMocBuilder
+use healpix::{
+  nested::{
+    cone_coverage_approx_custom,
+    ring_coverage_approx_custom,
+    elliptical_cone_coverage_custom,
+    polygon_coverage,
+    custom_polygon_coverage,
+    zone_coverage,
+    box_coverage,
+    append_external_edge,
+    external_edge, external_edge_struct,
+    bmoc::BMOC,
   },
-  range::op::{
-    or::{or, OrRangeIter},
-    minus::{minus, MinusRangeIter},
-    and::{and, AndRangeIter},
-    xor::xor,
-    multi_op::kway_or
-  }
+  compass_point::Ordinal,
+  sph_geom::ContainsSouthPoleMethod
 };
-use crate::deser::ascii::AsciiError;
-use healpix::compass_point::Ordinal;
+
+use crate::{
+  idx::Idx,
+  qty::{MocQty, Hpx, Time, Bounded, Frequency},
+  elem::cell::Cell,
+  elemset::{
+    range::MocRanges,
+    cell::{MocCells, Cells}
+  },
+  ranges::{SNORanges, BorrowedRanges, Ranges},
+  moc::{
+    HasMaxDepth, ZSorted, NonOverlapping, MOCProperties,
+    RangeMOCIterator, RangeMOCIntoIterator,
+    CellMOCIterator, CellOrCellRangeMOCIterator,
+    cell::CellMOC,
+    builder::{
+      fixed_depth::{
+        FixedDepthMocBuilder,
+        OwnedOrderedFixedDepthCellsToRangesFromU64
+      },
+      maxdepth_range::RangeMocBuilder
+    },
+    adapters::DepthMaxCellsFromRanges,
+    range::op::{
+      or::{or, OrRangeIter},
+      minus::{minus, MinusRangeIter},
+      and::{and, AndRangeIter},
+      xor::xor,
+      multi_op::kway_or
+    }
+  },
+  deser::ascii::AsciiError
+};
 
 pub mod op;
 
@@ -62,6 +69,16 @@ pub struct RangeMOC<T: Idx, Q: MocQty<T>> {
 impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   pub fn new(depth_max: u8, ranges: MocRanges<T, Q>) -> Self {
     Self {depth_max, ranges }
+  }
+  pub fn from_full_domain(depth_max: u8) -> Self {
+    let range = Range { 
+      start: T::zero(), 
+      end: Q::upper_bound_exclusive()
+    };
+    Self {
+      depth_max,
+      ranges: Ranges::new_unchecked(vec![range]).into()
+    }
   }
   pub fn depth_max(&self) -> u8 {
     self.depth_max
@@ -89,7 +106,11 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   pub fn eq_without_depth(&self, rhs: &Self) -> bool {
     self.ranges.eq(&rhs.ranges)
   }
-  
+  pub fn n_depth_max_cells(&self) -> T {
+    let range_sum = self.range_sum();
+    let shift = Q::shift_from_depth_max(self.depth_max);
+    range_sum.unsigned_shr(shift as u32)
+  }
   pub fn range_sum(&self) -> T {
     let mut sum = T::zero();
     for Range { start, end } in self.ranges.0.iter() {
@@ -123,7 +144,12 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     }
     builder.into_moc()
   }
-
+  
+  /// Flatten the MOC returning an (ordered) iterator of cells at the MOC depth_max depth.
+  pub fn flatten_to_fixed_depth_cells<'a>(&'a self) -> DepthMaxCellsFromRanges<T, Q, RangeRefMocIter<'a, T, Q>> {
+    DepthMaxCellsFromRanges::new((&self).into_range_moc_iter())
+  }
+  
   /// The value must be at the MOC depth
   pub fn contains_depth_max_val(&self, x: &T) -> bool {
     self.contains_val(&x.unsigned_shl(Q::shift_from_depth_max(self.depth_max) as u32))
@@ -899,4 +925,34 @@ impl<'a, T: Idx, Q: MocQty<T>> RangeRefMocIter<'a, T, Q> {
       _qty: PhantomData
     }
   }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  
+  #[test]
+  fn test_n_depth_max_cells(){
+    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(0);
+    assert_eq!(moc.n_depth_max_cells(), 12);
+    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(2);
+    assert_eq!(moc.n_depth_max_cells(), 192);
+    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(24);
+    assert_eq!(moc.n_depth_max_cells(), 3377699720527872);
+  }
+
+  #[test]
+  fn test_to_fixed_depth_cells() {
+    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(0);
+    assert_eq!(
+      moc.flatten_to_fixed_depth_cells().collect::<Vec<u64>>(), 
+      (0..12).into_iter().collect::<Vec<u64>>()
+    );
+    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(2);
+    assert_eq!(
+      moc.flatten_to_fixed_depth_cells().collect::<Vec<u64>>(),
+      (0..192).into_iter().collect::<Vec<u64>>()
+    );
+  }
+  
 }

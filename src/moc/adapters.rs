@@ -15,6 +15,67 @@ use crate::elem::{
 };
 use crate::moc::{CellMOCIterator, ZSorted, NonOverlapping, MOCProperties, CellOrCellRangeMOCIterator};
 
+/// Transforms a `RangeMOCIterator` into an `Iterator` over `depth_max` cells.
+pub struct DepthMaxCellsFromRanges<T, Q, R>
+  where
+    T: Idx,
+    Q: MocQty<T>,
+    R: RangeMOCIterator<T, Qty=Q>
+{
+  it: R,
+  curr: Option<MocRange<T, Q>>,
+  shift_dd: u32,
+  range_len_min: T,
+}
+
+impl<T, Q, R> DepthMaxCellsFromRanges<T, Q, R>
+  where
+    T: Idx,
+    Q: MocQty<T>,
+    R: RangeMOCIterator<T, Qty=Q>
+{
+
+  pub fn new(mut it: R) -> DepthMaxCellsFromRanges<T, Q, R> {
+    let curr = it.next().map(|range| range.into());
+    let shift_dd = Q::shift_from_depth_max(it.depth_max()) as u32;
+    let range_len_min = T::one().unsigned_shl(shift_dd);
+    DepthMaxCellsFromRanges {
+      it,
+      curr,
+      shift_dd,
+      range_len_min,
+    }
+  }
+}
+
+impl<T, Q, R> Iterator for DepthMaxCellsFromRanges<T, Q, R>
+  where
+    T: Idx,
+    Q: MocQty<T>,
+    R: RangeMOCIterator<T, Qty=Q>
+{
+
+  type Item = T;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    match self.curr.as_mut() {
+      Some(c) => {
+        if c.0.start < c.0.end {
+          let res = c.0.start.unsigned_shr(self.shift_dd);
+          c.0.start += self.range_len_min;
+          assert!(c.0.start <= c.0.end);
+          Some(res)
+        } else {
+          self.curr = self.it.next().map(|range| range.into());
+          self.next()
+        }
+      },
+      None => None,
+    }
+  }
+}
+
+
 /// Transforms a `RangeMOCIterator` into a `CellMOCIterator`.
 pub struct CellMOCIteratorFromRanges<T, Q, R>
   where

@@ -4,7 +4,15 @@ use std::io::Write;
 use std::ops::Range;
 use std::marker::PhantomData;
 
-use crate::deser;
+use healpix::nested::bmoc::{BMOC, BMOCBuilderUnsafe};
+
+use crate::deser::{
+  self,
+  fits::{
+    keywords, ranges_to_fits_ivoa,
+    error::FitsError
+  },
+};
 use crate::idx::Idx;
 use crate::qty::{MocQty, Bounded};
 use crate::elem::{
@@ -13,10 +21,8 @@ use crate::elem::{
   range::MocRange,
 };
 use crate::moc::adapters::{
-  RangeMOCIteratorFromCells,
-  RangeMOCIteratorFromCellOrCellRanges,
-  CellMOCIteratorFromRanges,
-  CellOrCellRangeMOCIteratorFromCells
+  RangeMOCIteratorFromCells, RangeMOCIteratorFromCellOrCellRanges, CellMOCIteratorFromRanges, 
+  CellOrCellRangeMOCIteratorFromCells, DepthMaxCellsFromRanges
 };
 use crate::moc::range::RangeMOC;
 use crate::moc::range::op::{
@@ -29,9 +35,6 @@ use crate::moc::range::op::{
   xor::{xor, XorRangeIter},
   minus::{minus, MinusRangeIter},
 };
-use healpix::nested::bmoc::{BMOC, BMOCBuilderUnsafe};
-use crate::deser::fits::{keywords, ranges_to_fits_ivoa};
-use crate::deser::fits::error::FitsError;
 
 pub mod range;
 pub mod cell;
@@ -57,7 +60,7 @@ pub trait NonOverlapping {}
 pub trait MOCProperties: HasMaxDepth + ZSorted + NonOverlapping { }
 
 ////////////////////////////
-// Encours d'elobaration
+// En cours d'elobaration
 /*pub trait MOC: MOCProperties {
   type Idx: Idx;
   type Qty: MocQty<T>;
@@ -81,7 +84,7 @@ Iterator<Item=Some(enum(Left(Ragne), Right(Range), Common(Range)))>.. ?*/
 pub trait CellMOCIterator<T: Idx>: Sized + MOCProperties + Iterator<Item=Cell<T>> {
   type Qty: MocQty<T>;
 
-  /// If available, returns the upper cellthe iterator will return, without consuming
+  /// If available, returns the upper cell the iterator will return, without consuming
   /// the iterator.
   /// This information is available e.g. for an Iterator from a Vector, but may not be available
   /// for an Iterator coming from a stream.
@@ -223,6 +226,10 @@ pub trait RangeMOCIterator<T: Idx>: Sized + MOCProperties + Iterator<Item=Range<
     rsum.cast_to_f64() / tot.cast_to_f64()
   }
 
+  fn flatten_to_fixed_depth_cells(self) -> DepthMaxCellsFromRanges<T, Self::Qty, Self> {
+    DepthMaxCellsFromRanges::new(self)
+  }
+  
   // I have not yet found a way to ensure that the quantity is the same, with only the a different
   // type T --> U
   fn convert<U, R>(self) -> ConvertIterator<T, Self::Qty, Self, U, R>
