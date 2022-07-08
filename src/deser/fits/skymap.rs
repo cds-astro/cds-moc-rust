@@ -132,16 +132,18 @@ fn from_fits_skymap_internal<R: BufRead>(
     );
   }
   let tform1 = check_keyword_and_get_str_val(it80.next().unwrap(), b"TFORM1 ")?;
-  let is_f64 = if tform1.contains('D') {
-    Ok(true)
-  } else if tform1.contains('E') {
-    Ok(false)
+  let (is_f64, n_pack) = if tform1 == "D" || tform1 == "1D" {
+    Ok((true, 1_u64))
+  } else if tform1 == "E" || tform1 == "1E" {
+    Ok((false, 1_u64))
+  } else if tform1 =="1024E" {
+    Ok((false, 1024_u64))
   } else {
     Err(
       FitsError::UnexpectedValue(
         String::from("TFORM1"),
         String::from("contains 'D' or 'K'"),
-        String::from(ttype1)
+        String::from(tform1)
       )
     )
   }?;
@@ -186,45 +188,91 @@ fn from_fits_skymap_internal<R: BufRead>(
   };
   // Read data
   // - we so far support only TForm1=D
-  let first_elem_byte_size = if is_f64 { size_of::<f64>() } else { size_of::<f32>() };
+  let first_elem_byte_size = if is_f64 {
+    size_of::<f64>()
+  } else {
+    size_of::<f32>()
+  } * n_pack as usize;
   let n_byte_skip = n_bytes_per_row as usize - first_elem_byte_size;
   let mut sink = vec![0; n_byte_skip];
   let mut prev_range = 0..0;
   let mut prev_val = 0.0;
   let mut uniq_val_dens: Vec<(u64, f64, f64)> = Vec::with_capacity(10_240);
   let mut cumul_skipped = 0_f64;
-  for ipix in 0..n_rows {
-    // - read (we could increase the perf here by monomorphising the loop to avoid the test at each iteration)
-    let val = if is_f64 { // per pix
-      reader.read_f64::<BigEndian>()? 
-    } else {
-      reader.read_f32::<BigEndian>()? as f64
-    }; 
-    reader.read_exact(&mut sink)?;
-    // - we skip too low value (e.g. all cells set to 0)
-    // - we pack together, in a same range, consecutive cells having the same value
-    //   and we build a multi resolution map to reuse existing code
-    if val > skip_value_le_this {
-       if val == prev_val && ipix == prev_range.end {
-         prev_range.end = ipix + 1;
-       } else {
-         if prev_range.start != prev_range.end {
-           let moc_range: MocRange<u64, Hpx<u64>> = CellRange::from_depth_range(
-             depth_max, 
-             prev_range.clone()
-           ).into();
-           for moc_cell in moc_range {
-             let n_cells = 1_u64 << ((depth_max - moc_cell.depth()) << 1);
-             let uniq = Cell::<u64>::from(moc_cell).uniq_hpx();
-             let uval = prev_val * (n_cells as f64);
-             uniq_val_dens.push((uniq, uval, prev_val))
-           }
-         }
-         prev_val = val;
-         prev_range = ipix..ipix + 1;
-       }
-    } else {
-      cumul_skipped += val;
+  if n_pack == 1 {
+    for ipix in 0..n_rows {
+      // - read (we could increase the perf here by monomorphising the loop to avoid the test at each iteration)
+      let val = if is_f64 { // per pix
+        reader.read_f64::<BigEndian>()?
+      } else {
+        reader.read_f32::<BigEndian>()? as f64
+      };
+      // - we skip too low value (e.g. all cells set to 0)
+      // - we pack together, in a same range, consecutive cells having the same value
+      //   and we build a multi resolution map to reuse existing code
+      if val > skip_value_le_this {
+        if val == prev_val && ipix == prev_range.end {
+          prev_range.end = ipix + 1;
+        } else {
+          if prev_range.start != prev_range.end {
+            let moc_range: MocRange<u64, Hpx<u64>> = CellRange::from_depth_range(
+              depth_max,
+              prev_range.clone()
+            ).into();
+            for moc_cell in moc_range {
+              let n_cells = 1_u64 << ((depth_max - moc_cell.depth()) << 1);
+              let uniq = Cell::<u64>::from(moc_cell).uniq_hpx();
+              let uval = prev_val * (n_cells as f64);
+              uniq_val_dens.push((uniq, uval, prev_val))
+            }
+          }
+          prev_val = val;
+          prev_range = ipix..ipix + 1;
+        }
+      } else {
+        cumul_skipped += val;
+      }
+      // Skip other columns bits
+      reader.read_exact(&mut sink)?;
+    }
+  } else {
+    for i_row in 0..n_rows {
+      // - read (we could increase the perf here by monomorphising the loop to avoid the test at each iteration)
+      let start = i_row * n_pack;
+      for ipix in start..start + n_pack {
+        let val = if is_f64 { // per pix
+          reader.read_f64::<BigEndian>()?
+        } else {
+          reader.read_f32::<BigEndian>()? as f64
+        };
+        // - we skip too low value (e.g. all cells set to 0)
+        // - we pack together, in a same range, consecutive cells having the same value
+        //   and we build a multi resolution map to reuse existing code
+        if val > skip_value_le_this {
+          if val == prev_val && ipix == prev_range.end {
+            prev_range.end = ipix + 1;
+          } else {
+            if prev_range.start != prev_range.end {
+              let moc_range: MocRange<u64, Hpx<u64>> = CellRange::from_depth_range(
+                depth_max,
+                prev_range.clone()
+              ).into();
+              for moc_cell in moc_range {
+                let n_cells = 1_u64 << ((depth_max - moc_cell.depth()) << 1);
+                let uniq = Cell::<u64>::from(moc_cell).uniq_hpx();
+                let uval = prev_val * (n_cells as f64);
+                uniq_val_dens.push((uniq, uval, prev_val))
+              }
+            }
+            prev_val = val;
+            prev_range = ipix..ipix + 1;
+          }
+        } else {
+          cumul_skipped += val;
+        }
+      }
+      // Skip other columns bits
+      reader.read_exact(&mut sink)?;
     }
   }
   if prev_range.start != prev_range.end {
@@ -259,12 +307,14 @@ mod tests {
 
   use std::path::PathBuf;
   use std::fs::File;
-  use std::io::BufReader;
+  use std::io::{BufReader, BufWriter};
+  use crate::deser::fits::ranges_to_fits_ivoa;
+  use crate::moc::RangeMOCIntoIterator;
   use super::from_fits_skymap;
 
   // Perform only in release mode (else slow: the decompresse fits files is 1.6GB large)!
-  /*#[test]
-  fn test_skymap() {
+  #[test]
+  fn test_skymap_v1() {
     let path_buf1 = PathBuf::from("resources/Skymap/bayestar.fits.gz");
     let path_buf2 = PathBuf::from("../resources/Skymap/bayestar.fits.gz");
     let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
@@ -273,7 +323,17 @@ mod tests {
     let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
     match res {
       Ok(o) => {
-        print!("{:?}", o);
+        let path_buf1 = PathBuf::from("resources/Skymap/bayestar.moc.out.fits");
+        let path_buf2 = PathBuf::from("../resources/Skymap/bayestar.moc.out.fits");
+        let file = File::create(&path_buf1).or_else(|_| File::create(&path_buf2)).unwrap();
+        let writer = BufWriter::new(file);
+        print!("{:?}", &o);
+        ranges_to_fits_ivoa(
+          o.into_range_moc_iter(),
+          None,
+          None,
+          writer
+        ).unwrap();
         assert!(true)
       },
       Err(e) => {
@@ -281,7 +341,7 @@ mod tests {
         assert!(false)
       },
     }
-  }*/
+  }
 
   #[test]
   fn test_skymap_v2() {
@@ -294,7 +354,17 @@ mod tests {
     let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
     match res {
       Ok(o) => {
-        print!("{:?}", o);
+        let path_buf1 = PathBuf::from("resources/Skymap/gbuts_healpix_systematic.moc.out.fits");
+        let path_buf2 = PathBuf::from("../resources/Skymap/gbuts_healpix_systematic.moc.out.fits");
+        let file = File::create(&path_buf1).or_else(|_| File::create(&path_buf2)).unwrap();
+        let writer = BufWriter::new(file);
+        print!("{:?}", &o);
+        ranges_to_fits_ivoa(
+          o.into_range_moc_iter(),
+          None,
+          None,
+          writer
+        ).unwrap();
         assert!(true)
       },
       Err(e) => {
