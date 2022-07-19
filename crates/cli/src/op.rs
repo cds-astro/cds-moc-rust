@@ -83,6 +83,8 @@ pub enum Op {
   #[structopt(name = "minus")]
   /// Performs the logical operation 'AND(left, NOT(right))' between 2 MOCs (= left minus right)
   Minus(Op2Args),
+  // MultiUnion OpNArgs (only FITS files?)
+  
   
   #[structopt(name = "tfold")]
   /// Returns the union of the S-MOCs associated to T-MOCs intersecting the given T-MOC. Left: T-MOC, right: ST-MOC, res: S-MOC.
@@ -91,6 +93,8 @@ pub enum Op {
   /// Returns the union of the T-MOCs associated to S-MOCs intersecting the given S-MOC. Left: S-MOC, right: ST-MOC, res: T-MOC.
   SpaceFold(Op2Args),
 
+  
+  
   // Add (?):
   // * moc contains (exit code=0 + output="true", else exit code=1 + output="false")
   // * moc overlaps

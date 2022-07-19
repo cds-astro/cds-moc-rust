@@ -10,6 +10,7 @@ use std::{
 
 use healpix::{
   nested::{
+    hash,
     cone_coverage_approx_custom,
     ring_coverage_approx_custom,
     elliptical_cone_coverage_custom,
@@ -22,7 +23,10 @@ use healpix::{
     bmoc::BMOC,
   },
   compass_point::Ordinal,
-  sph_geom::ContainsSouthPoleMethod
+  sph_geom::{
+    ContainsSouthPoleMethod,
+    coo3d::Coo3D
+  }
 };
 
 use crate::{
@@ -70,7 +74,10 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   pub fn new(depth_max: u8, ranges: MocRanges<T, Q>) -> Self {
     Self {depth_max, ranges }
   }
-  pub fn from_full_domain(depth_max: u8) -> Self {
+  pub fn new_empty(depth_max: u8) -> Self {
+    Self::new(depth_max, MocRanges::default())
+  }
+  pub fn new_full_domain(depth_max: u8) -> Self {
     let range = Range { 
       start: T::zero(), 
       end: Q::upper_bound_exclusive()
@@ -264,8 +271,6 @@ impl From<BMOC> for RangeMOC<u64, Hpx<u64>> {
   }
 }
 
-
-
 /// Complex type returned by the `expanded_iter` method.
 pub type ExpandedIter<'a, T> = OrRangeIter<
   T, Hpx<T>, RangeRefMocIter<'a, T, Hpx<T>>,
@@ -290,6 +295,13 @@ pub type IntBorderIter<'a, T> = AndRangeIter<
 >;
 
 impl<T: Idx> RangeMOC<T, Hpx<T>> {
+
+  /// Returns `true` if the given coordinates (in radians) is in the MOC
+  pub fn is_in(&self, lon: f64, lat: f64) -> bool {
+    let hash = hash(self.depth_max, lon, lat);
+    let hash = T::from_u64(hash);
+    self.contains_depth_max_val(&hash)
+  }
   
   /// Add the MOC external border of depth `self.depth_max`.
   pub fn expanded(&self) -> Self {
@@ -646,6 +658,7 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// # Input
   /// - `vertices` the list of vertices (in a slice) coordinates, in radians
   ///              `[(lon, lat), (lon, lat), ..., (lon, lat)]`
+  /// - `complement` boolean used to get the complement of the polygon returned by default
   /// - `depth`: the MOC depth
   pub fn from_polygon(vertices: &[(f64, f64)], complement: bool, depth: u8) -> Self {
     Self::from(
@@ -655,6 +668,18 @@ impl RangeMOC<u64, Hpx<u64>> {
         custom_polygon_coverage(depth, vertices, &ContainsSouthPoleMethod::DefaultComplement, true)
       }
     )
+  }
+
+  /// # Input
+  /// - `vertices` the list of vertices (in a slice) coordinates, in radians
+  ///              `[(lon, lat), (lon, lat), ..., (lon, lat)]`
+  /// - `control_point` the control point that must be inside the polygon, in radians
+  /// - `depth`: the MOC depth
+  pub fn from_polygon_with_control_point(vertices: &[(f64, f64)], control_point: (f64, f64), depth: u8) -> Self {
+    let coo = Coo3D::from_sph_coo(control_point.0, control_point.1);
+    let method =  ContainsSouthPoleMethod::ControlPointIn(coo);
+    let bmoc = custom_polygon_coverage(depth, vertices, &method, true);
+    Self::from(bmoc)
   }
 
   /// # Input
@@ -933,26 +958,52 @@ mod tests {
   
   #[test]
   fn test_n_depth_max_cells(){
-    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(0);
+    let moc = RangeMOC::<u64, Hpx::<u64>>::new_full_domain(0);
     assert_eq!(moc.n_depth_max_cells(), 12);
-    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(2);
+    let moc = RangeMOC::<u64, Hpx::<u64>>::new_full_domain(2);
     assert_eq!(moc.n_depth_max_cells(), 192);
-    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(24);
+    let moc = RangeMOC::<u64, Hpx::<u64>>::new_full_domain(24);
     assert_eq!(moc.n_depth_max_cells(), 3377699720527872);
   }
 
   #[test]
   fn test_to_fixed_depth_cells() {
-    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(0);
+    let moc = RangeMOC::<u64, Hpx::<u64>>::new_full_domain(0);
     assert_eq!(
       moc.flatten_to_fixed_depth_cells().collect::<Vec<u64>>(), 
       (0..12).into_iter().collect::<Vec<u64>>()
     );
-    let moc = RangeMOC::<u64, Hpx::<u64>>::from_full_domain(2);
+    let moc = RangeMOC::<u64, Hpx::<u64>>::new_full_domain(2);
     assert_eq!(
       moc.flatten_to_fixed_depth_cells().collect::<Vec<u64>>(),
       (0..192).into_iter().collect::<Vec<u64>>()
     );
   }
+  
+  #[test]
+  fn test_from_polygon_aladinlitev3() {
+    let vertices = [
+      (2.762765958009174, -1.1558461939389928), (1.8511822776529407, -1.0933557485463217),
+      (1.2223938385258124, -0.9257482282529843), (0.7433555354994513, -0.7588156605217202),
+      (0.3057973131669505, -0.6330807489082455), (-0.13178353851370578, -0.5615526603403407),
+      (-0.5856691165836956, -0.5400327446156468), (-0.4015158856736461, -0.255385904573062),
+      (-0.36447295312493533, 0.055767062790012194), (-0.46118312909272624, 0.3439014598749883),
+      (-0.7077120187325645, 0.5509825177593931), (-1.0770630524112423, 0.6032198101231719),
+      (-1.4301394011313524, 0.46923928877261123), (-1.4878998343615297, 0.8530569092752573),
+      (-1.9282441740007021, 1.1389659504677638), (-2.7514745722416727, 1.0909408969626568),
+      (-3.043766621461535, 0.7764645583461347), (-3.0294959096529364, 0.4089232125719977),
+      (-2.878305764522211, 0.05125802264111997), (3.0734739115502143, 0.057021963147195695),
+      (2.7821939201916965, -0.05879878325187485), (2.5647762800185414, -0.27363879379223127),
+      (2.4394176374317205, -0.5545388864809319), (2.444623710270669, -0.8678251267471937)
+    ];
+    let moc = RangeMOC::<u64, Hpx::<u64>>::from_polygon(&vertices, false, 2);
+    // println!("{:?}",moc.flatten_to_fixed_depth_cells().collect::<Vec<u64>>());
+    // draw moc 2/32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 48, 49, 50, 51, 56, 57, 58, 64, 72, 73, 74, 75, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 134, 136, 137, 138, 139, 144, 145, 146, 147, 148, 149, 150, 151, 152, 156, 157, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191
+    for (lon, lat) in vertices {
+      let hash = healpix::nested::hash(2, lon, lat);
+      assert!(moc.contains_depth_max_val(&hash));
+    }
+  }
+  
   
 }

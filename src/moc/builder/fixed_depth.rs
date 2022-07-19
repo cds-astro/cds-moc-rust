@@ -133,7 +133,7 @@ impl<T: Idx, Q: MocQty<T>> FixedDepthMocBuilder<T, Q> {
             from = *curr;
             to = *curr + T::one();
           },
-          Ordering::Greater =>  debug_assert_eq!(*curr, to - T::one()),
+          Ordering::Greater => debug_assert_eq!(*curr, to - T::one()),
         }
       }
       ranges.push(from.unsigned_shl(shift)..to.unsigned_shl(shift));
