@@ -498,14 +498,33 @@ fn build_range_moc2d_keywords<T: Idx>(
 
 // FROM FITS
 
+/// Load a MOC stored in a FITS file implementing the IVOA MOC standard.
+/// # Params
+/// * `reader`: the FITS file bytes reader
 pub fn from_fits_ivoa<R: BufRead>(reader: R) -> Result<MocIdxType<R>, FitsError> {
   from_fits_ivoa_custom(reader, false)
 }
 
 
 // We do not support compressed MOCs
-/// `coosys_permissive`: if set to true, do not fail if COORDSYS != C
-/// (made for Aladin Lite v3, to load MOCs associated to Galactic HiPS) 
+/// Load a MOC stored in a FITS file implementing the IVOA MOC standard, with a permissive
+/// option for more flexibility (see WARNING).
+///
+/// # Params
+/// * `reader`: the FITS file bytes reader
+/// * `coosys_permissive`: if set to true, do not fail if COORDSYS != C
+///   (made for Aladin Lite v3, to load MOCs associated to Galactic HiPS and to possibly 
+///   allow for planetary MOCs).
+/// # WARNING
+///   Spatial MOCs are supposed to be defined in the ICRS coordinate system only, see Tab. 3
+///   of the MOC standard (https://www.ivoa.net/documents/MOC/20220317/REC-moc-2.0-20220317.pdf).
+///   But, we may want to defined MOCs associated to planet coordinate systems and
+///   MOC have been defined in the Galactic coordinate system in HiPS made of Galactic tiles
+///   (https://www.ivoa.net/documents/HiPS/). 
+///   Operations between 2 MOCs defined from different coordinate systems should not be allowed, 
+///   so use MOCs loaded with `coosys_permissive = true` with caution (since we so far do not store
+///   the coordinate system in MOC objects, so we cannot prevent operations between MOC based on 
+///   different coosys).
 pub fn from_fits_ivoa_custom<R: BufRead>(mut reader: R, coosys_permissive: bool) -> Result<MocIdxType<R>, FitsError> {
   let mut header_block = [b' '; 2880];
   consume_primary_hdu(&mut reader,  &mut header_block)?;
