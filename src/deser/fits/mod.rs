@@ -498,8 +498,15 @@ fn build_range_moc2d_keywords<T: Idx>(
 
 // FROM FITS
 
+pub fn from_fits_ivoa<R: BufRead>(reader: R) -> Result<MocIdxType<R>, FitsError> {
+  from_fits_ivoa_custom(reader, false)
+}
+
+
 // We do not support compressed MOCs
-pub fn from_fits_ivoa<R: BufRead>(mut reader: R) -> Result<MocIdxType<R>, FitsError> {
+/// `coosys_permissive`: if set to true, do not fail if COORDSYS != C
+/// (made for Aladin Lite v3, to load MOCs associated to Galactic HiPS) 
+pub fn from_fits_ivoa_custom<R: BufRead>(mut reader: R, coosys_permissive: bool) -> Result<MocIdxType<R>, FitsError> {
   let mut header_block = [b' '; 2880];
   consume_primary_hdu(&mut reader,  &mut header_block)?;
   // Read the extention HDU
@@ -522,6 +529,9 @@ pub fn from_fits_ivoa<R: BufRead>(mut reader: R) -> Result<MocIdxType<R>, FitsEr
     for kw_record in &mut it80 {
       // Parse only MOC related keywords and ignore others
       if let Some(mkw) = MocKeywords::is_moc_kw(kw_record) {
+        if mkw.is_err() && common::get_keyword(kw_record) == b"COORDSYS" && coosys_permissive {
+          continue;
+        }
         if let Some(previous_mkw) = moc_kws.insert(mkw?) {
           // A FITS keyword MUST BE uniq (I may be more relax here, taking the last one and not complaining)
           // return Err(FitsError::MultipleKeyword(previous_mkw.keyword_str().to_string()))
