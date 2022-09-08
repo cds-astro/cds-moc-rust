@@ -36,18 +36,18 @@ depends = "$auto"
 section = "utility"
 priority = "optional"
 assets = [
-    ["target/release/moc", "usr/bin/mocset", "755"],
+    ["target/release/mocset", "usr/bin/mocset", "755"],
     ["COPYING", "usr/share/doc/mocset/", "644"],
     ["LICENSE-MIT", "usr/share/doc/mocset/", "644"],
     ["LICENSE-APACHE", "usr/share/doc/mocset/", "644"],
     ["CHANGELOG.md", "usr/share/doc/mocset/CHANGELOG", "644"],
     ["README.md", "usr/share/doc/mocset/README", "644"],
-    #["FAQ.md", "usr/share/doc/moc/FAQ", "644"],
-    ["doc/moc.1", "usr/share/man/man1/mocset.1", "644"],
+    #["FAQ.md", "usr/share/doc/mocset/FAQ", "644"],
+    ["doc/mocset.1", "usr/share/man/man1/mocset.1", "644"],
     # Similarly for shell completions.
-    #["deployment/deb/moc.bash", "usr/share/bash-completion/completions/moc", "644"],
-    #["deployment/deb/moc.fish", "usr/share/fish/vendor_completions.d/moc.fish", "644"],
-    #["deployment/deb/_moc", "usr/share/zsh/vendor-completions/", "644"],
+    #["deployment/deb/mocset.bash", "usr/share/bash-completion/completions/mocset", "644"],
+    #["deployment/deb/mocset.fish", "usr/share/fish/vendor_completions.d/mocset.fish", "644"],
+    #["deployment/deb/_mocset", "usr/share/zsh/vendor-completions/", "644"],
 ]
 extended-description = """\
 mocset is a command-line to query a set of MOCs pre-saved in a single large binary file.  

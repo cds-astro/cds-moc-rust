@@ -12,7 +12,7 @@ i.e. discretized geomatrical surfaces on the unit sphere.
 
 MOC Lib Rust, the Rust MOC library used in
 [MOCPy](https://github.com/cds-astro/mocpy),
-[MOCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli), and
+[MOCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli),
 [MOCSet](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set), and
 [MOCWasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm).
 
@@ -21,11 +21,13 @@ MOC Lib Rust rely on the [CDS HEALPix Rust library](https://github.com/cds-astro
 ## About
 
 This Rust library implements the v2.0 of the [MOC standard](https://ivoa.net/documents/MOC/),
-including (S-)MOCs, T-MOCs and ST-MOCs.
+including (S-)MOCs, T-MOCs and ST-MOCs.  
+It also implements a still experimental F-MOC (F for Frequency).
 
-It is used in:
+MOC Lib Rust is used in:
 * [MOCPy](https://github.com/cds-astro/mocpy), a Python wrapper to manipulate MOCs;
 * a standalone command line tool [MOCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli) for linux, MacOS and Windows;
+* a standalone command line tool [MOCSet](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set) for linux, MacOS and Windows;
 * a WASM library [MOCWasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm) to be used in web browsers.
 
 For tools able to display MOCs, see:

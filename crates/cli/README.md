@@ -351,6 +351,7 @@ time moc filter position SMOC_GLIMPSE_u32.fits kids_dr2.csv --has-header --lon R
 
 ## To-do list
 
+* [ ] Remove `structop` and replace by `clap v3`
 * [ ] MOC from cells (simpler than MOC from pos)
 * [ ] MOC from vcells with a simple constraint? 
 * [ ] Contact [gnuastro](https://www.gnu.org/software/gnuastro) ?
