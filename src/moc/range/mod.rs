@@ -103,7 +103,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   }
   pub fn to_ascii(&self) -> Result<String, AsciiError> {
     let mut sink = Vec::new();
-    (&self).into_range_moc_iter()
+    self.into_range_moc_iter()
       .cells()
       .cellranges()
       .to_ascii_ivoa(Some(80), true, &mut sink)?;
@@ -142,7 +142,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   
   /// Flatten the MOC returning an (ordered) iterator of cells at the MOC depth_max depth.
   pub fn flatten_to_fixed_depth_cells<'a>(&'a self) -> DepthMaxCellsFromRanges<T, Q, RangeRefMocIter<'a, T, Q>> {
-    DepthMaxCellsFromRanges::new((&self).into_range_moc_iter())
+    DepthMaxCellsFromRanges::new(self.into_range_moc_iter())
   }
   
   /// The value must be at the MOC depth
@@ -372,7 +372,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   /// * We continue the process with the updated original MOC
   pub fn split_into_joint_mocs(&self, include_indirect_neighbours: bool) -> Vec<CellMOC<T, Hpx<T>>> {
     if include_indirect_neighbours {
-      self.split_into_joint_mocs_gen(|depth, idx, delta_depth| external_edge(depth, idx, delta_depth))
+      self.split_into_joint_mocs_gen(external_edge)
     } else {
       self.split_into_joint_mocs_gen(
         |depth, idx, delta_depth| {
@@ -393,7 +393,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     where
       F: Fn(u8, u64, u8) -> Box<[u64]>
   {
-    let mut elems: Vec<T> = (&self).into_range_moc_iter()
+    let mut elems: Vec<T> = self.into_range_moc_iter()
       .cells()
       .map(|cell| cell.zuniq::<Hpx<T>>() << 1)// add the "already_visit" bit set to 0
       .collect();
@@ -585,10 +585,10 @@ impl RangeMOC<u64, Hpx<u64>> {
   ) -> Self {
     Self::from_fixed_depth_cells(
       depth,
-      cone_it.map(move |(lon_rad, lat_rad, radius_rad)|
+      cone_it.flat_map(move |(lon_rad, lat_rad, radius_rad)|
         cone_coverage_approx_custom(depth, delta_depth, lon_rad, lat_rad, radius_rad)
           .into_flat_iter()
-      ).flatten(),
+      ),
       buf_capacity
     )
   }

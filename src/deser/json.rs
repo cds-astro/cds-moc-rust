@@ -28,7 +28,8 @@ pub fn to_json_aladin<T, Q, I, W>(it: I, fold: &Option<usize>, line_prefix: &str
     W: Write
 {
   // Create n_depth strings (1 per depth)
-  let mut s_by_depth: Vec<String> = (0..=it.depth_max()).into_iter()
+  let depth_max = it.depth_max();
+  let mut s_by_depth: Vec<String> = (0..=depth_max).into_iter()
     .map(|i| format!("{}  \"{}\": [", line_prefix, i))
     .collect();
   // Fill them
@@ -39,7 +40,8 @@ pub fn to_json_aladin<T, Q, I, W>(it: I, fold: &Option<usize>, line_prefix: &str
       Some(n_chars) => {
         let l = buff.rfind('\n').unwrap_or(0);
         if buff.len() - l + s.len() > *n_chars {
-          buff.push_str(&format!("\n{}    ", line_prefix));
+          buff.push_str("\n    ");
+          buff.push_str(line_prefix);
         }
         buff.push_str(&s)
       },
@@ -49,7 +51,7 @@ pub fn to_json_aladin<T, Q, I, W>(it: I, fold: &Option<usize>, line_prefix: &str
   // Finally write the result
   writer.write_all(b"{\n")?;
   let mut first = true;
-  for s in s_by_depth {
+  for (depth, s) in s_by_depth.into_iter().enumerate() {
     if !s.ends_with('[') {
       if first {
         first = false;
@@ -61,6 +63,12 @@ pub fn to_json_aladin<T, Q, I, W>(it: I, fold: &Option<usize>, line_prefix: &str
         // must be on a newline or not.
         // Let's wait for someone to complain...
         write!(writer, ",\n{}]", &s[..s.len() - 2])?;
+      }
+    } else if depth as u8 == depth_max {
+      if first {
+        write!(writer, ",{}]", &s)?;
+      } else {
+        write!(writer, ",\n{}]", &s)?;
       }
     }
   }
@@ -292,7 +300,7 @@ mod tests {
       .to_json_aladin(Some(40), &mut sink)
       .unwrap();
      let json = String::from_utf8_lossy(&sink);
-    // println!("{}\n", &json);
+    println!("{}\n", &json);
     let mut sink2 = Vec::new();
     from_json_aladin::<u64, Hpx<u64>>(&json)
       .unwrap()

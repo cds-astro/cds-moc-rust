@@ -2,19 +2,16 @@
 use std::error::Error;
 
 use clap::Parser;
-// use structopt::StructOpt;
-// use structopt::clap::AppSettings;
 
-use moc_set::mk::Make;
-use moc_set::append::Append;
-use moc_set::chgstatus::ChangeStatus;
-use moc_set::purge::Purge;
-use moc_set::list::List;
-use moc_set::query::Query;
-use moc_set::extract::Extract;
-
-// #[derive(Debug, StructOpt)]
-// #[structopt(name = "mocset", global_settings = &[AppSettings::ColoredHelp, AppSettings::AllowNegativeNumbers])]
+use moc_set::{
+  mk::Make,
+  append::Append,
+  chgstatus::ChangeStatus,
+  purge::Purge,
+  list::List,
+  query::Query,
+  extract::Extract
+};
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None, allow_negative_numbers = true)]
@@ -35,8 +32,6 @@ enum Args {
   Query(Query),
   #[clap(name = "extract")]
   Extract(Extract),
-  // Operation on 2 MOCs or on a set of MOCs ?
-  // ...
 }
 
 impl Args {

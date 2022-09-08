@@ -109,7 +109,7 @@ impl<T, Q, U, R, I> MOC2Elem<T, Q, U, R, I>
     } else {
       debug_assert!(self.moc_1_it.next().is_none());
     }
-    let moc1 = RangeMOC::new(depth1, Ranges::new_unchecked(ranges1.into()).into());
+    let moc1 = RangeMOC::new(depth1, Ranges::new_unchecked(ranges1).into());
     RangeMOC2Elem::new(moc1, self.moc_2)
   }
 
@@ -175,7 +175,7 @@ impl<U: Idx, R: MocQty<U>> MOCUnion<U, R> {
     MOCUnion { utype, moc_2  }
   }
   fn from(left: &RangeMOC<U, R>, right: &RangeMOC<U, R>) -> Self {
-    let union = left.or(&right);
+    let union = left.or(right);
     MOCUnion::new(
       if union.eq_without_depth(left) {
         MOCUnionType::LeftContainsRight
@@ -233,7 +233,7 @@ impl<T, Q, U, R> MOC2ElemBuilder<T, Q, U, R>
   }
   
   fn to_moc2_elem(self) -> RangeMOC2Elem<T, Q, U, R> {
-    debug_assert!(self.moc_1_elems.len() > 0);
+    debug_assert!(!self.moc_1_elems.is_empty());
     let moc_1 = RangeMOC::new(self.moc_1_depth, Ranges::new_unchecked(self.moc_1_elems).into());
     RangeMOC2Elem::new(moc_1, self.moc_2)
   }
@@ -844,7 +844,7 @@ impl<T, Q, U, R, I1, J1, K1, L1, I2, J2, K2, L2> Iterator for OrRange2Iter<T, Q,
                     // - R-xx => return the current MOC
                     // - L--R--xx with R MOC2 included in L MOC2 (=> merge)
                     // - L--R--xx with R MOC2 NOT included in L MOC2 (=> add L--R to current MOC and return it)
-                    debug_assert!(self.moc2_builder.is_none() && moc_1_buff.len() > 0);
+                    debug_assert!(self.moc2_builder.is_none() && !moc_1_buff.is_empty());
                     let moc_2 = curr_moc2_left.moc_2.clone();
                     //  WasDepleted can be Right or None;
                     self.moc2_builder = Some(MOC2ElemBuilder::new(depth_1, moc_1_buff, moc_2, MOCOrg::Left));
@@ -863,7 +863,7 @@ impl<T, Q, U, R, I1, J1, K1, L1, I2, J2, K2, L2> Iterator for OrRange2Iter<T, Q,
                     // - L-xx => return the current MOC
                     // - R--L--xx with L MOC2 included in R MOC2 (=> merge)
                     // - R--L--xx with L MOC2 NOT included in R MOC2 (=> add R--L to current MOC and return it)
-                    debug_assert!(self.moc2_builder.is_none() && moc_1_buff.len() > 0);
+                    debug_assert!(self.moc2_builder.is_none() && !moc_1_buff.is_empty());
                     let moc_2 = curr_moc2_right.moc_2.clone();
                     //  WasDepleted can be Left or None;
                     self.moc2_builder = Some(MOC2ElemBuilder::new(depth_1, moc_1_buff, moc_2, MOCOrg::Right));
@@ -890,7 +890,7 @@ impl<T, Q, U, R, I1, J1, K1, L1, I2, J2, K2, L2> Iterator for OrRange2Iter<T, Q,
                             if !curr_moc2_left.moc1_it_is_depleted() {
                               let moc_1 = RangeMOC::new(depth_1, Ranges::new_unchecked(moc_1_buff).into());
                               return Some(RangeMOC2Elem::new(moc_1, moc_2_union.moc_2));
-                            } else if moc_1_buff.len() > 0 {
+                            } else if !moc_1_buff.is_empty() {
                               // check if nex_left_moc_1_head intersects  current right_moc_1_head 
                               // AND next_left_moc_2 also included in current right_moc_2
                               self.moc2_builder = Some(MOC2ElemBuilder::new(depth_1, moc_1_buff, moc_2_union.moc_2, MOCOrg::Right));
@@ -912,7 +912,7 @@ impl<T, Q, U, R, I1, J1, K1, L1, I2, J2, K2, L2> Iterator for OrRange2Iter<T, Q,
                             if !curr_moc2_left.moc1_it_is_depleted() {
                               let moc_1 = RangeMOC::new(depth_1, Ranges::new_unchecked(moc_1_buff).into());
                               return Some(RangeMOC2Elem::new(moc_1, moc_2_union.moc_2));
-                            } else if moc_1_buff.len() > 0 {
+                            } else if !moc_1_buff.is_empty() {
                               // check if nex_left_moc_1_head intersects  current right_moc_1_head 
                               // AND next_left_moc_2 also included in current right_moc_2
                               self.moc2_builder = Some(MOC2ElemBuilder::new(depth_1, moc_1_buff, moc_2_union.moc_2, MOCOrg::Right));
@@ -925,7 +925,7 @@ impl<T, Q, U, R, I1, J1, K1, L1, I2, J2, K2, L2> Iterator for OrRange2Iter<T, Q,
                             if !curr_moc2_right.moc1_it_is_depleted() {
                               let moc_1 = RangeMOC::new(depth_1, Ranges::new_unchecked(moc_1_buff).into());
                               return Some(RangeMOC2Elem::new(moc_1, moc_2_union.moc_2));
-                            } else if moc_1_buff.len() > 0 {
+                            } else if !moc_1_buff.is_empty() {
                               // check if nex_right_moc_1_head intersects  current left_moc_1_head 
                               // AND next_right_moc_2 also included in current left_moc_2
                               self.moc2_builder = Some(MOC2ElemBuilder::new(depth_1, moc_1_buff, moc_2_union.moc_2, MOCOrg::Left));
@@ -937,12 +937,12 @@ impl<T, Q, U, R, I1, J1, K1, L1, I2, J2, K2, L2> Iterator for OrRange2Iter<T, Q,
                             debug_assert!(self.moc2_builder.is_none());
                             if curr_moc2_left.moc1_it_is_depleted() && curr_moc2_right.moc1_it_is_depleted() {
                               // Check whether the next MOC equals the union or not
-                              debug_assert!(moc_1_buff.len() > 0);
+                              debug_assert!(!moc_1_buff.is_empty());
                               self.moc2_builder = Some(MOC2ElemBuilder::new(depth_1, moc_1_buff, moc_2_union.moc_2, MOCOrg::Union));
                               self.next_left();
                               self.next_right();
                               break;
-                            } else if moc_1_buff.len() > 0 {
+                            } else if !moc_1_buff.is_empty() {
                               let moc_1 = RangeMOC::new(depth_1, Ranges::new_unchecked(moc_1_buff).into());
                               return Some(RangeMOC2Elem::new(moc_1, moc_2_union.moc_2));
                             }
@@ -958,7 +958,7 @@ impl<T, Q, U, R, I1, J1, K1, L1, I2, J2, K2, L2> Iterator for OrRange2Iter<T, Q,
                             if !curr_moc2_right.moc1_it_is_depleted() {
                               let moc_1 = RangeMOC::new(depth_1, Ranges::new_unchecked(moc_1_buff).into());
                               return Some(RangeMOC2Elem::new(moc_1, moc_2_union.moc_2));
-                            } else if moc_1_buff.len() > 0 {
+                            } else if !moc_1_buff.is_empty() {
                               // check if nex_right_moc_1_head intersects  current left_moc_1_head 
                               // AND next_right_moc_2 also included in current left_moc_2
                               self.moc2_builder = Some(MOC2ElemBuilder::new(depth_1, moc_1_buff, moc_2_union.moc_2, MOCOrg::Left));
@@ -981,7 +981,7 @@ impl<T, Q, U, R, I1, J1, K1, L1, I2, J2, K2, L2> Iterator for OrRange2Iter<T, Q,
                         if !curr_moc2_right.moc1_it_is_depleted() {
                           let moc_1 = RangeMOC::new(depth_1, Ranges::new_unchecked(moc_1_buff).into());
                           return Some(RangeMOC2Elem::new(moc_1, moc_2_union.moc_2));
-                        } else if moc_1_buff.len() > 0 {
+                        } else if !moc_1_buff.is_empty() {
                           // check if nex_right_moc_1_head intersects  current left_moc_1_head 
                           // AND next_right_moc_2 also included in current left_moc_2
                           self.moc2_builder = Some(MOC2ElemBuilder::new(depth_1, moc_1_buff, moc_2_union.moc_2, MOCOrg::Left));
@@ -1009,7 +1009,7 @@ impl<T, Q, U, R, I1, J1, K1, L1, I2, J2, K2, L2> Iterator for OrRange2Iter<T, Q,
                         if !curr_moc2_left.moc1_it_is_depleted() {
                           let moc_1 = RangeMOC::new(depth_1, Ranges::new_unchecked(moc_1_buff).into());
                           return Some(RangeMOC2Elem::new(moc_1, moc_2_union.moc_2));
-                        } else if moc_1_buff.len() > 0 {
+                        } else if !moc_1_buff.is_empty() {
                           // check if nex_left_moc_1_head intersects  current right_moc_1_head 
                           // AND next_left_moc_2 also included in current right_moc_2
                           self.moc2_builder = Some(MOC2ElemBuilder::new(depth_1, moc_1_buff, moc_2_union.moc_2, MOCOrg::Right));

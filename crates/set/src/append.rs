@@ -28,10 +28,6 @@ use crate::{
   MocSetFileWriter
 };
 
-// Only ensures that no other modif is happening
-// (create a .file.lock and check if exists)
-// No problem for reading: append first the data part, then modify the header :)
-
 #[derive(Debug, Parser)]
 /// Append the given MOCs to an existing mocset
 pub struct Append {
@@ -45,7 +41,6 @@ pub struct Append {
   /// Path of the MOC to be append
   moc_path: PathBuf,
 }
-
 
 impl Append {
 

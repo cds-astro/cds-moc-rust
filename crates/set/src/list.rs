@@ -1,7 +1,9 @@
 
-use std::mem::size_of;
-use std::error::Error;
-use std::path::PathBuf;
+use std::{
+  mem::size_of,
+  error::Error,
+  path::PathBuf
+};
 
 use clap::Parser;
 
@@ -15,10 +17,6 @@ pub struct List {
   #[clap(parse(from_os_str))]
   /// The moc-set to be read.
   file: PathBuf,
-  // list of id
-  // deprecated only
-  // rm only
-  // ...
   #[clap(short = 'r', long = "ranges")]
   /// Print byte ranges instead of byte_size
   ranges: bool,

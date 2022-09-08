@@ -278,7 +278,7 @@ fn from_fits_skymap_internal<R: BufRead>(
   if prev_range.start != prev_range.end {
     let moc_range: MocRange<u64, Hpx<u64>> = CellRange::from_depth_range(
       depth_max,
-      prev_range.clone()
+      prev_range
     ).into();
     for moc_cell in moc_range {
       let n_cells = 1_u64 << ((depth_max - moc_cell.depth()) << 1);

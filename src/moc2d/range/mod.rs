@@ -152,7 +152,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
         }
       }
     }
-    return true;
+    true
   }
 
   

@@ -49,8 +49,8 @@ impl FromStr for Vertices {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     let list: Vec<f64> = s
-      .replace("(", "")
-      .replace(")", "")
+      .replace('(', "")
+      .replace(')', "")
       .split(',')
       .map(|t| str::parse::<f64>(t.trim()))
       .collect::<Result<Vec<f64>, _>>()?;
@@ -895,7 +895,7 @@ impl From {
             .ok_or_else(|| String::from("split to separate time from space failed."))?;
           let (lon_deg, lat_deg) = line.split_once(separator)
             .ok_or_else(|| String::from("split on space failed."))?;
-          let time_us = time.parse(&time_str)?;
+          let time_us = time.parse(time_str)?;
           let lon_deg = lon_deg.parse::<f64>()?;
           let lat_deg = lat_deg.parse::<f64>()?;
           let lon = lon_deg2rad(lon_deg)?;
@@ -905,7 +905,7 @@ impl From {
           Ok((time_idx, hpx))
         }
         let line2tpos = move |line: std::io::Result<String>| {
-          match line2tscoos(&separator, &time, &layer, time_shift, line) {
+          match line2tscoos(&separator, &time, layer, time_shift, line) {
             Ok(lonlat) => Some(lonlat),
             Err(e) => {
               eprintln!("Error reading or parsing line: {:?}", e);
@@ -960,7 +960,7 @@ impl From {
           Ok((tmin..tmax, hpx))
         }
         let line2trpos = move |line: std::io::Result<String>| {
-          match line2trcoos(&separator, &time, &layer, line) {
+          match line2trcoos(&separator, &time, layer, line) {
             Ok(lonlat) => Some(lonlat),
             Err(e) => {
               eprintln!("Error reading or parsing line: {:?}", e);
@@ -1063,7 +1063,7 @@ impl From {
 
 fn lon_deg2rad(lon_deg: f64) -> Result<f64, Box<dyn Error>> {
   let lon = lon_deg.to_radians();
-  if lon < 0.0 || TWICE_PI <= lon {
+  if !(0.0..TWICE_PI).contains(&lon) {
     Err(String::from("Longitude must be in [0, 2pi[").into())
   } else {
     Ok(lon)
@@ -1072,7 +1072,7 @@ fn lon_deg2rad(lon_deg: f64) -> Result<f64, Box<dyn Error>> {
 
 fn lat_deg2rad(lat_deg: f64) -> Result<f64, Box<dyn Error>> {
   let lat  = lat_deg.to_radians();
-  if lat < -HALF_PI || HALF_PI <= lat {
+  if !(-HALF_PI..HALF_PI).contains(&lat) {
     Err(String::from("Latitude must be in [-pi/2, pi/2]").into())
   } else {
     Ok(lat)
@@ -1159,7 +1159,7 @@ fn box2moc(
     Err(String::from("Semi-major axis must be in ]0, pi/2]").into())
   } else if b <= 0.0 || a <= b {
     Err(String::from("Semi-minor axis must be in ]0, a[").into())
-  } else if pa < 0.0 || PI <= pa {
+  } else if !(0.0..PI).contains(&pa) {
     Err(String::from("Position angle must be in [0, pi[").into())
   } else {
     Ok(RangeMOC::from_box(lon, lat, a, b, pa, depth))

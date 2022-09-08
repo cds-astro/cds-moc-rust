@@ -95,10 +95,7 @@ impl<T> Iterator for HpxToUniqIter<T>
             self.buffer.clear();
 
             self.depth += 1;
-            assert!(
-                self.depth <= Hpx::<T>::MAX_DEPTH
-                    || (self.depth > Hpx::<T>::MAX_DEPTH && self.ranges.is_empty())
-            );
+            assert!(self.depth <= Hpx::<T>::MAX_DEPTH || self.ranges.is_empty());
             if self.depth > Hpx::<T>::MAX_DEPTH && self.ranges.is_empty() {
                 break;
             }

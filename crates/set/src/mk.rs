@@ -14,9 +14,7 @@ use std::{
   error::Error
 };
 
-// use structopt::StructOpt;
 use clap::Parser;
-
 use byteorder::{LittleEndian, WriteBytesExt};
 use memmap::MmapMut;
 
@@ -67,7 +65,7 @@ impl Make {
         handle.read_to_string(&mut buffer).expect("Error reading data from stdin");
         buffer
       },
-      Some(path) => fs::read_to_string(path).expect(&format!("Unable to read file {:?}", path)),
+      Some(path) => fs::read_to_string(path).unwrap_or_else(|_| panic!("Unable to read file {:?}", path)),
     }
   }
 
@@ -105,7 +103,7 @@ impl Make {
     }
     // - ensure there is no ID duplicates (and that all IDs are valid)
     let mut sorted_id = moc_list.iter()
-      .map(|(id_and_flag, _)| check_id((*id_and_flag).abs() as u64)) // take abs since negative = deprecated 
+      .map(|(id_and_flag, _)| check_id((*id_and_flag).unsigned_abs())) // take abs since negative = 'deprecated'
       .collect::<Result<Vec<u64>, _>>()?;
     sorted_id.sort_unstable();
     sorted_id.dedup();

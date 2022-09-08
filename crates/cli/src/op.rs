@@ -896,7 +896,7 @@ impl Op2 {
         )
       },
       Op2::Union => output.write_stmoc(left_stmoc.or(right_stmoc)),
-      Op2::Difference => return Err(String::from("Difference (or xor) not implemented yet for ST-MOCs.").into()), // todo!()
+      Op2::Difference => Err(String::from("Difference (or xor) not implemented yet for ST-MOCs.").into()), // todo!()
       Op2::Minus => {
         let (time_depth_1, hpx_depth_1) = (left_stmoc.depth_max_1(), left_stmoc.depth_max_2());
         let (time_depth_2, hpx_depth_2) = (right_stmoc.depth_max_1(), right_stmoc.depth_max_2());
@@ -906,7 +906,7 @@ impl Op2 {
           left_stmoc.difference(&right_stmoc).time_space_iter(time_depth_1.max(time_depth_2), hpx_depth_1.max(hpx_depth_2))
         )
       }, // warning method name is misleading
-      Op2::TimeFold | Op2::SpaceFold => return Err(String::from("Operation must involve either a S-MOC or a T-MOC").into()),
+      Op2::TimeFold | Op2::SpaceFold => Err(String::from("Operation must involve either a S-MOC or a T-MOC").into()),
     }
   }
 

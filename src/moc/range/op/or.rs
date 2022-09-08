@@ -108,7 +108,7 @@ impl <T, Q, I1, I2> OrRangeIter<T, Q, I1, I2>
       }
     }
     // Normal behaviour
-    return OrRangeIter {
+    OrRangeIter {
       depth,
       last,
       strategy: Strategy::Regular {

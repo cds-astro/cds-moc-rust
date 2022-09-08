@@ -17,7 +17,7 @@ use cdshealpix::{
 };
 
 use moclib::{
-  idx::Idx, 
+  idx::Idx,
   qty::{MocQty, Hpx},
   ranges::{SNORanges, Ranges, BorrowedRanges},
   elemset::range::BorrowedMocRanges,
@@ -130,7 +130,7 @@ pub fn fmt_from_extension(path: &Path) -> Result<InputFormat, String> {
 }
 
 impl Query {
-  
+
   pub fn exec(self) -> Result<(), Box<dyn Error>> {
     match self.region {
       Region::Pos { lon_deg, lat_deg} => {
@@ -166,7 +166,7 @@ impl Query {
         if r_rad <= 0.0 {
           Err(String::from("Radius must be positive").into())
         } else {
-          let moc64: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_cone(lon, lat, r_rad, depth, 2); 
+          let moc64: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_cone(lon, lat, r_rad, depth, 2);
           let moc32: RangeMOC<u32, Hpx<u32>> = convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>(
             (&moc64).into_range_moc_iter()
           ).into_range_moc();
@@ -190,22 +190,20 @@ impl Query {
                 move |ranges| ranges.contains(&moc64_ref),
               )
             }
+          } else if self.print_coverage {
+            exec_gen_with_coverage(
+              self.file,
+              self.include_deprecated,
+              move |ranges| ranges.intersects(&moc32_ref),
+              move |ranges| ranges.intersects(&moc64_ref),
+            )
           } else {
-            if self.print_coverage {
-              exec_gen_with_coverage(
-                self.file,
-                self.include_deprecated,
-                move |ranges| ranges.intersects(&moc32_ref),
-                move |ranges| ranges.intersects(&moc64_ref),
-              )
-            } else {
-              exec_gen(
-                self.file,
-                self.include_deprecated,
-                move |ranges| ranges.intersects(&moc32_ref),
-                move |ranges| ranges.intersects(&moc64_ref),
-              )
-            }
+            exec_gen(
+              self.file,
+              self.include_deprecated,
+              move |ranges| ranges.intersects(&moc32_ref),
+              move |ranges| ranges.intersects(&moc64_ref),
+            )
           }
         }
       }
@@ -246,32 +244,32 @@ impl Query {
               move |ranges| ranges.contains(&moc64_ref),
             )
           }
+        } else if self.print_coverage {
+          exec_gen_with_coverage(
+            self.file,
+            self.include_deprecated,
+            move |ranges| ranges.intersects(&moc32_ref),
+            move |ranges| ranges.intersects(&moc64_ref),
+          )
         } else {
-          if self.print_coverage {
-            exec_gen_with_coverage(
-              self.file,
-              self.include_deprecated,
-              move |ranges| ranges.intersects(&moc32_ref),
-              move |ranges| ranges.intersects(&moc64_ref),
-            )
-          } else {
-            exec_gen(
-              self.file,
-              self.include_deprecated,
-              move |ranges| ranges.intersects(&moc32_ref),
-              move |ranges| ranges.intersects(&moc64_ref),
-            )
-          }
+          exec_gen(
+            self.file,
+            self.include_deprecated,
+            move |ranges| ranges.intersects(&moc32_ref),
+            move |ranges| ranges.intersects(&moc64_ref),
+          )
         }
       }
     }
   }
 }
 
+type MocTuple = (RangeMOC<u32, Hpx<u32>>, RangeMOC<u64, Hpx<u64>>);
+
 pub fn load_moc<R: BufRead>(
   mut input: R,
   input_fmt: InputFormat,
-) -> Result<(RangeMOC<u32, Hpx<u32>>, RangeMOC<u64, Hpx<u64>>), Box<dyn Error>>
+) -> Result<MocTuple, Box<dyn Error>>
 {
   match input_fmt {
     InputFormat::Ascii => {
@@ -347,8 +345,8 @@ pub fn load_moc<R: BufRead>(
   }
 }
 
-fn exec_gen<F, D>(file: PathBuf, include_deprecated: bool, f: F, d: D) -> Result<(), Box<dyn Error>> 
-  where 
+fn exec_gen<F, D>(file: PathBuf, include_deprecated: bool, f: F, d: D) -> Result<(), Box<dyn Error>>
+  where
     F: Fn(&BorrowedRanges<'_, u32>) -> bool,
     D: Fn(&BorrowedRanges<'_, u64>) -> bool
 {
@@ -411,7 +409,7 @@ fn exec_gen_with_coverage<F, D>(file: PathBuf, include_deprecated: bool, f: F, d
 
 fn lon_deg2rad(lon_deg: f64) -> Result<f64, Box<dyn Error>> {
   let lon = lon_deg.to_radians();
-  if lon < 0.0 || TWICE_PI <= lon {
+  if !(0.0..TWICE_PI).contains(&lon) {
     Err(String::from("Longitude must be in [0, 2pi[").into())
   } else {
     Ok(lon)
@@ -420,7 +418,7 @@ fn lon_deg2rad(lon_deg: f64) -> Result<f64, Box<dyn Error>> {
 
 fn lat_deg2rad(lat_deg: f64) -> Result<f64, Box<dyn Error>> {
   let lat  = lat_deg.to_radians();
-  if lat < -HALF_PI || HALF_PI <= lat {
+  if !(-HALF_PI..HALF_PI).contains(&lat) {
     Err(String::from("Latitude must be in [-pi/2, pi/2]").into())
   } else {
     Ok(lat)

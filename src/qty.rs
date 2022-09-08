@@ -351,8 +351,8 @@ impl<T: Idx> Frequency<T> {
     /// # Panics
     /// * if `freq` not in `[5.048709793414476e-29, 5.846006549323611e+48[`.
     pub fn freq2hash(freq: f64) -> T {
-        const FREQ_MIN: f64 = 5.048709793414476e-29; // f64::from_bits(929_u64 << 52);
-        const FREQ_MAX: f64 = 5.846006549323611e+48; // f64::from_bits((1184_u64 << 52) | F64_MANTISSA_BIT_MASK);
+        const FREQ_MIN: f64 = 5.048_709_793_414_476e-29; // f64::from_bits(929_u64 << 52);
+        const FREQ_MAX: f64 = 5.846_006_549_323_611e48; // f64::from_bits((1184_u64 << 52) | F64_MANTISSA_BIT_MASK);
         assert!(FREQ_MIN <= freq, "Wrong frequency in Hz. Expected: >= {}. Actual: {}", FREQ_MIN, freq);
         assert!(freq < FREQ_MAX, "Wrong frequency in Hz. Expected: < {}. Actual: {}", FREQ_MAX, freq);
         // f64: 1 sign bit + 11 exponent bits + 52 fraction bits
@@ -369,7 +369,7 @@ impl<T: Idx> Frequency<T> {
         let freq_bits = freq.to_bits();
         assert_eq!(freq_bits & F64_SIGN_BIT_MASK, 0); // We already checked that freq is positive, but...
         let exponent = (freq_bits & F64_EXPONENT_BIT_MASK) >> 52;
-        assert!(929 <= exponent && exponent <= 1184, "Exponent: {}", exponent); // Should be ok since we already tested freq range values
+        assert!((929..=1184).contains(&exponent), "Exponent: {}", exponent); // Should be ok since we already tested freq range values
         let exponent = (exponent - 929) << 52;
         let freq_hash_dmax = (freq_bits & F64_BUT_EXPONENT_BIT_MASK) | exponent;
         T::from_u64_idx(freq_hash_dmax)

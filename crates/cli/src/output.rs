@@ -312,7 +312,7 @@ impl OutputFormat {
 }
 
 fn add_number_before_extension(num: usize, path: &mut PathBuf) {
-  match path.extension().and_then(|s| s.to_str()).map(|s| String::from(s)) {
+  match path.extension().and_then(|s| s.to_str()).map(String::from) {
     Some(ext) => path.set_extension(format!("{}.{}", num, ext)),
     None => path.set_extension(format!("{}", num)),
   };

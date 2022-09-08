@@ -190,14 +190,14 @@ pub fn print_tmoc<T, I>(print_header: bool, it: I) -> Result<(), Box<dyn Error>>
   let stdout = io::stdout();
   let mut buff = stdout.lock();
   if print_header {
-    write!(&mut buff, "# Time ranges in JD\n")?;
-    write!(&mut buff, "from_inclusive,to_exclusive\n")?;
+    writeln!(&mut buff, "# Time ranges in JD")?;
+    writeln!(&mut buff, "from_inclusive,to_exclusive")?;
   }
   for Range { start, end } in it {
     let start = start.to_u64_idx();
     let end = end.to_u64_idx();
-    write!(
-      &mut buff, "{}.{},{}.{}\n",
+    writeln!(
+      &mut buff, "{}.{},{}.{}",
       start / N_MICROSEC_IN_DAY_U64,
       (((start % N_MICROSEC_IN_DAY_U64) as f64 / N_MICROSEC_IN_DAY) * 1e+17) as u64,
       end / N_MICROSEC_IN_DAY_U64,
@@ -215,11 +215,11 @@ pub fn print_fmoc<T, I>(print_header: bool, it: I) -> Result<(), Box<dyn Error>>
   let stdout = io::stdout();
   let mut buff = stdout.lock();
   if print_header {
-    write!(&mut buff, "# Frequency ranges in Hz\n")?;
-    write!(&mut buff, "from_inclusive,to_exclusive\n")?;
+    writeln!(&mut buff, "# Frequency ranges in Hz")?;
+    writeln!(&mut buff, "from_inclusive,to_exclusive")?;
   }
   for Range { start, end } in it {
-    write!(&mut buff, "{:e},{:e}\n", Frequency::<T>::hash2freq(start), Frequency::<T>::hash2freq(end))?;
+    writeln!(&mut buff, "{:e},{:e}", Frequency::<T>::hash2freq(start), Frequency::<T>::hash2freq(end))?;
   }
   Ok(())
 }

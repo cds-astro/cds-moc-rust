@@ -1,9 +1,11 @@
 
-use std::io::{self, BufWriter};
-use std::fs::File;
-use std::str;
-use std::path::PathBuf;
-use std::error::Error;
+use std::{
+  str,
+  fs::File,
+  error::Error,
+  path::PathBuf,
+  io::{self, BufWriter}
+};
 
 use clap::Parser;
 

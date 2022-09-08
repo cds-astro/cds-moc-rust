@@ -88,14 +88,14 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
           Ordering::Less => {
             // There is a change in time, build moc_2
             let moc_2 = moc_builder_2.into_moc();
-            debug_assert!(moc_2.len() > 0);
+            debug_assert!(!moc_2.is_empty());
             // Check whether or not the moc_2 is the same as the on in the current moc_1_builder 
             if let Some(p_moc_2) = prev_moc_2.as_ref() {
               if !moc_2.eq(p_moc_2) { // if not create a new entry
                 let p_moc_1 = moc_builder_1.into_moc();
                 let p_moc_2 = prev_moc_2.replace(moc_2).unwrap();
-                debug_assert!(p_moc_1.len() > 0);
-                debug_assert!(p_moc_2.len() > 0);
+                debug_assert!(!p_moc_1.is_empty());
+                debug_assert!(!p_moc_2.is_empty());
                 range_mocs.push(RangeMOC2Elem::new(p_moc_1, p_moc_2));
                 moc_builder_1 = FixedDepthMocBuilder::<T, Q>::new(self.depth_1, Some(64));
                 moc_builder_1.push(from_1);
@@ -122,8 +122,8 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
         if !moc_2.eq(p_moc_2) { // if not create a new entry
           let p_moc_1 = moc_builder_1.into_moc();
           let p_moc_2 = prev_moc_2.replace(moc_2).unwrap();
-          debug_assert!(p_moc_1.len() > 0);
-          debug_assert!(p_moc_2.len() > 0);
+          debug_assert!(!p_moc_1.is_empty());
+          debug_assert!(!p_moc_2.is_empty());
           range_mocs.push(RangeMOC2Elem::new(p_moc_1, p_moc_2));
           moc_builder_1 = FixedDepthMocBuilder::<T, Q>::new(self.depth_1, Some(64));
           moc_builder_1.push(from_1);
@@ -132,14 +132,14 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
         } else {
           moc_builder_1.push(from_1);
           let moc_1 = moc_builder_1.into_moc();
-          debug_assert!(moc_1.len() > 0);
-          debug_assert!(moc_2.len() > 0);
+          debug_assert!(!moc_1.is_empty());
+          debug_assert!(!moc_2.is_empty());
           range_mocs.push(RangeMOC2Elem::new(moc_1, moc_2));
         }
       } else {
         let moc_1 = moc_builder_1.into_moc();
-        debug_assert!(moc_1.len() > 0);
-        debug_assert!(moc_2.len() > 0);
+        debug_assert!(!moc_1.is_empty());
+        debug_assert!(!moc_2.is_empty());
         range_mocs.push(RangeMOC2Elem::new(moc_1, moc_2));
       }
     }

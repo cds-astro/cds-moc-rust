@@ -20,10 +20,6 @@ use crate::{
   append_moc_bytes, StatusFlag, MocSetFileReader, MocSetFileWriter, MocSetFileIOHelper
 };
 
-// Create a modified copy, ensuring first that no modif is taking place
-// (create a .file.lock and check if exists)
-// Make a move once it is done
-
 #[derive(Debug, Parser)]
 /// Purge the mocset removing physically the MOCs flagged as 'removed'
 pub struct Purge {
@@ -34,7 +30,6 @@ pub struct Purge {
   /// n x 128 - 1 = number of MOCs that can be stored in this purged moc set, 
   /// if larger than the current value. 
   n128: Option<u64>,
-  
 }
 
 impl Purge {
@@ -42,7 +37,7 @@ impl Purge {
     // read and write in a new file
     // get an iterator of (meta, data), perform operation similar to mk.rs
     // - write lock
-    // - copy in a  temporary file
+    // - copy in a temporary file
     // - mv files
     // - remove old file
     // - remove lock
@@ -54,7 +49,7 @@ impl Purge {
     let mut tmp_file = self.file.clone();
     assert!(
       tmp_file.set_extension(
-        tmp_file.extension().map(|e| format!("{:?}.tmp", e)).unwrap_or(String::from(".tmp"))
+        tmp_file.extension().map(|e| format!("{:?}.tmp", e)).unwrap_or_else(|| String::from(".tmp"))
       )
     );
     // TODO/WARNING: part of code duplicated from 'mk.rs' and 'append.rs' => to be clean (e.g. passing a closure)!

@@ -435,10 +435,10 @@ impl<'a, T: Idx> SNORanges<'a, T> for BorrowedRanges<'a, T> {
                     }
                 }
             } else {
-                return true
+                return true;
             }
         }
-        return false;
+        false
     }
     
     #[allow(clippy::many_single_char_names)]

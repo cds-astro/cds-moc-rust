@@ -130,7 +130,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> SweepLineMOC2ElemBuilder<T, Q, 
         assert!(*self.start_1.get_or_insert(start) <= start);
         None
       },
-      None => if self.cells_2.len() == 0 {
+      None => if self.cells_2.is_empty() {
         // The current MOC2 element is void, start a new one
         debug_assert!(self.is_empty());
         self.cells_2.insert(elem, 1);
@@ -153,7 +153,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> SweepLineMOC2ElemBuilder<T, Q, 
         // - build the moc_1 draining all rang_1 elements
         let moc_1 = RangeMOC::new(
           self.depth_1, 
-          MocRanges::new_unchecked(mem::replace(&mut self.ranges_1, Default::default()))
+          MocRanges::new_unchecked(mem::take(&mut self.ranges_1))
         );
         Some(RangeMOC2Elem::new(moc_1, moc_2))
       },
@@ -174,7 +174,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> SweepLineMOC2ElemBuilder<T, Q, 
             // - build the moc_1 draining all rang_1 elements
             let moc_1 = RangeMOC::new(
               self.depth_1,
-              MocRanges::new_unchecked(mem::replace(&mut self.ranges_1, Default::default()))
+              MocRanges::new_unchecked(mem::take(&mut self.ranges_1))
             );
             // The list of moc_2 elements and moc_1 ranges changes, so we build a new MOC2Elem
             // - build the moc_2 leaving all elements in place
@@ -207,7 +207,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> SweepLineMOC2ElemBuilder<T, Q, 
       debug_assert!(self.start_1.is_none());
       let moc_1 = RangeMOC::new(
         self.depth_1, 
-        MocRanges::new_unchecked(mem::replace(&mut self.ranges_1, Default::default()))
+        MocRanges::new_unchecked(mem::take(&mut self.ranges_1))
       );
       let moc_2 = self.build_moc_2();
       Some(RangeMOC2Elem::new(moc_1, moc_2))
@@ -285,9 +285,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangesAndFixedDepthCellsSTMocBu
           }
           return;
         } // else no intersection
-      } /*else if self.sorted && range_1.start < *r.start {
-        self.sorted_no_overlap = false;
-      }*/
+      }
     }
     self.buff.push((range_1, idx_2));
     if self.buff.len() == self.buff.capacity() {
@@ -318,8 +316,8 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangesAndFixedDepthCellsSTMocBu
     let mut events: Vec<SweepLineEvent<'_, T, U>> = Vec::with_capacity(self.buff.len() << 1);
     for e in self.buff.iter() {
       // println!("PUT {} {}, {}", e.0.start, e.0.end, e.1);
-      events.push(SweepLineEvent::Start(&e));
-      events.push(SweepLineEvent::End(&e));
+      events.push(SweepLineEvent::Start(e));
+      events.push(SweepLineEvent::End(e));
     }
     events.sort_unstable();
     // Build MOC2

@@ -1,14 +1,16 @@
 
-use std::fs::{self, OpenOptions, File};
-use std::io::{self, Seek, Cursor, BufReader, Write, BufWriter, SeekFrom};
-use std::ptr::slice_from_raw_parts;
-use std::slice;
-use std::str::FromStr;
-use std::ops::Range;
-use std::mem::{align_of, size_of};
-use std::path::PathBuf;
-use std::error::Error;
-use std::collections::HashMap;
+use std::{
+  slice,
+  ops::Range,
+  str::FromStr,
+  error::Error,
+  path::PathBuf,
+  collections::HashMap,
+  mem::{align_of, size_of},
+  fs::{self, OpenOptions, File},
+  io::{self, Seek, Cursor, BufReader, Write, BufWriter, SeekFrom},
+  ptr::slice_from_raw_parts
+};
 
 use memmap::{MmapOptions, Mmap, MmapMut};
 
@@ -170,7 +172,7 @@ impl<'a> IntoIterator for &Metadata<'a> {
   type IntoIter = MetadataIter<'a>;
 
   fn into_iter(self) -> Self::IntoIter {
-    MetadataIter(self.0.into_iter())
+    MetadataIter(self.0.iter())
   } 
 }
 
@@ -199,7 +201,7 @@ impl<'a> IntoIterator for &CumulByteSize<'a> {
   type IntoIter = MOCByteRangeIter<'a>;
 
   fn into_iter(self) -> Self::IntoIter {
-    let mut it = self.0.into_iter();
+    let mut it = self.0.iter();
     let start = it.next().map(|v| *v as usize).unwrap_or(0);
     MOCByteRangeIter {
       start,
@@ -313,7 +315,7 @@ impl MocSetFileWriter {
     let mut lock_path = path.clone();
     assert!(
       lock_path.set_extension(
-        lock_path.extension().map(|e| format!("{:?}.lock", e)).unwrap_or(String::from(".lock"))
+        lock_path.extension().map(|e| format!("{:?}.lock", e)).unwrap_or_else(|| String::from(".lock"))
       )
     );
     // Atomic operation: fails if the file is already created!
@@ -406,7 +408,7 @@ impl MocSetFileWriter {
       eprintln!("WARNING: MOC ID {} to be updated not found.", remaining_id);
     }
     self.flush_meta()?;
-    return Ok(());
+    Ok(())
   }
   
   pub fn append_moc<T: Idx>(

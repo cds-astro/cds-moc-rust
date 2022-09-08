@@ -138,14 +138,13 @@ pub fn hms2jday_fract(hours: u8, minutes: u8, seconds: f64) -> f64 {
 pub fn hms2day_fract(hours: u8, minutes: u8, seconds: f64) -> f64 {
   assert!(hours < 24);
   assert!(minutes < 60);
-  assert!(0.0 <= seconds && seconds < 60.0); // <=60 for leap seconds?
+  assert!((0.0..60.0).contains(&seconds)); // <=60 for leap seconds?
   hours as f64 / 24_f64 + minutes as f64 / 1440_f64 + seconds / 86400_f64
 }
 
 pub fn gregorian2jd(year: i16, month: u8, day: u8) -> i32 {
   let (j, g) = calendar2f(year, month, day);
-  let j = j as i32 - ((3 * ((g as i32 + 184) / 100)) >> 2) + 38;
-  j //as f64 + (day_fract - 0.5)
+  j as i32 - ((3 * ((g as i32 + 184) / 100)) >> 2) + 38
 }
 
 // Sub-routine common to julian and gregorian calendar conversion
