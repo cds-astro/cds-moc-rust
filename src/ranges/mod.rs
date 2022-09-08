@@ -57,6 +57,26 @@ pub trait SNORanges<'a, T: Idx>: Sized {
           .any(|a| a)
     }
 
+    fn contains(&self, rhs: &'a Self) -> bool {
+        // TODO: implement a more efficient algo, avoiding to re-explore the sub-part of self
+        // already explored (since rhs ranges are also ordered!)
+        for range in rhs.iter() {
+            if !self.contains_range(range) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Returns the sum of the ranges lengths
+    fn range_sum(&'a self) -> T {
+        let mut sum = T::zero();
+        for Range { start, end } in self.iter() {
+            sum += *end - *start;
+        }
+        sum
+    }
+
     fn intersects(&self, rhs: &Self) -> bool;
     
     fn merge(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self::OwnedRanges;

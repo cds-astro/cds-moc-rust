@@ -119,23 +119,11 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     range_sum.unsigned_shr(shift as u32)
   }
   pub fn range_sum(&self) -> T {
-    let mut sum = T::zero();
-    for Range { start, end } in self.ranges.0.iter() {
-      sum += *end - *start;
-    }
-    sum
+    self.ranges.range_sum()
   }
 
   pub fn coverage_percentage(&self) -> f64 {
-    let rsum = self.range_sum();
-    let tot = Q::upper_bound_exclusive();
-    if T::N_BITS > 52 { // 52 = n mantissa bits in a f64
-      // Divide by the same power of 2, dropping the LSBs
-      let shift = (T::N_BITS - 52) as u32;
-      rsum.unsigned_shr(shift);
-      tot.unsigned_shr(shift);
-    }
-    rsum.cast_to_f64() / tot.cast_to_f64()
+    self.ranges.coverage_percentage()
   }
 
 

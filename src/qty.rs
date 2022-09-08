@@ -388,14 +388,14 @@ impl<T: Idx> Frequency<T> {
 
 #[cfg(test)]
 mod tests {
+    
     use crate::qty::{MocableQty, MocQty, Time, Hpx, Frequency};
-
-
+    
     #[test]
     fn test_hpx_uniq_ext() {
         println!("{:?}", Hpx::<u32>::from_uniq_hpx(96));
     }
-    
+
     #[test]
     fn test_hpx_uniq() {
         for depth in 0..8 {
@@ -423,7 +423,6 @@ mod tests {
         assert_eq!(Hpx::<u64>::n_cells_max(), 12 * 4_u64.pow(29));
     }
 
-
     #[test]
     fn test_hpx_zuniq() {
         for depth in 0..8 {
@@ -432,7 +431,6 @@ mod tests {
             }
         }
     }
-
 
     #[test]
     fn test_hpx() {
@@ -463,7 +461,7 @@ mod tests {
         assert_eq!(Time::<u64>::MAX_SHIFT, 61);
         assert_eq!(Time::<u64>::n_cells_max(), 2_u64.pow(62));
     }
-
+    
     #[test]
     fn test_freq() {
         // Independent of T

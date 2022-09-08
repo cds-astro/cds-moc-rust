@@ -9,7 +9,7 @@ use num::{One, Zero};
 
 use crate::idx::Idx;
 use crate::qty::{Bounded, MocQty, Hpx, Time};
-use crate::ranges::{Ranges, SNORanges, MergeOverlappingRangesIter};
+use crate::ranges::{Ranges, SNORanges, MergeOverlappingRangesIter, BorrowedRanges};
 
 // Commodity type definitions
 pub type HpxRanges<T> = MocRanges<T, Hpx<T>>;
@@ -146,6 +146,11 @@ impl<T: Idx, Q: MocQty<T>> MocRanges<T, Q> {
         self
     }
 
+
+    pub fn coverage_percentage(&self) -> f64 {
+        BorrowedMocRanges::<'_, T, Q>::from( BorrowedRanges::from(&self.0)).coverage_percentage()
+    }
+    
     pub fn complement(&self) -> Self {
         self.complement_with_upper_bound(Q::upper_bound_exclusive())
     }
@@ -242,6 +247,88 @@ impl<T, Q> FromIterator<Range<T>> for MocRanges<T, Q>
         )
     }
 }
+
+
+
+pub struct BorrowedMocRanges<'a, T: Idx, Q: MocQty<T>>(pub BorrowedRanges<'a, T>, PhantomData<Q>);
+
+impl<'a, T: Idx, Q: MocQty<T>> From<BorrowedRanges<'a, T>> for BorrowedMocRanges<'a, T, Q> {
+    fn from(ranges: BorrowedRanges<'a, T>) -> Self {
+        BorrowedMocRanges(ranges,  PhantomData)
+    }
+}
+
+impl<'a, T: Idx, Q: MocQty<T>> SNORanges<'a, T> for BorrowedMocRanges<'a, T, Q> {
+
+    type OwnedRanges = MocRanges<T, Q>;
+
+    type Iter = Iter<'a, Range<T>>;
+    #[cfg(not(target_arch = "wasm32"))]
+    type ParIter = rayon::slice::Iter<'a, Range<T>>;
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn iter(&'a self) -> Self::Iter {
+        self.0.iter()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn par_iter(&'a self) -> Self::ParIter {
+        self.0.par_iter()
+    }
+
+    fn intersects_range(&self, x: &Range<T>) -> bool {
+        self.0.intersects_range(x)
+    }
+
+    fn contains_val(&self, x: &T) -> bool {
+        self.0.contains_val(x)
+    }
+
+    fn contains_range(&self, x: &Range<T>) -> bool {
+        self.0.contains_range(x)
+    }
+
+    fn intersects(&self, rhs: &Self) -> bool {
+        self.0.intersects(&rhs.0)
+    }
+
+    fn merge(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self::OwnedRanges {
+        MocRanges(self.0.merge(&other.0, op), PhantomData)
+    }
+
+    fn union(&self, other: &Self) -> Self::OwnedRanges {
+        self.0.union(&other.0).into()
+    }
+
+    fn intersection(&self, other: &Self) -> Self::OwnedRanges {
+        self.0.intersection(&other.0).into()
+    }
+
+    fn complement_with_upper_bound(&self, upper_bound_exclusive: T) -> Self::OwnedRanges {
+        MocRanges(self.0.complement_with_upper_bound(upper_bound_exclusive), PhantomData)
+    }
+}
+
+impl<'a, T: Idx,  Q: MocQty<T>> BorrowedMocRanges<'a, T, Q> {
+
+    pub fn coverage_percentage(&self) -> f64 {
+        let rsum = self.range_sum();
+        let tot = Q::upper_bound_exclusive();
+        if T::N_BITS > 52 { // 52 = n mantissa bits in a f64
+            // Divide by the same power of 2, dropping the LSBs
+            let shift = (T::N_BITS - 52) as u32;
+            rsum.unsigned_shr(shift);
+            tot.unsigned_shr(shift);
+        }
+        rsum.cast_to_f64() / tot.cast_to_f64()
+    }
+    
+}
+
+
 
 /*
 impl<Q: MocQty<u64>> From<MocRanges<u64, Q>> for Array2<u64> {
