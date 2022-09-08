@@ -70,9 +70,13 @@ or update the Rust compiler with:
 rustup update
 ``` 
 
-Install from [crates.io] using `cargo`:
+Clone the [moc lib rust](https://github.com/cds-astro/cds-moc-rust) project:
+```dtd
+git clone https://github.com/cds-astro/cds-moc-rust
+```
+Install from using `cargo`:
 ```bash
-cargo install moc-cli
+cargo install --path crates/cli
 ```
 (due to a heavy use of [monomorphization](https://en.wikipedia.org/wiki/Monomorphization),
 the compilation time may be very long, i.e. more than a minute).

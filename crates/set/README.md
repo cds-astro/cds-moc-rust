@@ -8,6 +8,67 @@ from having to open/read/parse a possible large set of FITS files.
 A `moc-set` can be updated by adding or removing MOCs from it, without having 
 to re-build the full binary file (except from time to time using the `purge` command).
 
+## Install
+
+### Debian package
+
+Download the last `mocset_vxx_yyy.deb` corresponding to your architecture
+(`x86_64_musl` has the most chances to fit your needs)
+from the [github release page](https://github.com/cds-astro/cds-moc-rust/releases).
+
+Install the `.deb` by clicking on it or using the command line:
+```bash
+sudo dpkg -i mocset_vxx_yyy.deb
+sudo apt-get install -f
+```
+
+Then you can use the tool:
+```bash
+mocset
+man mocset
+```
+
+You can uninstall using, e.g.:
+```bash
+sudo dpkg -r $(dpkg -f mocset_vxx_yyy.deb Package)
+```
+
+### Pre-compile binaries for MacOS, Linux and Windows
+
+Download the last `mocset-vxx_yyy.tar.gz` corresponding to your architecture
+from the [github release page](https://github.com/cds-astro/cds-moc-rust/releases).
+You probably want ot use:
+* Linux: `mocset-vxx-x86_64-unknown-linux-musl.tar.gz`
+* MacOS: `mocset-vxx-x86_64-apple-darwin.tar.gz`
+* Windows: `mocset-vxx-.zip`
+
+WARNING: for linux, use [`musl`](https://en.wikipedia.org/wiki/Musl) instead of `gnu` (high chances of incompatibility in the latter case)
+
+The tar contains a single executable binary file.
+```bash
+tar xzvf mocset-vxx-yyy.tar.gz
+./mocset
+```
+
+### Compile from source code
+
+[Install rust](https://www.rust-lang.org/tools/install)
+(and check that `~/.cargo/bin/` is in your path),
+or update the Rust compiler with:
+```bash
+rustup update
+``` 
+
+Clone the [moc lib rust](https://github.com/cds-astro/cds-moc-rust) project:
+```dtd
+git clone https://github.com/cds-astro/cds-moc-rust
+```
+Install from using `cargo`:
+```bash
+cargo install --path crates/set
+```
+
+
 ## Usage
 
 Exec `mocset --help` to get the help message:
