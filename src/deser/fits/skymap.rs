@@ -312,7 +312,8 @@ mod tests {
   use crate::moc::RangeMOCIntoIterator;
   use super::from_fits_skymap;
 
-  // Perform only in release mode (else slow: the decompresse fits files is 1.6GB large)!
+  // Perform only in release mode (else slow: the decompressed fits files is 1.6GB large)!
+  #[cfg(not(debug_assertions))]
   #[test]
   fn test_skymap_v1() {
     let path_buf1 = PathBuf::from("resources/Skymap/bayestar.fits.gz");

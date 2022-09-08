@@ -12,9 +12,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Unit cli tests
+      run: cargo test --package moc-cli
     - name: Install cli
       run:  cargo install --path crates/cli
-    - name: Test cli
+    - name: Integration cli tests
       run: |
         cd crates/cli/test
         ./test.bash

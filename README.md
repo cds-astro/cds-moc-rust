@@ -12,7 +12,8 @@ i.e. discretized geomatrical surfaces on the unit sphere.
 
 MOC Lib Rust, the Rust MOC library used in
 [MOCPy](https://github.com/cds-astro/mocpy),
-[MOCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli) and
+[MOCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli), and
+[MOCSet](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set), and
 [MOCWasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm).
 
 MOC Lib Rust rely on the [CDS HEALPix Rust library](https://github.com/cds-astro/cds-healpix-rust).
@@ -35,8 +36,9 @@ For tools able to display MOCs, see:
 ## Release
 
 The github [releases](https://github.com/cds-astro/cds-moc-rust/releases) section number 
-is the [MOCCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli) 
-and [MOCWasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli) 
+is the [MOCCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli),
+[MOCSet](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set)
+and [MOCWasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm) 
 release number.
 
 ## Install/test
@@ -106,7 +108,6 @@ pub fn or<T, Q, U, R, I1, J1, K1, I2, J2, K2>(
 * [ ] Implement the compact notation (bits coding quad-tree traversal) for S-MOCs (binary + ASCII Base 64)
 * [ ] Implement compact S-MOC: single z-order curve sorted array of indices with a 2 bits flag telling
       whether the index is a single index, a range lower bound or a range upper bound
-* [ ] Implement multi-MOC operations resorting to a sweep line (a sweep line is already used in ST-MOC builder from ranges).
 * [ ] Make a PostgresQL wrapper using e.g. [pgx](https://github.com/zombodb/pgx/)?
 
 ## License

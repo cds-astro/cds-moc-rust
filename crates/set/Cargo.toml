@@ -1,0 +1,55 @@
+[package]
+name = "moc-set"
+version = "0.5.0"
+authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
+description = """
+mocset is a command-line tool to build, update and query a persistent set of
+Multi-Order Coverages maps (MOCs), see https://ivoa.net/documents/MOC/.
+"""
+license = "Apache-2.0 OR MIT"
+readme = "README.md"
+categories = ["command-line-utilities", "science", "data-structures", "algorithms"]
+keywords = ["healpix", "moc"]
+documentation = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set"
+homepage = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set"
+repository = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+path = "src/main.rs"
+name = "mocset"
+bench = false
+test = false
+
+[dependencies]
+moclib = { package = "moc", path = "../.." }
+cdshealpix = "0.6.3"
+memmap = { package = "memmap2", version = "0.5" }
+clap = { version = "3.0", features = ["derive"] }
+byteorder = "1"
+
+[package.metadata.deb]
+maintainer = "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/moc", "usr/bin/mocset", "755"],
+    ["COPYING", "usr/share/doc/mocset/", "644"],
+    ["LICENSE-MIT", "usr/share/doc/mocset/", "644"],
+    ["LICENSE-APACHE", "usr/share/doc/mocset/", "644"],
+    ["CHANGELOG.md", "usr/share/doc/mocset/CHANGELOG", "644"],
+    ["README.md", "usr/share/doc/mocset/README", "644"],
+    #["FAQ.md", "usr/share/doc/moc/FAQ", "644"],
+    ["doc/moc.1", "usr/share/man/man1/mocset.1", "644"],
+    # Similarly for shell completions.
+    #["deployment/deb/moc.bash", "usr/share/bash-completion/completions/moc", "644"],
+    #["deployment/deb/moc.fish", "usr/share/fish/vendor_completions.d/moc.fish", "644"],
+    #["deployment/deb/_moc", "usr/share/zsh/vendor-completions/", "644"],
+]
+extended-description = """\
+mocset is a command-line to query a set of MOCs pre-saved in a single large binary file.  
+The file can be seen as a persistent cache preventing from having to open/read/parse a possible large set of FITS files.
+"""
