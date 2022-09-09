@@ -2,11 +2,45 @@
 
 # moc-set
 
-Query a set of MOCs pre-saved in a single large binary file.  
+A command-line tool to build, update and query a persistent set of
+Multi-Order Coverages maps (MOCs), see [this IVOA standard](https://ivoa.net/documents/MOC).
+
+## About
+
+Query a set of S-MOCs pre-saved in a single large binary file.  
 The file can be seen as a persistent cache preventing
 from having to open/read/parse a possible large set of FITS files.  
 A `moc-set` can be updated by adding or removing MOCs from it, without having 
 to re-build the full binary file (except from time to time using the `purge` command).
+It is built in such a way that read operations are allowed while updating (add, remove, change status, purge) 
+the binary file, but a write operation immediately fails (return status != 0) if another write operation 
+is already ongoing.  
+
+
+## Used by
+
+MOC set in used:
+* internally in [VizieR](https://vizier.u-strasbg.fr/viz-bin/VizieR) when querying a cone
+  on the `> 16_000` catalogues; and should be soon used in production.
+
+## Similar to the [CDS MOC Server](http://alasky.unistra.fr/MocServer/query).  
+
+The [CDS MOC Server](http://alasky.unistra.fr/MocServer/query) additionally stores metadata information associated 
+to each MOC, allows queries with constraints on those metadata, and supports T-MOCs and ST-MOCs in addition to S-MOCs. 
+
+
+So, `moc-set` offers functionalities similar to **a sub-part of** the MOC Server functionalities
+(except for T-MOCs and ST-MOCs, one could build a MOC Server like service based on `moc-set`, 
+using an additional mechanism to store and filter metadata).
+
+The MOC Server is implemented in Java. All information used by the MOC Server are loaded 
+in memory at service startup. To speed up the starting time, the MOC Server also resort on a binary dump, 
+needing synchronisation mechanisms with the running server data when the list of MOCs is updated. 
+
+`moc-set` has primarily been developed for VizieR needs: lighter/simpler version of the MOC server, with 
+less information needed (VizieR already store catalogues metadata), system programming language with no runtime, 
+possibly less memory available, ...
+
 
 ## Install
 
@@ -466,7 +500,7 @@ If used on a server with a lot of I/O, the data may not stay in the disk cache f
 If we nevertheless want to always answer quickly, there is at least three options:
 * write a daemon loading the full dataset in memory 
 * create a VM (or a docker?) containing only the `moc-set` tool
-* (my favourite one) use shared memory, use e.g. the [shared_memory crate](https://crates.io/crates/shared_memory)
+* my favourite one: use shared memory, resorting e.g. on the [shared_memory crate](https://crates.io/crates/shared_memory)
 
 ### File structure
 

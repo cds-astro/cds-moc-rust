@@ -102,7 +102,7 @@ impl FromStr for StatusFlag {
       DEPRECATED => Ok(StatusFlag::Deprecated),
       VALID => Ok(StatusFlag::Valid),
       // Hide 'void'.
-      _ => Err(format!("Status string not valid: Actual: {}. Excpected: {}, {} or {}", s, REMOVED, DEPRECATED, VALID))
+      _ => Err(format!("Status string not valid: Actual: {}. Expected: {}, {} or {}", s, REMOVED, DEPRECATED, VALID))
     }
   }
 }
@@ -243,7 +243,6 @@ impl<'a> Iterator for MOCByteRangeIter<'a> {
 ///    so if `meta` not yet updated, we are not going to read the added informations
 pub struct MocSetFileReader {
   helper: MocSetFileIOHelper,
-  // file: File,
   mmap: Mmap,
 }
 
@@ -253,7 +252,6 @@ impl MocSetFileReader {
     let file = File::open(path)?;
     let helper = MocSetFileIOHelper::from_file(&file)?;
     let mmap = unsafe { MmapOptions::new().map(&file)? };
-    //Ok(MocSetFileReader { helper, file, mmap })
     Ok(MocSetFileReader { helper, mmap })
   }
 
@@ -266,7 +264,7 @@ impl MocSetFileReader {
     let len = self.helper.n_mocs_max();
     assert_eq!(blob.len(), len << META_ELEM_BYTE_SIZE_SHIFT);
     // ######################################
-    // # Security check before using unsafe #k
+    // # Security check before using unsafe #
     let offset = blob.as_ptr().align_offset(align_of::<FlagDepthId>());
     if offset != 0 {
       panic!("Wrong metadata alignment!");
@@ -329,7 +327,6 @@ impl MocSetFileWriter {
       .open(&path)?;
     let helper = MocSetFileIOHelper::from_file(&file)?;
     let mmap = unsafe { MmapOptions::new().map_mut(&file)? };
-    //Ok(MocSetFileReader { helper, file, mmap })
     Ok(MocSetFileWriter { helper, file, lock_path, mmap })
   }
   
@@ -502,13 +499,7 @@ pub(crate) fn append_moc_bytes(
   Ok(from_byte)
 }
 
-/// We reserve
-// MOC identifier =
-// * depth  = 5 bits  (=> max = 31)
-// * status = 2 bits  (=> max =  3)
-// * mocid  = 2 bytes (= max= 65535)
 
-// Use n_128 instead (since 128 * 8 = 1kB)
 pub struct MocSetFileIOHelper {
   n128: u64,
 }

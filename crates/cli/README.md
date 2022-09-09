@@ -2,8 +2,8 @@
 
 # `moc-cli`
 
-Executable to read/write/create/manipulate HEALPix **M**ulti-**O**rder **C**overage maps (**MOC**s) using command lines.
-
+A command-line to create and manipulate HEALPix **M**ulti-**O**rder **C**overage maps (**MOC**s),
+, see [this IVOA standard](https://ivoa.net/documents/MOC).
 
 ## About
 

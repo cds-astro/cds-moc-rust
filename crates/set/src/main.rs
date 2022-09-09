@@ -27,7 +27,7 @@ enum Args {
   #[clap(name = "purge")]
   Purge(Purge),
   #[clap(name = "list")]
-  List(List), // option count to read flags only!
+  List(List),
   #[clap(name = "query")]
   Query(Query),
   #[clap(name = "extract")]

@@ -1,5 +1,14 @@
 # `moc-cli` Change Log
 
+## 0.5.1
+
+Realeased 2022-09-09
+
+### Bug correction
+
+* Print the deepest order in JSON output even when it contains no cell 
+
+
 ## 0.5.0-alpha
 
 Realeased 2022-06-17

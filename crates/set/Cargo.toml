@@ -1,12 +1,9 @@
 [package]
 name = "moc-set"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
-description = """
-mocset is a command-line tool to build, update and query a persistent set of
-Multi-Order Coverages maps (MOCs), see https://ivoa.net/documents/MOC/.
-"""
-license = "Apache-2.0 OR MIT"
+description = "command-line tool to build, update and query a persistent set of HEALPix Multi-Order Coverages maps (MOCs)"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 categories = ["command-line-utilities", "science", "data-structures", "algorithms"]
 keywords = ["healpix", "moc"]

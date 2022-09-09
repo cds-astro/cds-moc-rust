@@ -1,5 +1,15 @@
 # `moc` Change Log
 
+## 0.9.0
+
+Released 2022-09-09
+
+### Bug correction
+
+* Print the deepest order in JSON output even when it contains no cell 
+
+
+
 ## 0.9.0-alpha
 
 Released 2022-06-17

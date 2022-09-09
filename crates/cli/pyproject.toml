@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin>=0.13,<0.14"]
+build-backend = "maturin"
+
+# See: https://maturin.rs/metadata.html
+
+[project]
+name = "moc-cli"
+
+[project.urls]
+repository = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli"
+
+[tool.maturin]
+# Bindings type
+bindings = "bin"
+# Strip the library for minimum file size
+strip = true
+# Build artifacts with the specified Cargo profile
+profile = "release"
+# Cargo manifest path
+# manifest-path = "Cargo.toml"
+# Require Cargo.lock and cache are up to date
+frozen = false
+# Require Cargo.lock is up to date
+locked = false
+
