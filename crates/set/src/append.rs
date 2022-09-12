@@ -29,6 +29,7 @@ use crate::{
 };
 
 #[derive(Debug, Parser)]
+#[clap(allow_negative_numbers = true)]
 /// Append the given MOCs to an existing mocset
 pub struct Append {
   #[clap(parse(from_os_str))]

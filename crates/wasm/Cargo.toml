@@ -1,6 +1,6 @@
 [package]
 name = "moc-wasm"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = """
 WASM library to create and manipulate HEALPix

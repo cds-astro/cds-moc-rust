@@ -61,7 +61,7 @@ pub struct Query {
 
 #[derive(Debug, Parser)]
 pub enum Region {
-  #[clap(name = "pos")]
+  #[clap(name = "pos", allow_negative_numbers = true)]
   /// Single position.
   Pos {
     /// Longitude of the cone center (in degrees)
@@ -69,7 +69,7 @@ pub enum Region {
     /// Latitude of the cone center (in degrees)
     lat_deg: f64,
   },
-  #[clap(name = "cone")]
+  #[clap(name = "cone", allow_negative_numbers = true)]
   /// A cone, i.e. a position with a small area around (approximated by a MOC). 
   Cone {
     /// Longitude of the cone center (in degrees)

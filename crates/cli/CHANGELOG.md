@@ -1,5 +1,11 @@
 # `moc-cli` Change Log
 
+
+## 0.5.2
+
+Realeased 2022-09-12
+
+
 ## 0.5.1
 
 Realeased 2022-09-09

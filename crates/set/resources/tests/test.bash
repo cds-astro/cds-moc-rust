@@ -33,6 +33,14 @@ query_cone_valid(){
   assert_eq "${actual}" "${expected}" "query cone 0.0 +0.0 0.1"
 }
 
+query_cone_negdec_valid(){
+  local cmd="cargo run --release -- query ${mocset} cone 10.0 -12.0 0.1"
+  local actual=$(${cmd} | tr '\n' ' ' | sed -r 's/ +$//')
+  local expected="id"
+  assert_eq "${actual}" "${expected}" "query cone 10.0 -12.0 0.1"
+}
+
+
 query_cone_valid_prec6(){
   local cmd="cargo run --release -- query ${mocset} cone 0.0 +0.0 0.1 --precision 6"
   local actual=$(${cmd} | tr '\n' ' ' | sed -r 's/ +$//')
@@ -105,6 +113,7 @@ list1
 query_cone_valid
 query_cone_valid_with_coverage
 query_cone_valid_prec6
+query_cone_negdec_valid
 #cargo run --release list --ranges mocset.bin
 cargo run --release purge mocset.bin
 #cargo run --release list --ranges mocset.bin
@@ -124,7 +133,8 @@ query_cone_deprecated_withdeprect
 cargo run --release chgstatus mocset.bin 161 removed
 query_cone_removed_nodeprec
 query_cone_removed_withdeprec
-cargo run --release append mocset.bin 161 data/CDS_J_ApJ_811_30_table3.fits
+cargo run --release append mocset.bin -161 data/CDS_J_ApJ_811_30_table3.fits
+cargo run --release chgstatus mocset.bin 161 valid
 cargo run --release purge mocset.bin
 query_cone_valid
 query_cone_valid_with_coverage
