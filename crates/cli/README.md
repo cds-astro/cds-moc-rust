@@ -18,6 +18,15 @@ For tools able to display MOCs, see:
 
 ## Install
 
+### From pypi for python users
+
+MOC cli is available in [pypi](https://pypi.org/project/moc-cli), 
+you can thus install the `moc` executable using `pip`:
+```bash
+pip install -U moc-cli
+moc --help
+```
+
 ### Debian package
 
 Download the last `moc-cli_vxx_yyy.deb` corresponding to your architecture 
@@ -71,7 +80,7 @@ rustup update
 ``` 
 
 Clone the [moc lib rust](https://github.com/cds-astro/cds-moc-rust) project:
-```dtd
+```bash
 git clone https://github.com/cds-astro/cds-moc-rust
 ```
 Install from using `cargo`:

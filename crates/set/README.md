@@ -44,6 +44,15 @@ possibly less memory available, ...
 
 ## Install
 
+### From pypi for python users
+
+MOCSet is available in [pypi](https://pypi.org/project/moc-set),
+you can thus install the `mocset` executable using `pip`:
+```bash
+pip install -U moc-set
+mocset --help
+```
+
 ### Debian package
 
 Download the last `mocset_vxx_yyy.deb` corresponding to your architecture
