@@ -16,10 +16,18 @@
     "releaseNotes": "https://github.com/cds-astro/cds-moc-rust/blob/main/CHANGELOG.md",
     "funding": "ESCAPE, European Union’s Horizon 2020, Grant Agreement no. 824064",
     "developmentStatus": "active",
-    "funder": {
+    "funder": [
+      {
         "@type": "Organization",
         "name": "Université de Strasbourg"
-    },
+      },
+      {
+        "@type": "Organization",
+        "name": "European Commission",
+        "@id": "https://doi.org/10.13039/501100000780"
+      }
+    ],
+    "funding": "ESCAPE: European Science Cluster of Astronomy & Particle physics ESFRI research infrastructures",
     "keywords": [
         "astronomy",
         "IVOA",

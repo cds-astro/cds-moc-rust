@@ -1,0 +1,46 @@
+{
+    "access_right": "open",
+    "communities": [
+        {
+            "identifier": "escape2020"
+        }
+    ],
+    "creators": [
+        {
+            "affiliation": "Universit\u00e9 de Strasbourg, CNRS, Observatoire astronomique de Strasbourg, UMR7550",
+            "name": "Pineau, Fran\u00e7ois-Xavier",
+            "orcid": "0000-0002-2335-4499"
+        },
+        {
+            "affiliation": "Universit\u00e9 de Strasbourg, CNRS, Observatoire astronomique de Strasbourg, UMR7550",
+            "name": "Baumann, Matthieu"
+        }
+    ],
+    "description": "Rust implementation of the IVOA MOC standard (MOC Lib Rust); \nassociated command line tool (MOCCli) and\nJavascript/WebAssembly wrapper to manipulate MOCs in Web Browsers (MOCWasm).",
+    "grants": [
+        {
+            "id": "10.13039/501100000780::824064"
+        }
+    ],
+    "keywords": [
+        "astronomy",
+        "IVOA",
+        "MOC",
+        "HEALPix"
+    ],
+    "language": "eng",
+    "license": "MIT",
+    "notes": "Release Notes: https://github.com/cds-astro/cds-moc-rust/blob/main/CHANGELOG.md",
+    "publication_date": "2021-10-18",
+    "related_identifiers": [
+        {
+            "identifier": "https://github.com/cds-astro/cds-moc-rust",
+            "relation": "isDerivedFrom",
+            "resource_type": "software",
+            "scheme": "url"
+        }
+    ],
+    "title": "MOC Lib Rust, MOCCLi, MOCWasm",
+    "upload_type": "software",
+    "version": "0.4.0"
+}
