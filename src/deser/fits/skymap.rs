@@ -1,7 +1,6 @@
 
-use std::io::{Read, Seek, BufRead, BufReader};
+use std::io::{self, Read, Seek, BufRead, BufReader};
 use std::mem::size_of;
-use std::marker::PhantomData;
 
 use byteorder::{ReadBytesExt, BigEndian};
 use healpix::depth;
@@ -49,8 +48,8 @@ use crate::deser::{
 /// PCOUNT  =                    0 / number of group parameters                     
 /// GCOUNT  =                    1 / number of groups                               
 /// TFIELDS =                   ?? / number of table fields
-/// TTYPE1  = 'XXX' // MUST STARS WITH 'PROB'                                                            
-/// TFORM1  = 'XXX' // MUST CONTAINS D (f64) or E (f32)                                                            
+/// TTYPE1  = 'XXX'       // SHOULD STARS WITH 'PROB', else WARNING                                                            
+/// TFORM1  = 'XXX'       // MUST CONTAINS D (f64) or E (f32)                                                            
 /// TUNIT1  = 'pix-1    '
 /// TTYPE2  = ???                                                         
 /// TFORM2  = ???                                                            
@@ -58,7 +57,7 @@ use crate::deser::{
 /// MOC     =                    T                                                  
 /// PIXTYPE = 'HEALPIX '           / HEALPIX pixelisation                           
 /// ORDERING= 'NESTED  '           / Pixel ordering scheme: RING, NESTED, or NUNIQ  
-/// COORDSYS= 'C       '           / Ecliptic, Galactic or Celestial (equatorial)   
+/// COORDSYS= 'C       '  // WARNING if not found
 /// NSIDE    =                  ?? / MOC resolution (best nside) 
 ///  or
 /// ORDER    =                  ?? / MOC resolution (best order), superseded by NSIDE
@@ -122,14 +121,15 @@ fn from_fits_skymap_internal<R: BufRead>(
   check_keyword_and_val(it80.next().unwrap(), b"GCOUNT  ", b"1")?;
   let _n_cols = check_keyword_and_parse_uint_val::<u64>(it80.next().unwrap(), b"TFIELDS ")?;
   // check_keyword_and_val(it80.next().unwrap(), b"TTYPE1 ", b"'PROB    '")?;
-  // check_keyword_and_val(it80.next().unwrap(), b"TFORM1 ", b"'D       '")?; // Accept K also?
+  // check_keyword_and_val(it80.next().unwrap(), b"TFORM1 ", b"'D       '")?;
   let ttype1 = check_keyword_and_get_str_val(it80.next().unwrap(), b"TTYPE1 ")?;
   if !ttype1.to_uppercase().starts_with("PROB") {
-    return Err(FitsError::UnexpectedValue(
+    let err = FitsError::UnexpectedValue(
       String::from("TTYPE1"),
       String::from("starts with 'PROB'"), 
-      String::from(ttype1))
+      String::from(ttype1)
     );
+    eprintln!("WARNING: {}", err);
   }
   let tform1 = check_keyword_and_get_str_val(it80.next().unwrap(), b"TFORM1 ")?;
   let (is_f64, n_pack) = if tform1 == "D" || tform1 == "1D" {
@@ -142,7 +142,7 @@ fn from_fits_skymap_internal<R: BufRead>(
     Err(
       FitsError::UnexpectedValue(
         String::from("TFORM1"),
-        String::from("contains 'D' or 'K'"),
+        String::from("'D', '1D', 'E', '1E' or '1024E'"),
         String::from(tform1)
       )
     )
@@ -173,27 +173,105 @@ fn from_fits_skymap_internal<R: BufRead>(
   }
   // Check header params
   moc_kws.check_pixtype()?;
-  moc_kws.check_ordering(Ordering::Nested)?;
-  moc_kws.check_coordsys()?;
+  // moc_kws.check_ordering(Ordering::Nested)?;
+  if let Err(e) = moc_kws.check_coordsys() {
+    eprintln!("WARNING: {}", e);
+  }
   moc_kws.check_index_schema(IndexSchema::Implicit)?;
   // - get MOC depth
-  let depth_max = match moc_kws.get(PhantomData::<MocOrder>) {
+  let depth_max = match moc_kws.get::<MocOrder>() {
     Some(MocKeywords::MOCOrder(MocOrder { depth })) => *depth,
     _ => {
-      match moc_kws.get(PhantomData::<Nside>) {
-        Some(MocKeywords::Nside(Nside { nside })) => depth(*nside),
+      match moc_kws.get::<Nside>() {
+        Some(MocKeywords::Nside(Nside { nside })) => {
+          if healpix::is_nside(*nside) {
+            depth(*nside)
+          } else {
+            return Err(FitsError::Custom(format!("Nside is not valid (to be used in nested mode at least): {}", nside)));
+          }
+        },
         _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string()))
       }
     },
   };
+  if n_rows * n_pack != healpix::n_hash(depth_max) {
+    return Err(FitsError::Custom(format!("Number of elements {} do not match number of HEALPix cells {}", n_rows * n_pack, healpix::n_hash(depth_max))))
+  }
   // Read data
-  // - we so far support only TForm1=D
-  let first_elem_byte_size = if is_f64 {
-    size_of::<f64>()
-  } else {
-    size_of::<f32>()
-  } * n_pack as usize;
-  let n_byte_skip = n_bytes_per_row as usize - first_elem_byte_size;
+  let (uniq_val_dens, cumul_skipped) = match moc_kws.get::<Ordering>() {
+    Some(MocKeywords::Ordering(Ordering::Nested)) =>
+      if is_f64 {
+        let first_elem_byte_size = size_of::<f64>() * n_pack as usize;
+        let n_byte_skip = n_bytes_per_row as usize - first_elem_byte_size;
+        load_from_nested(
+          reader,
+          |r| r.read_f64::<BigEndian>(),
+          skip_value_le_this, depth_max, n_pack, n_byte_skip, n_rows
+        )
+      } else {
+        let first_elem_byte_size = size_of::<f32>() * n_pack as usize;
+        let n_byte_skip = n_bytes_per_row as usize - first_elem_byte_size;
+        load_from_nested(
+          reader,
+          |r| r.read_f32::<BigEndian>().map(|v| v as f64),
+          skip_value_le_this, depth_max, n_pack, n_byte_skip, n_rows
+        )
+      }?,
+    Some(MocKeywords::Ordering(Ordering::Ring)) =>
+      if is_f64 {
+        let first_elem_byte_size = size_of::<f64>() * n_pack as usize;
+        let n_byte_skip = n_bytes_per_row as usize - first_elem_byte_size;
+        load_from_ring(
+          reader,
+          |r| r.read_f64::<BigEndian>(),
+          skip_value_le_this, depth_max, n_pack, n_byte_skip, n_rows
+        )
+      } else {
+        let first_elem_byte_size = size_of::<f32>() * n_pack as usize;
+        let n_byte_skip = n_bytes_per_row as usize - first_elem_byte_size;
+        load_from_ring(
+          reader,
+          |r| r.read_f32::<BigEndian>().map(|v| v as f64),
+          skip_value_le_this, depth_max, n_pack, n_byte_skip, n_rows
+        )
+      }?,
+    Some(MocKeywords::Ordering(other_ordering)) => 
+      return Err(FitsError::UnexpectedValue(
+        Ordering::keyword_string(),
+        format!("{} or {}", Ordering::Nested.to_fits_value(), Ordering::Ring.to_fits_value()),
+        other_ordering.to_fits_value()
+      )),
+    Some(_other_keyword) => unreachable!(),
+    None => return Err(FitsError::MissingKeyword(Ordering::keyword_string())),
+  };
+  // Build the MOC
+  let ranges = valued_cells_to_moc_with_opt(
+    depth_max,
+    uniq_val_dens,
+    cumul_from - cumul_skipped,
+    cumul_to - cumul_skipped,
+    asc,
+    strict,
+    no_split,
+    reverse_decent,
+  );
+  Ok(RangeMOC::new(depth_max, ranges))
+}
+
+
+fn load_from_nested<R, F>(
+  mut reader: R,
+  read_f64: F,
+  skip_value_le_this: f64,
+  depth_max: u8,
+  n_pack: u64,
+  n_byte_skip: usize,
+  n_rows: u64,
+) -> io::Result<(Vec<(u64, f64, f64)>, f64)> 
+  where
+    R: BufRead,
+    F: Fn(&mut R) -> io::Result<f64>
+{
   let mut sink = vec![0; n_byte_skip];
   let mut prev_range = 0..0;
   let mut prev_val = 0.0;
@@ -201,12 +279,7 @@ fn from_fits_skymap_internal<R: BufRead>(
   let mut cumul_skipped = 0_f64;
   if n_pack == 1 {
     for ipix in 0..n_rows {
-      // - read (we could increase the perf here by monomorphising the loop to avoid the test at each iteration)
-      let val = if is_f64 { // per pix
-        reader.read_f64::<BigEndian>()?
-      } else {
-        reader.read_f32::<BigEndian>()? as f64
-      };
+      let val = read_f64(&mut reader)?;
       // - we skip too low value (e.g. all cells set to 0)
       // - we pack together, in a same range, consecutive cells having the same value
       //   and we build a multi resolution map to reuse existing code
@@ -237,14 +310,9 @@ fn from_fits_skymap_internal<R: BufRead>(
     }
   } else {
     for i_row in 0..n_rows {
-      // - read (we could increase the perf here by monomorphising the loop to avoid the test at each iteration)
       let start = i_row * n_pack;
       for ipix in start..start + n_pack {
-        let val = if is_f64 { // per pix
-          reader.read_f64::<BigEndian>()?
-        } else {
-          reader.read_f32::<BigEndian>()? as f64
-        };
+        let val = read_f64(&mut reader)?;
         // - we skip too low value (e.g. all cells set to 0)
         // - we pack together, in a same range, consecutive cells having the same value
         //   and we build a multi resolution map to reuse existing code
@@ -287,18 +355,59 @@ fn from_fits_skymap_internal<R: BufRead>(
       uniq_val_dens.push((uniq, uval, prev_val))
     }
   }
-  // Build the MOC
-  let ranges = valued_cells_to_moc_with_opt(
-    depth_max,
-    uniq_val_dens,
-    cumul_from - cumul_skipped,
-    cumul_to - cumul_skipped,
-    asc,
-    strict,
-    no_split,
-    reverse_decent,
-  );
-  Ok(RangeMOC::new(depth_max, ranges))
+  Ok((uniq_val_dens, cumul_skipped))
+}
+
+fn load_from_ring<R, F>(
+  mut reader: R,
+  read_f64: F,
+  skip_value_le_this: f64,
+  depth_max: u8,
+  n_pack: u64,
+  n_byte_skip: usize,
+  n_rows: u64,
+) -> io::Result<(Vec<(u64, f64, f64)>, f64)>
+  where
+    R: BufRead,
+    F: Fn(&mut R) -> io::Result<f64>
+{
+  let nested_layer = healpix::nested::get(depth_max);
+  let mut sink = vec![0; n_byte_skip];
+  let mut uniq_val_dens: Vec<(u64, f64, f64)> = Vec::with_capacity(10_240);
+  let mut cumul_skipped = 0_f64;
+  if n_pack == 1 {
+    for ipix_ring in 0..n_rows {
+      let val = read_f64(&mut reader)?;
+      // - we skip too low value (e.g. all cells set to 0)
+      if val > skip_value_le_this {
+        let ipix_nested = nested_layer.from_ring(ipix_ring);
+        let uniq = Hpx::<u64>::uniq_hpx(depth_max, ipix_nested);
+        uniq_val_dens.push((uniq, val, val))
+      } else {
+        cumul_skipped += val;
+      }
+      // Skip other columns bits
+      reader.read_exact(&mut sink)?;
+    }
+  } else {
+    for i_row in 0..n_rows {
+      let start = i_row * n_pack;
+      for ipix_ring in start..start + n_pack {
+        let val = read_f64(&mut reader)?;
+        // - we skip too low value (e.g. all cells set to 0)
+        if val > skip_value_le_this {
+          let ipix_nested = nested_layer.from_ring(ipix_ring);
+          let uniq = Hpx::<u64>::uniq_hpx(depth_max, ipix_nested);
+          uniq_val_dens.push((uniq, val, val))
+        } else {
+          cumul_skipped += val;
+        }
+      }
+      // Skip other columns bits
+      reader.read_exact(&mut sink)?;
+    }
+  }
+  Ok((uniq_val_dens, cumul_skipped))
 }
 
 
@@ -388,6 +497,9 @@ mod tests {
     match res {
       Ok(o) => {
         print!("{:?}", o);
+
+        print!("{}", o.to_ascii().unwrap());
+        
         assert!(true)
       },
       Err(e) => {
@@ -397,6 +509,30 @@ mod tests {
     }
   }
 
+
+  #[test]
+  fn test_skymap_v4() {
+    let path_buf1 = PathBuf::from("resources/Skymap/hese_59031_run00134244.evt000034406854.fits");
+    let path_buf2 = PathBuf::from("../resources/Skymap/hese_59031_run00134244.evt000034406854.fits");
+
+    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let reader = BufReader::new(file);
+
+    let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
+    match res {
+      Ok(o) => {
+        // print!("{:?}", o);
+
+        print!("{}", o.to_ascii().unwrap());
+        
+        assert!(true)
+      },
+      Err(e) => {
+        print!("{:?}", e);
+        assert!(false)
+      },
+    }
+  }
 
 
 }

@@ -54,5 +54,8 @@ quick_error! {
     UnexpectedDepth(depth: u8, depth_max: u8) {
       display("unexpected depth. Max expected: {}. Actual: {}", depth_max, depth)
     }
+    Custom(msg: String) {
+      display("FITS not valid: '{}'", msg)
+    }
   }
 }
