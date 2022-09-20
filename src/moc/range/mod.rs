@@ -106,7 +106,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     self.into_range_moc_iter()
       .cells()
       .cellranges()
-      .to_ascii_ivoa(Some(80), true, &mut sink)?;
+      .to_ascii_ivoa(Some(80), false, &mut sink)?;
     Ok(unsafe { String::from_utf8_unchecked(sink) })
   }
   
