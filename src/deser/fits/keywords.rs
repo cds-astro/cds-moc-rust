@@ -2,7 +2,6 @@
 
 use std::str::{self, FromStr};
 use std::fmt;
-use std::marker::PhantomData;
 use std::slice::ChunksMut;
 
 use crate::deser::fits::{
@@ -494,7 +493,7 @@ impl MocKeywordsMap {
     self.entries[entry.index()].replace(entry)
   }
 
-  pub(super) fn get<T: MocCard>(&self, _phantom: PhantomData<T>) -> Option<&MocKeywords> {
+  pub(super) fn get<T: MocCard>(&self/*, _phantom: PhantomData<T>*/) -> Option<&MocKeywords> {
     self.entries[T::INDEX as usize].as_ref()
   }
 
@@ -506,7 +505,7 @@ impl MocKeywordsMap {
   }
 
   pub(super) fn check_pixtype(&self) -> Result<(), FitsError> {
-    match self.get(PhantomData::<PixType>) {
+    match self.get::<PixType>() {
       Some(MocKeywords::PixType(PixType::Healpix)) => Ok(()),
       None => Err(FitsError::MissingKeyword(PixType::keyword_string())),
       _ => unreachable!() // since there is only one elem in PixType enum
@@ -514,7 +513,7 @@ impl MocKeywordsMap {
   }
 
   pub(super) fn check_coordsys(&self) -> Result<(), FitsError> {
-    match self.get(PhantomData::<CoordSys>) {
+    match self.get::<CoordSys>() {
       Some(MocKeywords::CoordSys(CoordSys::ICRS)) => Ok(()),
       None => Err(FitsError::MissingKeyword(CoordSys::keyword_string())),
       _ => unreachable!() // since there is only one elem in CoorSys enum
@@ -522,7 +521,7 @@ impl MocKeywordsMap {
   }
   
   pub(super) fn check_ordering(&self, expected: Ordering) -> Result<(), FitsError> {
-    match self.get(PhantomData::<Ordering>) {
+    match self.get::<Ordering>() {
       Some(MocKeywords::Ordering(actual)) => if *actual == expected {
         Ok(())
       } else {
@@ -537,7 +536,7 @@ impl MocKeywordsMap {
   }
 
   pub(super) fn check_index_schema(&self, expected: IndexSchema) -> Result<(), FitsError> {
-    match self.get(PhantomData::<IndexSchema>) {
+    match self.get::<IndexSchema>() {
       Some(MocKeywords::IndexSchema(actual)) => if *actual == expected {
         Ok(())
       } else {

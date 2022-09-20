@@ -1,7 +1,6 @@
 
 use std::io::{Read, Seek, BufRead, BufReader};
 use std::f64::consts::PI;
-use std::marker::PhantomData;
 
 use byteorder::{ReadBytesExt, BigEndian};
 
@@ -135,7 +134,7 @@ fn from_fits_multiordermap_internal<R: BufRead>(
   moc_kws.check_ordering(Ordering::Nuniq)?;
   moc_kws.check_coordsys()?;
   // - get MOC depth
-  let depth_max = match moc_kws.get(PhantomData::<MocOrder>) {
+  let depth_max = match moc_kws.get::<MocOrder>() {
     Some(MocKeywords::MOCOrder(MocOrder { depth })) => *depth,
     _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
   };

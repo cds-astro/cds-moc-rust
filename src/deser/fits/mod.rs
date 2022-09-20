@@ -573,16 +573,16 @@ pub fn from_fits_ivoa_custom<R: BufRead>(mut reader: R, coosys_permissive: bool)
   // CREATE RMIXED
   // 0: runiq 1: borne inf (max depht) 2: borne sup (max depth) => very fast binary search :)
   // println!("{:?}", &moc_kws);
-  match moc_kws.get(PhantomData::<MocVers>) {
+  match moc_kws.get::<MocVers>() {
     Some(MocKeywords::MOCVers(MocVers::V2_0)) => {
-      match moc_kws.get(PhantomData::<MocDim>) {
+      match moc_kws.get::<MocDim>() {
         Some(MocKeywords::MOCDim(MocDim::Space)) => {
-          let depth_max = match moc_kws.get(PhantomData::<MocOrdS>) {
+          let depth_max = match moc_kws.get::<MocOrdS>() {
             Some(MocKeywords::MOCOrdS(MocOrdS { depth })) => *depth,
             _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
           };
           moc_kws.check_coordsys()?;
-          match moc_kws.get(PhantomData::<Ordering>) {
+          match moc_kws.get::<Ordering>() {
             Some(MocKeywords::Ordering(Ordering::Nuniq)) => load_s_moc_nuniq(reader, n_bytes, n_elems, depth_max, &moc_kws),
             Some(MocKeywords::Ordering(Ordering::Range)) => load_s_moc_range(reader, n_bytes, n_elems, depth_max, &moc_kws),
             Some(MocKeywords::Ordering(Ordering::Range29)) => Err(FitsError::UncompatibleKeywordContent(
@@ -593,11 +593,11 @@ pub fn from_fits_ivoa_custom<R: BufRead>(mut reader: R, coosys_permissive: bool)
           }
         },
         Some(MocKeywords::MOCDim(MocDim::Time)) => {
-          let depth_max = match moc_kws.get(PhantomData::<MocOrdT>) {
+          let depth_max = match moc_kws.get::<MocOrdT>() {
             Some(MocKeywords::MOCOrdT(MocOrdT { depth })) => *depth,
             _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
           };
-          match moc_kws.get(PhantomData::<Ordering>) {
+          match moc_kws.get::<Ordering>() {
             Some(MocKeywords::Ordering(Ordering::Nuniq)) => Err(FitsError::UncompatibleKeywordContent(
               String::from("MOCDIM  = 'TIME'"), String::from("ORDERING= 'NUNIQ'"))),
             Some(MocKeywords::Ordering(Ordering::Range)) => load_t_moc_range(reader, n_bytes, n_elems, depth_max, &moc_kws),
@@ -609,15 +609,15 @@ pub fn from_fits_ivoa_custom<R: BufRead>(mut reader: R, coosys_permissive: bool)
           }
         },
         Some(MocKeywords::MOCDim(MocDim::TimeSpace)) => {
-          let depth_max_time = match moc_kws.get(PhantomData::<MocOrdT>) {
+          let depth_max_time = match moc_kws.get::<MocOrdT>() {
             Some(MocKeywords::MOCOrdT(MocOrdT { depth })) => *depth,
             _ => return Err(FitsError::MissingKeyword(MocOrdT::keyword_string())),
           };
-          let depth_max_hpx = match moc_kws.get(PhantomData::<MocOrdS>) {
+          let depth_max_hpx = match moc_kws.get::<MocOrdS>() {
             Some(MocKeywords::MOCOrdS(MocOrdS { depth })) => *depth,
             _ => return Err(FitsError::MissingKeyword(MocOrdS::keyword_string())),
           };
-          match moc_kws.get(PhantomData::<Ordering>) {
+          match moc_kws.get::<Ordering>() {
             Some(MocKeywords::Ordering(Ordering::Nuniq)) => Err(FitsError::UncompatibleKeywordContent(
               String::from("MOCDIM  = 'TIME.SPACE'"), String::from("ORDERING= 'NUNIQ'"))),
             Some(MocKeywords::Ordering(Ordering::Range)) => {
@@ -631,11 +631,11 @@ pub fn from_fits_ivoa_custom<R: BufRead>(mut reader: R, coosys_permissive: bool)
           }
         },
         Some(MocKeywords::MOCDim(MocDim::Frequency)) => {
-          let depth_max = match moc_kws.get(PhantomData::<MocOrdF>) {
+          let depth_max = match moc_kws.get::<MocOrdF>() {
             Some(MocKeywords::MOCOrdF(MocOrdF { depth })) => *depth,
             _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
           };
-          match moc_kws.get(PhantomData::<Ordering>) {
+          match moc_kws.get::<Ordering>() {
             Some(MocKeywords::Ordering(Ordering::Nuniq)) => Err(FitsError::UncompatibleKeywordContent(
               String::from("MOCDIM  = 'FREQUENCY'"), String::from("ORDERING= 'NUNIQ'"))),
             Some(MocKeywords::Ordering(Ordering::Range)) => load_f_moc_range(reader, n_bytes, n_elems, depth_max, &moc_kws),
@@ -651,16 +651,16 @@ pub fn from_fits_ivoa_custom<R: BufRead>(mut reader: R, coosys_permissive: bool)
     },
     _ => {
       // MOC v1.0 => SMOC only (or ST-MOC pre v2.0)
-      let depth_max = match moc_kws.get(PhantomData::<MocOrder>) {
+      let depth_max = match moc_kws.get::<MocOrder>() {
         Some(MocKeywords::MOCOrder(MocOrder { depth })) => *depth,
         _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
       };
-      match moc_kws.get(PhantomData::<Ordering>) {
+      match moc_kws.get::<Ordering>() {
         Some(MocKeywords::Ordering(Ordering::Nuniq)) => load_s_moc_nuniq(reader, n_bytes, n_elems, depth_max, &moc_kws),
         Some(MocKeywords::Ordering(Ordering::Range)) => load_s_moc_range(reader, n_bytes, n_elems, depth_max, &moc_kws),
         Some(MocKeywords::Ordering(Ordering::Range29)) => {
           // let depth_max_time = depth_max << 1;
-          let (depth_max_time, depth_max_hpx) = match (moc_kws.get(PhantomData::<MocOrdT>), moc_kws.get(PhantomData::<MocOrdS>)) {
+          let (depth_max_time, depth_max_hpx) = match (moc_kws.get::<MocOrdT>(), moc_kws.get::<MocOrdS>()) {
             (None, Some(MocKeywords::MOCOrdS(MocOrdS { depth }))) => (depth_max << 1, *depth),
             (Some(MocKeywords::MOCOrdT(MocOrdT { depth })), None) => ((*depth) << 1, depth_max),
             (Some(MocKeywords::MOCOrdT(MocOrdT { depth: tdepth })), Some(MocKeywords::MOCOrdS(MocOrdS { depth: sdepth }))) => ((*tdepth) << 1, *sdepth),
@@ -682,7 +682,7 @@ fn load_s_moc_nuniq<R: BufRead>(
   moc_kws: &MocKeywordsMap
 ) -> Result<MocIdxType<R>, FitsError>
 {
-  match (moc_kws.get(PhantomData::<TForm1>), n_bytes) {
+  match (moc_kws.get::<TForm1>(), n_bytes) {
     (Some(MocKeywords::TForm1(TForm1::OneI)), u16::N_BYTES) =>
       Ok(MocIdxType::U16(MocQtyType::Hpx(MocType::Cells(
         from_fits_nuniq::<u16, R>(reader, depth_max, n_elems as usize)?
@@ -711,7 +711,7 @@ fn load_s_moc_range<R: BufRead>(
   moc_kws: &MocKeywordsMap
 ) -> Result<MocIdxType<R>, FitsError>
 {
-  match (moc_kws.get(PhantomData::<TForm1>), n_bytes) {
+  match (moc_kws.get::<TForm1>(), n_bytes) {
     (Some(MocKeywords::TForm1(TForm1::OneI)), u16::N_BYTES) =>
       Ok(MocIdxType::U16(MocQtyType::Hpx(MocType::Ranges(
         from_fits_range::<u16, Hpx::<u16>, R>(reader, depth_max, n_elems >> 1)?
@@ -741,7 +741,7 @@ fn load_t_moc_range<R: BufRead>(
 ) -> Result<MocIdxType<R>, FitsError>
 {
   let n_ranges = n_elems >> 1;
-  match (moc_kws.get(PhantomData::<TForm1>), n_bytes) {
+  match (moc_kws.get::<TForm1>(), n_bytes) {
     (Some(MocKeywords::TForm1(TForm1::OneI)), u16::N_BYTES) =>
       Ok(MocIdxType::U16(MocQtyType::Time(MocType::Ranges(
         from_fits_range::<u16, Time::<u16>, R>(reader, depth_max, n_ranges)?
@@ -778,7 +778,7 @@ fn load_f_moc_range<R: BufRead>(
 ) -> Result<MocIdxType<R>, FitsError>
 {
   let n_ranges = n_elems >> 1;
-  match (moc_kws.get(PhantomData::<TForm1>), n_bytes) {
+  match (moc_kws.get::<TForm1>(), n_bytes) {
     (Some(MocKeywords::TForm1(TForm1::OneI)), u16::N_BYTES) =>
       Ok(MocIdxType::U16(MocQtyType::Freq(MocType::Ranges(
         from_fits_range::<u16, Frequency::<u16>, R>(reader, depth_max, n_ranges)?
@@ -816,7 +816,7 @@ fn load_st_moc_range<R: BufRead>(
 ) -> Result<MocIdxType<R>, FitsError>
 {
   let n_ranges = n_elems >> 1;
-  match (moc_kws.get(PhantomData::<TForm1>), n_bytes) {
+  match (moc_kws.get::<TForm1>(), n_bytes) {
     (Some(MocKeywords::TForm1(TForm1::OneI)), u16::N_BYTES) =>
       Ok(MocIdxType::U16(MocQtyType::TimeHpx(STMocType::V2(
         from_fits_range2d::<u16, _>(reader, depth_max_time, depth_max_hpx, n_ranges)?
@@ -854,7 +854,7 @@ fn load_st_moc_range29<R: BufRead>(
 ) -> Result<MocIdxType<R>, FitsError>
 {
   let n_ranges = n_elems >> 1;
-  match (moc_kws.get(PhantomData::<TForm1>), n_bytes) {
+  match (moc_kws.get::<TForm1>(), n_bytes) {
     (Some(MocKeywords::TForm1(TForm1::OneK)), u64::N_BYTES) =>
       Ok(MocIdxType::U64(MocQtyType::TimeHpx(STMocType::PreV2(
         from_fits_range2d_29::<_>(reader, depth_max_time, depth_max_hpx, n_ranges)?
