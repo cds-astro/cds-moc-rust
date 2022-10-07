@@ -10,11 +10,13 @@ i.e. discretized geomatrical surfaces on the unit sphere.
 [![API Documentation on docs.rs](https://docs.rs/moc/badge.svg)](https://docs.rs/moc/)
 [![BenchLib](https://github.com/cds-astro/cds-moc-rust/actions/workflows/bench.yml/badge.svg)](https://github.com/cds-astro/cds-moc-rust/actions/workflows/bench.yml)
 
-MOC Lib Rust, the Rust MOC library used in
-[MOCPy](https://github.com/cds-astro/mocpy),
-[MOCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli),
-[MOCSet](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set), and
-[MOCWasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm).
+MOC Lib Rust, the Rust MOC library used in:
+* [MOCPy](https://github.com/cds-astro/mocpy),
+* [MOCli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli);
+* [MOCSet](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set);
+* [MOCWasm](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/wasm);
+* [Aladin Lite V3](https://github.com/cds-astro/aladin-lite/tree/develop);
+  see the [Cargo.tom](https://github.com/cds-astro/aladin-lite/blob/develop/src/core/Cargo.toml) file.
 
 MOC Lib Rust rely on the [CDS HEALPix Rust library](https://github.com/cds-astro/cds-healpix-rust).
 

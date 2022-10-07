@@ -20,8 +20,10 @@ is already ongoing.
 ## Used by
 
 MOC set in used:
-* internally in [VizieR](https://vizier.u-strasbg.fr/viz-bin/VizieR) when querying a cone
-  on the `> 16_000` catalogues; and should be soon used in production.
+* in production in [VizieR](https://vizier.u-strasbg.fr/viz-bin/VizieR) when querying a cone
+  on the `> 16_000` catalogues
+* in an ongoing project leading by [@lmichel](https://github.com/lmichel) to look for XMM FOVs intersecting a user define region.
+
 
 ## Similar to the [CDS MOC Server](http://alasky.unistra.fr/MocServer/query).  
 

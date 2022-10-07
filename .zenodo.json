@@ -8,7 +8,7 @@
     "creators": [
         {
             "affiliation": "Universit\u00e9 de Strasbourg, CNRS, Observatoire astronomique de Strasbourg, UMR7550",
-            "name": "Pineau, Fran\u00e7ois-Xavier",
+            "name": "Pineau, Francois-Xavier",
             "orcid": "0000-0002-2335-4499"
         },
         {
@@ -38,9 +38,15 @@
             "relation": "isDerivedFrom",
             "resource_type": "software",
             "scheme": "url"
+        },
+        {
+            "identifier": "https://github.com/cds-astro/cds-moc-rust/blob/main/README.md",
+            "relation": "isDocumentedBy",
+            "resource_type": "publication-softwaredocumentation",
+            "scheme": "url"
         }
     ],
-    "title": "MOC Lib Rust, MOCCLi, MOCWasm",
+    "title": "MOC Lib Rust, MOCCLi, MOCWasm and MOCSet",
     "upload_type": "software",
-    "version": "0.4.0"
+    "version": "0.5.2"
 }

@@ -9,11 +9,12 @@
     "dateModified": "2022-04-13",
     "downloadUrl": "https://github.com/cds-astro/cds-moc-rust/releases",
     "issueTracker": "https://github.com/cds-astro/cds-moc-rust/issues",
-    "name": "MOC Lib Rust, MOCCLi, MOCWasm",
-    "version": "0.4.0",
+    "name": "MOC Lib Rust, MOCCLi, MOCWasm and MOCSet",
+    "softwareVersion": "0.5.2",
     "description": "Rust implementation of the IVOA MOC standard (MOC Lib Rust); \nassociated command line tool (MOCCli) and\nJavascript/WebAssembly wrapper to manipulate MOCs in Web Browsers (MOCWasm).",
     "applicationCategory": "Astronomy",
     "releaseNotes": "https://github.com/cds-astro/cds-moc-rust/blob/main/CHANGELOG.md",
+    "readme": "https://github.com/cds-astro/cds-moc-rust/blob/main/README.md",
     "funding": "ESCAPE, European Union’s Horizon 2020, Grant Agreement no. 824064",
     "developmentStatus": "active",
     "funder": [
@@ -46,7 +47,7 @@
         {
             "@type": "Person",
             "@id": "http://orcid.org/0000-0002-2335-4499",
-            "givenName": "François-Xavier",
+            "givenName": "Francois-Xavier",
             "familyName": "Pineau",
             "email": "francois-xavier.pineau@astro.unistra.fr",
             "affiliation": {
@@ -55,6 +56,17 @@
             }
         }
     ],
+    "maintainer": {
+        "@type": "Person",
+        "@id": "http://orcid.org/0000-0002-2335-4499",
+        "givenName": "Francois-Xavier",
+        "familyName": "Pineau",
+        "email": "francois-xavier.pineau@astro.unistra.fr",
+        "affiliation": {
+            "@type": "Organization",
+            "name": "Université de Strasbourg, CNRS, Observatoire astronomique de Strasbourg, UMR7550"
+        }
+    },
     "contributor": [
         {
             "@type": "Person",

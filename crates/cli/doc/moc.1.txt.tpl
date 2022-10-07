@@ -98,7 +98,7 @@ VERSION
 
 HOMEPAGE
 --------
-https://github.com/cds-astro/moc
+https://github.com/cds-astro/cds-moc-rust
 
 Please report bugs and feature requests in the issue tracker.
 
