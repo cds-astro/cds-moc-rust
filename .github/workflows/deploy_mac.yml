@@ -1,0 +1,36 @@
+name: build-wheel-macosi
+
+on: [push]
+
+jobs:
+  # Deploy for Windows and MoxOS 64 bits.
+  # If Windows 32 bits neede, check e.g. https://github.com/marketplace/actions/setup-msys2
+  build-macos-wheels:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Run all matrix jobs even if one is failling (default behaviour is to stop all jobs)
+      # To be changed when option --skip-existing will be available in maturin
+      fail-fast: false
+      matrix:
+        os: [macOS-latest]
+        python-version: ['3.8']
+    steps:
+     - uses: actions/checkout@v2
+     - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+       uses: actions/setup-python@v2
+       with:
+         python-version: ${{ matrix.python-version }}
+     - name: Build and publish wheel for Python ${{ matrix.python-version }} on ${{ matrix.os }}
+       # We do not use environement variable for user, because it seems that the way of providing it in the command
+       # line is not the same for macos and for windows. We should create 2 different actions (see 
+       # https://docs.github.com/en/actions/reference/encrypted-secrets )
+       env:
+        MATURIN_USERNAME: ${{ secrets.PYPI_USERNAME_FXP }}
+        MATURIN_PASSWORD: ${{ secrets.PYPI_PASSWORD_FXP }}
+       run: |
+         rustup target add aarch64-apple-darwin
+         pip install maturin
+         cd crates/set
+         maturin publish -b bin --interpreter python${{matrix.python_version}} --no-sdist --universal2 --skip-existing --username "$MATURIN_USERNAME"
+         cd ../cli
+         maturin publish -b bin --interpreter python${{matrix.python_version}} --no-sdist --universal2 --skip-existing --username "$MATURIN_USERNAME"

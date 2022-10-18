@@ -56,6 +56,7 @@ jobs:
           #- { os: ubuntu-latest, cross: true, toolchain: stable, target: x86_64-linux-android }   
           # Macos
           - { os: macos-latest, cross: false, toolchain: stable, target: x86_64-apple-darwin }
+          - { os: macos-latest, cross: false, toolchain: stable, target: aarch64-apple-darwin }
           # iOS
           #- { os: macos-latest, cross: false, toolchain: stable, target: aarch64-apple-ios }
           #- { os: macos-latest, cross: false, toolchain: stable, target: x86_64-apple-ios }
@@ -139,6 +140,7 @@ jobs:
           #- { os: ubuntu-latest, cross: true, toolchain: stable, target: x86_64-linux-android }   
           # Macos
           - { os: macos-latest, cross: false, toolchain: stable, target: x86_64-apple-darwin }
+          - { os: macos-latest, cross: false, toolchain: stable, target: aarch64-apple-darwin }
           # iOS
           #- { os: macos-latest, cross: false, toolchain: stable, target: aarch64-apple-ios }
           #- { os: macos-latest, cross: false, toolchain: stable, target: x86_64-apple-ios }

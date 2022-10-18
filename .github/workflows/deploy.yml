@@ -27,16 +27,18 @@ jobs:
          cd crates/set
          for PYBIN in /opt/python/cp38*/bin; do
            "${PYBIN}/pip" install maturin
-           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --no-sdist --manylinux 2014 --username "$MATURIN_USERNAME"
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
          done
          cd ../cli
          for PYBIN in /opt/python/cp38*/bin; do
            "${PYBIN}/pip" install maturin
-           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --no-sdist --manylinux 2014 --username "$MATURIN_USERNAME"
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
          done
 
 
-  # Decomment if 32 bit asked one day... 
+  ## Decomment if 32 bit asked one day... 
   #build-linux32-wheels:
   #  runs-on: ubuntu-latest
   #  # CentOS 7 32 bits Docker Hub image that 'build-linux-wheels' executes in.
@@ -59,25 +61,28 @@ jobs:
   #       cd crates/set
   #       for PYBIN in /opt/python/cp38*/bin; do
   #         "${PYBIN}/pip" install maturin
-  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --no-sdist --manylinux 2014 --username "$MATURIN_USERNAME"
+  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
   #       done 
   #      cd ../cli
   #       for PYBIN in /opt/python/cp38*/bin; do
   #         "${PYBIN}/pip" install maturin
-  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --manylinux 2014 --username "$MATURIN_USERNAME"
+  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
   #       done
+
 
 
   # Deploy for Windows and MoxOS 64 bits.
   # If Windows 32 bits neede, check e.g. https://github.com/marketplace/actions/setup-msys2
-  build-macos-and-windows-wheels:      
+  build-windows-wheels:      
     runs-on: ${{ matrix.os }}
     strategy:
       # Run all matrix jobs even if one is failling (default behaviour is to stop all jobs)
       # To be changed when option --skip-existing will be available in maturin
       fail-fast: false      
       matrix:
-        os: [windows-latest, macOS-latest]
+        os: [windows-latest]
         python-version: ['3.8']
     steps:
      - uses: actions/checkout@v2
@@ -94,7 +99,40 @@ jobs:
        run: |
          pip install maturin
          cd crates/set
-         maturin publish --interpreter python${{matrix.python_version}} --skip-existing --no-sdist --username fxpineau 
+         maturin publish --interpreter python${{matrix.python_version}} --skip-existing --username fxpineau 
          cd ../cli
-         maturin publish --interpreter python${{matrix.python_version}} --skip-existing --no-sdist --username fxpineau 
+         maturin publish --interpreter python${{matrix.python_version}} --skip-existing --username fxpineau 
+
+  # Deploy for Windows and MoxOS 64 bits.
+  # If Windows 32 bits neede, check e.g. https://github.com/marketplace/actions/setup-msys2
+  build-macos-wheels:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Run all matrix jobs even if one is failling (default behaviour is to stop all jobs)
+      # To be changed when option --skip-existing will be available in maturin
+      fail-fast: false
+      matrix:
+        os: [macOS-latest]
+        python-version: ['3.8']
+    steps:
+     - uses: actions/checkout@v2
+     - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+       uses: actions/setup-python@v2
+       with:
+         python-version: ${{ matrix.python-version }}
+     - name: Build and publish wheel for Python ${{ matrix.python-version }} on ${{ matrix.os }}
+       # We do not use environement variable for user, because it seems that the way of providing it in the command
+       # line is not the same for macos and for windows. We should create 2 different actions (see 
+       # https://docs.github.com/en/actions/reference/encrypted-secrets )
+       env:
+        MATURIN_USERNAME: ${{ secrets.PYPI_USERNAME_FXP }}
+        MATURIN_PASSWORD: ${{ secrets.PYPI_PASSWORD_FXP }}
+       run: |
+         rustup target add aarch64-apple-darwin
+         pip install maturin
+         cd crates/set
+         maturin publish --interpreter python${{matrix.python_version}} --universal2 --skip-existing --username "$MATURIN_USERNAME"
+         cd ../cli
+         maturin publish --interpreter python${{matrix.python_version}} --universal2 --skip-existing --username "$MATURIN_USERNAME"
+
 
