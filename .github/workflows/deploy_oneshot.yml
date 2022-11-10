@@ -1,0 +1,41 @@
+name: publish-wheels
+on:
+  push:
+  # Allows to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  # Linux is specific: because of manylinux, we have to use a docker file 
+  build-linux64-wheels:
+    runs-on: ubuntu-latest
+    # CentOS 7 64 bits Docker Hub image that 'build-linux-wheels' executes in.
+    # See https://github.com/pypa/manylinux for this particular container:
+    # * CPython 3.5, 3.6, 3.7, 3.8, 3.9 and 3.10, installed in /opt/python/<python tag>-<abi tag>
+    container: quay.io/pypa/manylinux2014_x86_64
+    steps:
+     - name: "Checkout the full project"
+       uses: actions/checkout@v1
+     - name: "Install Rust"
+       run: |
+         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+     - name: "Build and publish wheels"
+       shell: bash
+       env:
+        MATURIN_USERNAME: ${{ secrets.PYPI_USERNAME_FXP }}
+        MATURIN_PASSWORD: ${{ secrets.PYPI_PASSWORD_FXP }}
+       run: |
+         source $HOME/.cargo/env
+         cd crates/set
+         for PYBIN in /opt/python/cp38*/bin; do
+           "${PYBIN}/pip" install maturin
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+           # "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
+         done
+         cd ../cli
+         for PYBIN in /opt/python/cp38*/bin; do
+           "${PYBIN}/pip" install maturin
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+           #"${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
+         done
+
+

@@ -3,6 +3,9 @@ on:
   push:
     tags:
        - v*
+  # Allows to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
 jobs:
   # Linux is specific: because of manylinux, we have to use a docker file 
   build-linux64-wheels:
@@ -28,13 +31,13 @@ jobs:
          for PYBIN in /opt/python/cp38*/bin; do
            "${PYBIN}/pip" install maturin
            "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
-           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
+           # "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
          done
          cd ../cli
          for PYBIN in /opt/python/cp38*/bin; do
            "${PYBIN}/pip" install maturin
            "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
-           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
+           #"${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
          done
 
 
