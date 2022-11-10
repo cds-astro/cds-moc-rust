@@ -534,5 +534,27 @@ mod tests {
     }
   }
 
+  #[test]
+  fn test_skymap_v5() {
+    let path_buf1 = PathBuf::from("resources/Skymap/cWB.fits.gz");
+    let path_buf2 = PathBuf::from("../resources/Skymap/cWB.fits.gz");
+
+    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let reader = BufReader::new(file);
+
+    let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
+    match res {
+      Ok(o) => {
+        // print!("{:?}", o);
+        print!("{}", o.to_ascii().unwrap());
+        assert!(true)
+      },
+      Err(e) => {
+        print!("{:?}", e);
+        assert!(false)
+      },
+    }
+  }
+
 
 }

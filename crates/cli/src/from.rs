@@ -65,7 +65,7 @@ impl FromStr for Vertices {
 }
 
 #[derive(StructOpt, Clone, Debug)]
-/// Multi-order map input file format
+/// Create a Spatial MOC from list of (cell, value) tuples: can be a multi-order map or a skymap
 pub enum MultiOrderInputFormat {
   #[structopt(name = "multires")]
   /// Possibly gzipped Fits file supporting (a so far limited sub-set of) the multi-resolution format

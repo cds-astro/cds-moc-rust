@@ -6,6 +6,8 @@ Released XXX-XX-XX
 
 ### Added
 
+* Supports ring indexed skymaps
+* Switch to standard ASCII serialisation in RangeMOC
 * Add `TTYPE1=RANGE` keyword in FITS files (TTYPE is optional in the FITS standard but without
   it astropy seems not to be able to read the file)
 * Add the `CellHpxMOCIterator` trait to easily save S-MOC in FITS files compatible with v1.0
