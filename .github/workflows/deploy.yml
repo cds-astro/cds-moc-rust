@@ -27,14 +27,14 @@ jobs:
          cd crates/set
          for PYBIN in /opt/python/cp38*/bin; do
            "${PYBIN}/pip" install maturin
-           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
-           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
          done
          cd ../cli
          for PYBIN in /opt/python/cp38*/bin; do
            "${PYBIN}/pip" install maturin
-           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
-           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+           "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
          done
 
 
@@ -61,19 +61,19 @@ jobs:
   #       cd crates/set
   #       for PYBIN in /opt/python/cp38*/bin; do
   #         "${PYBIN}/pip" install maturin
-  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
-  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
+  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
   #       done 
   #      cd ../cli
   #       for PYBIN in /opt/python/cp38*/bin; do
   #         "${PYBIN}/pip" install maturin
-  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
-  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
+  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux2014 --username "$MATURIN_USERNAME"
+  #         "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility musllinux_1_2 --username "$MATURIN_USERNAME"
   #       done
 
 
 
-  # Deploy for Windows and MoxOS 64 bits.
+  # Deploy for Windows 64 bits.
   # If Windows 32 bits neede, check e.g. https://github.com/marketplace/actions/setup-msys2
   build-windows-wheels:      
     runs-on: ${{ matrix.os }}
@@ -99,12 +99,11 @@ jobs:
        run: |
          pip install maturin
          cd crates/set
-         maturin publish --interpreter python${{matrix.python_version}} --skip-existing --username fxpineau 
+         maturin publish --interpreter python${{matrix.python_version}} --no-sdist --skip-existing --username fxpineau 
          cd ../cli
-         maturin publish --interpreter python${{matrix.python_version}} --skip-existing --username fxpineau 
+         maturin publish --interpreter python${{matrix.python_version}} --no-sdist --skip-existing --username fxpineau 
 
-  # Deploy for Windows and MoxOS 64 bits.
-  # If Windows 32 bits neede, check e.g. https://github.com/marketplace/actions/setup-msys2
+  # Deploy for MocOS 64 bits (also support M1 archi).
   build-macos-wheels:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -131,8 +130,8 @@ jobs:
          rustup target add aarch64-apple-darwin
          pip install maturin
          cd crates/set
-         maturin publish --interpreter python${{matrix.python_version}} --universal2 --skip-existing --username "$MATURIN_USERNAME"
+         maturin publish --interpreter python${{matrix.python_version}} --no-sdist --universal2 --skip-existing --username "$MATURIN_USERNAME"
          cd ../cli
-         maturin publish --interpreter python${{matrix.python_version}} --universal2 --skip-existing --username "$MATURIN_USERNAME"
+         maturin publish --interpreter python${{matrix.python_version}} --no-sdist --universal2 --skip-existing --username "$MATURIN_USERNAME"
 
 

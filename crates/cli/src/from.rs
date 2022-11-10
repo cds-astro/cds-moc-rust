@@ -1408,6 +1408,7 @@ mod tests {
       separator: String::from(","),
       out: OutputFormat::Fits {
         force_u64: true,
+        force_v1: false,
         moc_id: None,
         moc_type: None,
         file: PathBuf::from("test/resources/xmmlog.range.stmoc.fits")

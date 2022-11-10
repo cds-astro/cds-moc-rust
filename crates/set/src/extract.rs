@@ -25,6 +25,7 @@ use moclib::{
     ascii::to_ascii_ivoa,
   }
 };
+use moclib::moc::CellHpxMOCIterator;
 
 use crate::{StatusFlag, MocSetFileReader};
 
@@ -96,6 +97,9 @@ pub enum OutputFormat {
     #[clap(short = 'f', long = "force-u64")]
     /// Force indices to be stored on u64 (ignored after operations involving 2 MOCs)
     force_u64: bool,
+    #[clap(short = 'p', long = "force-v1")]
+    /// Force compatibility with MOC v1.0 (i.e. save NUNIQ instead of Ranges; ignored if MOC is not a S-MOC)
+    force_v1: bool,
     #[clap(short = 'i', long = "moc-id")]
     /// MOC ID to be written in the FITS header
     moc_id: Option<String>,
@@ -124,11 +128,10 @@ impl OutputFormat {
     }
   }
   
-  pub fn write_moc<T, Q, I>(self, it: I) -> Result<(), Box<dyn Error>>
+  pub fn write_moc<T, I>(self, it: I) -> Result<(), Box<dyn Error>>
     where
       T: Idx,
-      Q: MocQty<T>,
-      I: RangeMOCIterator<T, Qty=Q>
+      I: RangeMOCIterator<T, Qty=Hpx<T>>
   {
     match self {
       OutputFormat::Ascii { fold, range_len, opt_file: None } => {
@@ -147,10 +150,15 @@ impl OutputFormat {
         let file = File::create(path)?;
         to_json_aladin(it.cells(), &fold, "", BufWriter::new(file)).map_err(|e| e.into())
       },
-      OutputFormat::Fits { force_u64: _, moc_id, moc_type, file } => {
+      OutputFormat::Fits { force_u64: _, force_v1: false, moc_id, moc_type, file } => {
         let file = File::create(file)?;
         let writer = BufWriter::new(file);
         ranges_to_fits_ivoa(it, moc_id, moc_type, writer).map_err(|e| e.into())
+      },
+      OutputFormat::Fits { force_u64: _, force_v1: true, moc_id, moc_type, file } => {
+        let file = File::create(file)?;
+        let writer = BufWriter::new(file);
+        it.cells().hpx_cells_to_fits_ivoa(moc_id, moc_type, writer).map_err(|e| e.into())
       }
     }
   }

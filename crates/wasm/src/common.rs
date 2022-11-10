@@ -6,22 +6,23 @@ use unreachable::UncheckedResultExt;
 
 use wasm_bindgen::JsValue;
 
-use moclib::qty::{Hpx, Time, Frequency};
-use moclib::moc::{
-  RangeMOCIterator, RangeMOCIntoIterator,
-  CellMOCIterator,
-  CellOrCellRangeMOCIterator,
-  range::RangeMOC
+use moclib::{
+  qty::{Hpx, Time, Frequency},
+  moc::{
+    RangeMOCIterator, RangeMOCIntoIterator, CellHpxMOCIterator,
+    CellMOCIterator,
+    CellOrCellRangeMOCIterator,
+    range::RangeMOC
+  },
+  moc2d::{
+    HasTwoMaxDepth,
+    RangeMOC2IntoIterator,
+    CellMOC2Iterator, CellMOC2IntoIterator,
+    CellOrCellRangeMOC2Iterator, CellOrCellRangeMOC2IntoIterator,
+    range::RangeMOC2
+  },
+  deser::fits::ranges2d_to_fits_ivoa
 };
-use moclib::moc2d::{
-  HasTwoMaxDepth,
-  RangeMOC2IntoIterator,
-  CellMOC2Iterator, CellMOC2IntoIterator,
-  CellOrCellRangeMOC2Iterator, CellOrCellRangeMOC2IntoIterator,
-  range::RangeMOC2
-};
-use moclib::deser::fits::ranges2d_to_fits_ivoa;
-
 
 use super::MocQType;
 
@@ -155,7 +156,10 @@ impl InternalMoc {
     }
   }
   
-  pub(crate) fn to_fits(&self) -> Box<[u8]> {
+  /// # Params
+  /// * `force_v1_compatibility`: set to `true` to save a S-MOC using NUNIQ (to be compatible with 
+  ///    MOC standard v1).
+  pub(crate) fn to_fits(&self, force_v1_compatibility: bool) -> Box<[u8]> {
     let mut buf: Vec<u8> = Default::default();
     // Uses unsafe [unchecked_unwrap_ok](https://docs.rs/unreachable/1.0.0/unreachable/trait.UncheckedResultExt.html)
     // for wasm size optimisation.
@@ -163,9 +167,16 @@ impl InternalMoc {
     unsafe {
       match self {
         InternalMoc::Space(moc) =>
-          moc.into_range_moc_iter()
-            .to_fits_ivoa(None, None, &mut buf)
-            .unchecked_unwrap_ok(),
+          if force_v1_compatibility {
+            moc.into_range_moc_iter()
+              .cells()
+              .hpx_cells_to_fits_ivoa(None, None, &mut buf)
+              .unchecked_unwrap_ok()
+          } else {
+            moc.into_range_moc_iter()
+              .to_fits_ivoa(None, None, &mut buf)
+              .unchecked_unwrap_ok()
+          },
         InternalMoc::Time(moc) =>
           moc.into_range_moc_iter()
             .to_fits_ivoa(None, None, &mut buf)

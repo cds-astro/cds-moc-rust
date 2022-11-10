@@ -443,6 +443,7 @@ pub fn from_fits(name: &str, data: &[u8]) -> Result<(), JsValue> {
 }
 
 /// Create o S-MOC from a FITS multi-order map plus other parameters.
+/// # Args
 /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
 /// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
 /// * `asc`: Compute cumulative value from ascending density values instead of descending (often = false).
@@ -474,6 +475,7 @@ pub fn from_multiordermap_fits_file(
 }
 
 /// Create o S-MOC from a FITS skymap plus other parameters.
+/// # Args
 /// * `skip_values_le`: skip cells associated to values lower or equal to the given value 
 /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
 /// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
@@ -775,6 +777,9 @@ pub async fn stmoc_from_json_url(name: String, url: String) -> Result<(), JsValu
 // SAVE MOC //
 // return a string or an array of u8?
 
+/// Returns the ASCII serialization of the given MOC.
+/// # Args
+/// 
 #[wasm_bindgen(js_name = "toAscii")]
 pub fn to_ascii(name: &str, fold: Option<usize>) -> JsValue {
   // from_str creates a copy :o/
@@ -789,9 +794,13 @@ pub fn to_json(name: &str, fold: Option<usize>) -> JsValue {
     .unwrap_or(JsValue::NULL)
 }
 
+/// Returns in memory the FITS serialization of the MOC of given `name`.
+/// # Args
+/// * `name`: name of the MOC in the internal store
+/// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard. 
 #[wasm_bindgen(js_name = "toFits")]
-pub fn to_fits(name: &str) -> Option<Box<[u8]>> {
-  store::exec(name, move |moc| moc.to_fits())
+pub fn to_fits(name: &str, force_v1_compatibility: Option<bool>) -> Option<Box<[u8]>> {
+  store::exec(name, move |moc| moc.to_fits(force_v1_compatibility.unwrap_or(false)))
 }
 
 #[wasm_bindgen(js_name = "toAsciiFile", catch)]
@@ -808,9 +817,13 @@ pub fn to_json_file(name: &str, fold: Option<usize>) -> Result<(), JsValue> {
   to_file(name, ".json", "application/json", data.into_bytes().into_boxed_slice())
 }
 
+/// Download the FITS serialization of the MOC of given `name`.
+/// # Args
+/// * `name`: name of the MOC in the internal store
+/// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard. 
 #[wasm_bindgen(js_name = "toFitsFile", catch)]
-pub fn to_fits_file(name: &str) -> Result<(), JsValue> {
-  let data: Box<[u8]> = store::exec(name, move |moc| moc.to_fits())
+pub fn to_fits_file(name: &str, force_v1_compatibility: Option<bool>) -> Result<(), JsValue> {
+  let data: Box<[u8]> = store::exec(name, move |moc| moc.to_fits(force_v1_compatibility.unwrap_or(false)))
     .ok_or_else(|| JsValue::from_str("MOC not found"))?;
   to_file(name,".fits", "application/fits", data)
 }
@@ -1314,7 +1327,7 @@ pub fn space_fold(space_moc: &str, st_moc: &str, res_tmoc_name: &str) -> Result<
 
 /// Returns an array of boolean (u8 set to 1 or 0) telling if the pairs of coordinates
 /// in the input array are in (true=1) or out of (false=0) the S-MOC of given name.
-/// # Params
+/// # Args
 /// * `name`: the name of the S-MOC to be used for filtering
 /// * `coos_deg`: list of coordinates in degrees `[lon_1, lat_1, lon_2, lat_2, ..., lon_n, lat_n]`
 /// # Remarks
@@ -1355,7 +1368,7 @@ pub fn filter_pos(name: &str, coos_deg: Box<[f64]>) ->  Result<Box<[u8]>, JsValu
 
 /// Returns an array of boolean (u8 set to 1 or 0) telling if the time (in Julian Days)
 /// in the input array are in (true=1) or out of (false=0) the T-MOC of given name.
-/// # Params
+/// # Args
 /// * `name`: the name of the S-MOC to be used for filtering
 /// * `jds`: array of decimal JD time (`f64`)
 /// # Remarks

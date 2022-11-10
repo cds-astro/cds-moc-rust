@@ -1,28 +1,32 @@
 
-use std::fs::File;
-use std::io::{self, BufWriter};
-use std::str;
-use std::path::PathBuf;
-use std::error::Error;
+use std::{
+  str,
+  fs::File,
+  error::Error,
+  path::PathBuf,
+  io::{self, BufWriter},
+};
+
 use structopt::StructOpt;
 
-use moclib::idx::Idx;
-use moclib::qty::{MocQty, Hpx, Time, Frequency};
-use moclib::deser::fits;
-use moclib::moc::{
-  RangeMOCIterator, CellMOCIterator,
-  range::op::convert::{convert_to_u64, convert_from_u64}
-};
-use moclib::moc2d::{
-  RangeMOC2Iterator,
-  RangeMOC2ElemIt,
-  CellMOC2IntoIterator,
-  CellOrCellRangeMOC2IntoIterator,
-};
-use moclib::deser::{
-  fits::{ranges_to_fits_ivoa, ranges2d_to_fits_ivoa},
-  json::{to_json_aladin, cellmoc2d_to_json_aladin},
-  ascii::{to_ascii_ivoa, to_ascii_stream, moc2d_to_ascii_ivoa},
+use moclib::{
+  idx::Idx,
+  qty::{MocQty, Hpx, Time, Frequency},
+  moc::{
+    RangeMOCIterator, CellMOCIterator, CellHpxMOCIterator,
+    range::op::convert::{convert_to_u64, convert_from_u64}
+  },
+  moc2d::{
+    RangeMOC2Iterator,
+    RangeMOC2ElemIt,
+    CellMOC2IntoIterator,
+    CellOrCellRangeMOC2IntoIterator,
+  },
+  deser::{
+    fits::{self, ranges_to_fits_ivoa, ranges2d_to_fits_ivoa},
+    json::{to_json_aladin, cellmoc2d_to_json_aladin},
+    ascii::{to_ascii_ivoa, to_ascii_stream, moc2d_to_ascii_ivoa},
+  }
 };
 
 #[derive(StructOpt, Clone, Debug)]
@@ -54,6 +58,9 @@ pub enum OutputFormat {
     #[structopt(short = "-f", long = "--force-u64")]
     /// Force indices to be stored on u64 (ignored after operations involving 2 MOCs)
     force_u64: bool,
+    #[structopt(short = "-p", long = "--force-v1")]
+    /// Force compatibility with MOC v1.0 (i.e. save NUNIQ instead of Ranges; ignored if MOC is not a S-MOC)
+    force_v1: bool,
     #[structopt(short="-i", long = "--moc-id")]
     /// MOC ID to be written in the FITS header
     moc_id: Option<String>,
@@ -86,30 +93,42 @@ impl OutputFormat {
     matches!(self, OutputFormat::Fits { .. })
   }
 
+  pub fn is_fits_forced_to_v1_std(&self) -> bool {
+    matches!(self, OutputFormat::Fits { force_v1: true, .. })
+  }
+  
   pub fn is_fits_forced_to_u64(&self) -> bool {
     matches!(self, OutputFormat::Fits { force_u64: true, .. })
   }
 
   pub fn is_fits_not_forced_to_u64(&self) -> bool {
     matches!(self, OutputFormat::Fits { force_u64: false, .. })
-
   }
 
   pub fn write_smoc_possibly_auto_converting_from_u64<I>(self, it: I) -> Result<(), Box<dyn Error>>
     where
       I: RangeMOCIterator<u64, Qty=Hpx<u64>>
   {
-    if self.is_fits_not_forced_to_u64() {
-      let depth = it.depth_max();
+    let depth = it.depth_max();
+    if self.is_fits_not_forced_to_u64() && depth <= Hpx::<u32>::MAX_DEPTH {
       if depth <= Hpx::<u16>::MAX_DEPTH {
-        self.write_moc(convert_from_u64::<Hpx<u64>, u16, Hpx<u16>, _>(it))
-      } else if depth <= Hpx::<u32>::MAX_DEPTH {
-        self.write_moc(convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>(it))
+        if self.is_fits_forced_to_v1_std() {
+          self.write_smoc_fits_v1(convert_from_u64::<Hpx<u64>, u16, Hpx<u16>, _>(it))
+        } else {
+          self.write_moc(convert_from_u64::<Hpx<u64>, u16, Hpx<u16>, _>(it)) 
+        }
       } else {
-        self.write_moc(it)
+        assert!(depth <= Hpx::<u32>::MAX_DEPTH);
+        if self.is_fits_forced_to_v1_std() {
+          self.write_smoc_fits_v1(convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>(it))
+        } else {
+          self.write_moc(convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>(it))
+        }
       }
+    } else if self.is_fits_forced_to_v1_std() {
+      self.write_smoc_fits_v1(it)
     } else {
-      self.write_moc(it)
+      self.write_moc(it)  
     }
   }
 
@@ -118,7 +137,13 @@ impl OutputFormat {
       I: RangeMOCIterator<T, Qty=Hpx<T>>
   {
     if self.is_fits_forced_to_u64() {
-      self.write_moc(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it))
+      if self.is_fits_forced_to_v1_std() {
+        self.write_smoc_fits_v1(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it))
+      } else {
+        self.write_moc(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it)) 
+      }
+    } else if self.is_fits_forced_to_v1_std() {
+      self.write_smoc_fits_v1(it)
     } else {
       self.write_moc(it)
     }
@@ -129,9 +154,15 @@ impl OutputFormat {
       I: CellMOCIterator<T, Qty=Hpx<T>>
   {
     if self.is_fits_forced_to_u64() {
-      self.write_moc(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it.ranges()))
+      if self.is_fits_forced_to_v1_std() {
+        self.write_smoc_fits_v1_from_cells(it)
+      } else {
+        self.write_moc(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it.ranges()))
+      }
+    } else if self.is_fits_forced_to_v1_std() {
+        self.write_smoc_fits_v1_from_cells(it)
     } else {
-      self.write_moc_from_cells(it)
+        self.write_moc_from_cells(it)
     }
   }
 
@@ -216,7 +247,7 @@ impl OutputFormat {
         let file = File::create(path)?;
         to_json_aladin(it.cells(), &fold, "", BufWriter::new(file)).map_err(|e| e.into())
       },
-      OutputFormat::Fits { force_u64: _, moc_id, moc_type, file } => {
+      OutputFormat::Fits { force_u64: _, force_v1: _ , moc_id, moc_type, file } => {
         // Here I don't know how to convert the generic qty MocQty<T> into MocQty<u64>...
         let file = File::create(file)?;
         ranges_to_fits_ivoa(it, moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
@@ -228,6 +259,29 @@ impl OutputFormat {
     }
   }
 
+  pub fn write_smoc_fits_v1<T, I>(self, it: I) -> Result<(), Box<dyn Error>>
+    where
+      T: Idx,
+      I: RangeMOCIterator<T, Qty=Hpx<T>>
+  {
+    self.write_smoc_fits_v1_from_cells(it.cells())
+  }
+  
+  pub fn write_smoc_fits_v1_from_cells<T, I>(self, it: I) -> Result<(), Box<dyn Error>>
+    where
+      T: Idx,
+      I: CellMOCIterator<T, Qty=Hpx<T>>
+  {
+    match self {
+      OutputFormat::Fits { force_u64: _, force_v1: _, moc_id, moc_type, file } => {
+        // Here I don't know how to convert the generic qty MocQty<T> into MocQty<u64>...
+        let file = File::create(file)?;
+        it.hpx_cells_to_fits_ivoa(moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
+      },
+      _ => unreachable!()
+    }
+  }
+  
   pub fn write_moc_from_cells<T, Q, I>(self, it: I) -> Result<(), Box<dyn Error>>
     where
       T: Idx,
@@ -251,7 +305,7 @@ impl OutputFormat {
         let file = File::create(path)?;
         to_json_aladin(it, &fold, "", BufWriter::new(file)).map_err(|e| e.into())
       },
-      OutputFormat::Fits { force_u64: _, moc_id, moc_type, file } => {
+      OutputFormat::Fits { force_u64: _, force_v1: _, moc_id, moc_type, file } => {
         // Here I don't know how to convert the generic qty MocQty<T> into MocQty<u64>...
         let file = File::create(file)?;
         ranges_to_fits_ivoa(it.ranges(), moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
@@ -297,7 +351,7 @@ impl OutputFormat {
         let file = File::create(path)?;
         cellmoc2d_to_json_aladin(stmoc.into_cell_moc2_iter(), &fold, BufWriter::new(file)).map_err(|e| e.into())
       },
-      OutputFormat::Fits { force_u64: _, moc_id, moc_type, file } => {
+      OutputFormat::Fits { force_u64: _, force_v1: _ , moc_id, moc_type, file } => {
         // TODO handle the forced to u64??
         let file = File::create(file)?;
         ranges2d_to_fits_ivoa(stmoc, moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())

@@ -1,39 +1,47 @@
 //! A MOC is a set of ordered, non-overlapping MOC elements, associated to a maximum depth.
 
-use std::io::Write;
-use std::ops::Range;
-use std::marker::PhantomData;
+use std::{
+  io::Write,
+  ops::Range,
+  marker::PhantomData
+};
 
 use healpix::nested::bmoc::{BMOC, BMOCBuilderUnsafe};
 
-use crate::deser::{
-  self,
-  fits::{
-    keywords, ranges_to_fits_ivoa,
-    error::FitsError
+use crate::{
+  idx::Idx,
+  qty::{MocQty, Bounded, Hpx},
+  elem::{
+    cell::Cell,
+    cellcellrange::CellOrCellRange,
+    range::MocRange,
   },
-};
-use crate::idx::Idx;
-use crate::qty::{MocQty, Bounded};
-use crate::elem::{
-  cell::Cell,
-  cellcellrange::CellOrCellRange,
-  range::MocRange,
-};
-use crate::moc::adapters::{
-  RangeMOCIteratorFromCells, RangeMOCIteratorFromCellOrCellRanges, CellMOCIteratorFromRanges, 
-  CellOrCellRangeMOCIteratorFromCells, DepthMaxCellsFromRanges
-};
-use crate::moc::range::RangeMOC;
-use crate::moc::range::op::{
-  check::{check, CheckedIterator},
-  convert::{convert, ConvertIterator},
-  degrade::{degrade, DegradeRangeIter},
-  not::{not, NotRangeIter},
-  and::{and, AndRangeIter},
-  or::{or, OrRangeIter},
-  xor::{xor, XorRangeIter},
-  minus::{minus, MinusRangeIter},
+  moc::{
+    adapters::{
+      RangeMOCIteratorFromCells, RangeMOCIteratorFromCellOrCellRanges, CellMOCIteratorFromRanges,
+      CellOrCellRangeMOCIteratorFromCells, DepthMaxCellsFromRanges
+    },
+    range::{
+      RangeMOC,
+      op::{
+        check::{check, CheckedIterator},
+        convert::{convert, ConvertIterator},
+        degrade::{degrade, DegradeRangeIter},
+        not::{not, NotRangeIter},
+        and::{and, AndRangeIter},
+        or::{or, OrRangeIter},
+        xor::{xor, XorRangeIter},
+        minus::{minus, MinusRangeIter},
+      }
+    }
+  },
+  deser::{
+    self,
+    fits::{
+      keywords, ranges_to_fits_ivoa, hpx_cells_to_fits_ivoa,
+      error::FitsError
+    },
+  }
 };
 
 pub mod range;
@@ -59,27 +67,6 @@ pub trait NonOverlapping {}
 /// Commodity trait containing all MOC properties
 pub trait MOCProperties: HasMaxDepth + ZSorted + NonOverlapping { }
 
-////////////////////////////
-// En cours d'elobaration
-/*pub trait MOC: MOCProperties {
-  type Idx: Idx;
-  type Qty: MocQty<T>;
-  type RangeIt: Iterator<Item=Range<Self::Idx>>;
-  /// If we need to reuse the MOC, two solutions: clone or implement MOC on &Self.
-  /// Then use Cow<MOC> in operations (if needed).
-  fn into_iter(self) -> RangeIt;
-}
-pub trait MOCIterator<T: Idx>: Iterator<Item=Range<Idx>> {
-  type Qty: MocQty<T>;
-}
-
-struct SweepLine {
-  left_it
-  right_it
-}
-Iterator<Item=Some(enum(Left(Ragne), Right(Range), Common(Range)))>.. ?*/
-/////////////////////////////
-
 /// Iterator over MOC cells
 pub trait CellMOCIterator<T: Idx>: Sized + MOCProperties + Iterator<Item=Cell<T>> {
   type Qty: MocQty<T>;
@@ -101,8 +88,22 @@ pub trait CellMOCIterator<T: Idx>: Sized + MOCProperties + Iterator<Item=Cell<T>
   fn to_json_aladin<W: Write>(self, fold: Option<usize>, writer: W) -> std::io::Result<()> {
     deser::json::to_json_aladin(self, &fold, "", writer)
   }
-
 }
+
+pub trait CellHpxMOCIterator<T: Idx>: CellMOCIterator<T, Qty = Hpx<T>> {
+  fn hpx_cells_to_fits_ivoa<W: Write>(
+    self,
+    moc_id: Option<String>,
+    moc_type: Option<keywords::MocType>,
+    writer: W
+  ) -> Result<(), FitsError> {
+    hpx_cells_to_fits_ivoa(self, moc_id, moc_type, writer)
+  }
+}
+/// All types that implement `CellMOCIterator<T, Qty = Hpx<T>>` get methods defined in 
+/// `CellHpxMOCIterator` for free.
+impl<T: Idx, I: CellMOCIterator<T, Qty = Hpx<T>>> CellHpxMOCIterator<T> for I { }
+
 
 pub trait IntoBMOC<T: Idx + Into<u64>>: CellMOCIterator<T> {
   fn into_bmoc(self) -> BMOC {
@@ -115,7 +116,6 @@ pub trait IntoBMOC<T: Idx + Into<u64>>: CellMOCIterator<T> {
   }
 }
 impl<T: Idx + Into<u64>, U: CellMOCIterator<T>> IntoBMOC<T> for U {}
-
 
 
 /// Transform an object into an iterator over MOC cells.

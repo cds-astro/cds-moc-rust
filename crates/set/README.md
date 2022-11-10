@@ -1,5 +1,3 @@
-<meta charset="utf-8"/>
-
 # moc-set
 
 A command-line tool to build, update and query a persistent set of

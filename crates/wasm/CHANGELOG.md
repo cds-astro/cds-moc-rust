@@ -1,5 +1,15 @@
 # `moc-wasm` Change Log
 
+## 0.5.3
+
+Realeased 2022-11-10
+
+* Add `TTYPE1=RANGE` keyword in FITS files (TTYPE is optional in the FITS standard but without
+  it astropy seems not to be able to read the file)
+* Add option in `toFits` functions to generate a FITS file compatible with v1.0
+  of the MOC standard (S-MOC only).
+
+
 ## 0.5.2
 
 Realeased 2022-09-12

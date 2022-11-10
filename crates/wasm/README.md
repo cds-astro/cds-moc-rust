@@ -1,5 +1,3 @@
-<meta charset="utf-8"/>
-
 # `moc-wasm`
 
 WebAssembly Library to read/write/create/manipulate HEALPix **M**ulti-**O**rder **C**overage maps (**MOC**s) in a web page.

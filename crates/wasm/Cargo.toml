@@ -1,6 +1,6 @@
 [package]
 name = "moc-wasm"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = """
 WASM library to create and manipulate HEALPix
@@ -60,5 +60,15 @@ features = [
 ]
 
 # To reduce WASM size, see https://rustwasm.github.io/book/reference/code-size.html
-#[profile.release]
-#lto = true
+[profile.release]
+panic = 'unwind'
+debug = false
+debug-assertions = false
+overflow-checks = false
+opt-level = 3
+lto = true
+
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = true
+

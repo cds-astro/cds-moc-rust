@@ -124,6 +124,7 @@ impl<T: Idx, R: BufRead> STMocType<T, R> {
 
 // We could have avoided to create Cell and directly write uniq, to be changed later.
 // we lazily re-use the Cell iterator made to save in JSON format.
+/// To be compatible with version 1.0 of the MOC standard.
 pub fn hpx_cells_to_fits_ivoa<T, I, W>(
   moc_it: I,
   moc_id: Option<String>,
@@ -222,7 +223,7 @@ fn write_fits_header<R: Write>(
 }
 
 /*
-pub fn cells_to_fits_ivoa<T, I, W>( // using GUNIQ (to be done
+pub fn cells_to_fits_ivoa<T, I, W>(
   moc_it: I,
   moc_id: Option<String>,
   moc_type: Option<keywords::MocType>,
@@ -245,8 +246,6 @@ pub fn cells_to_fits_ivoa<T, I, W>( // using GUNIQ (to be done
     },
   }
 }
-
-
 fn cells_to_fits_internal<T, I, W>(
   n_cells: usize,
   mut range_it: I,
@@ -339,6 +338,7 @@ fn build_range_moc_keywords<T: Idx, Q: MocQty<T>>(
   }
   // BINTABLE specific
   moc_kws.insert(MocKeywords::TForm1(T::TFORM));
+  moc_kws.insert(MocKeywords::TType1(TType1{ ttype: String::from("RANGE") }));
   // No ttype
   moc_kws
 }

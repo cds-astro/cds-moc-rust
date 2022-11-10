@@ -1,5 +1,17 @@
 # `moc` Change Log
 
+### x.x.x
+
+Released XXX-XX-XX
+
+### Added
+
+* Add `TTYPE1=RANGE` keyword in FITS files (TTYPE is optional in the FITS standard but without
+  it astropy seems not to be able to read the file)
+* Add the `CellHpxMOCIterator` trait to easily save S-MOC in FITS files compatible with v1.0
+  of the MOC standard.
+
+
 ## 0.9.0
 
 Released 2022-09-09
@@ -7,7 +19,6 @@ Released 2022-09-09
 ### Bug correction
 
 * Print the deepest order in JSON output even when it contains no cell 
-
 
 
 ## 0.9.0-alpha

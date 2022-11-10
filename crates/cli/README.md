@@ -1,5 +1,3 @@
-<meta charset="utf-8"/>
-
 # `moc-cli`
 
 A command-line to create and manipulate HEALPix **M**ulti-**O**rder **C**overage maps (**MOC**s),

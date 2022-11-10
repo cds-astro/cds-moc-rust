@@ -80,7 +80,6 @@ pub(crate) fn get_info(name: &str) -> Option<MocInfo> {
 
 pub(crate) fn exec<R, F>(name: &str, op: F) -> Option<R> 
   where
-    R: ,
     F: Fn(&InternalMoc) -> R
 {
   get_store().read().unwrap()
