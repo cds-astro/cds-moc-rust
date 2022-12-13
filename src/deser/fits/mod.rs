@@ -1251,7 +1251,6 @@ mod tests {
       Err(e) => println!("{}", e),
       _ => assert!(false),
     }
-    
   }
   
   #[test]

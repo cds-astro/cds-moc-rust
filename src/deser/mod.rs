@@ -12,3 +12,4 @@ pub mod ascii;
 pub mod json;
 pub mod fits;
 pub mod gz;
+pub mod img;
