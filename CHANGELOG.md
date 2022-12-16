@@ -1,11 +1,15 @@
 # `moc` Change Log
 
-### x.x.x
+### 0.10.0
 
 Released XXX-XX-XX
 
 ### Added
 
+* Add computation of a MOC mean centre and the maximum distance from a given point.
+* Add generation of PNG files to visualize a MOC
+    + add the mapproj crate dependency
+    + add the png crate dependency
 * Supports ring indexed skymaps
 * Switch to standard ASCII serialisation in RangeMOC
 * Add `TTYPE1=RANGE` keyword in FITS files (TTYPE is optional in the FITS standard but without

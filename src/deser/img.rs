@@ -11,10 +11,12 @@ use std::{
 use healpix::nested;
 
 use mapproj::{
+  math::{HALF_PI, CustomFloat},
   LonLat, ImgXY, CanonicalProjection, CenteredProjection,
   img2proj::ReversedEastPngImgXY2ProjXY,
   img2celestial::Img2Celestial,
   pseudocyl::mol::Mol,
+  zenithal::sin::Sin,
 };
 
 use crate::{
@@ -22,14 +24,34 @@ use crate::{
   qty::{Hpx, MocQty},
   elem::cell::Cell,
   moc::{
-    RangeMOCIntoIterator, RangeMOCIterator,
+    RangeMOCIntoIterator, RangeMOCIterator, CellMOCIterator,
     range::RangeMOC,
   },
 };
 
 
-// ADD EXTRA ROTATION ALONG LOCAL X-AXIS (LONGPOLE)
-// AUTODETECT CENTER AND BOUNDS!!
+pub fn to_img_auto<T: Idx>(
+  smoc: &RangeMOC<T, Hpx::<T>>,
+  img_size_y: u16,
+) -> (Vec<u8>, (u16, u16)) {
+  let (lon, lat) = smoc.into_range_moc_iter().cells().mean_center();
+  let r_max = smoc.into_range_moc_iter().cells().max_distance_from(lon, lat);
+
+  let proj_center = Some((lon, lat));
+  if r_max > HALF_PI {
+    // Mollweide, all sky
+    let img_size = (img_size_y << 1, img_size_y);
+    let rgba = to_img_default(smoc, img_size, proj_center, None);
+    (rgba, img_size)
+  } else {
+    // Sinus, computed bounds from d_max
+    let img_size = (img_size_y, img_size_y);
+    let bound = r_max.sin() * 1.05; // add 5% of the distance
+    let proj_bounds = Some((-bound..=bound, -bound..=bound));
+    let rgba = to_img(smoc, img_size, Sin::new(), proj_center, proj_bounds);
+    (rgba, img_size)
+  }
+}
 
 
 /// Returns an RGBA array (each pixel is made of 4 successive u8: RGBA) using the Mollweide projection.
@@ -37,7 +59,7 @@ use crate::{
 /// # Params
 /// * `smoc`: the Spatial MOC to be print;
 /// * `size`: the `(X, Y)` number of pixels in the image; 
-/// * `proj_center_deg`: the `(lon, lat)` coordinates of the center of the projection, in degrees, 
+/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians, 
 ///                      if different from `(0, 0)`;
 /// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values 
 ///                  which depends on the projection. For unbounded projections, de default value
@@ -45,10 +67,10 @@ use crate::{
 pub fn to_img_default<T: Idx>(
   smoc: &RangeMOC<T, Hpx::<T>>,
   img_size: (u16, u16),
-  proj_center_deg: Option<(f64, f64)>,
+  proj_center: Option<(f64, f64)>,
   proj_bounds: Option<(RangeInclusive<f64>, RangeInclusive<f64>)>,
 ) -> Vec<u8> {
-  to_img(smoc, img_size, Mol::new(), proj_center_deg, proj_bounds)
+  to_img(smoc, img_size, Mol::new(), proj_center, proj_bounds)
 }
 
 /// Returns an RGBA array (each pixel is made of 4 successive u8: RGBA).
@@ -57,7 +79,7 @@ pub fn to_img_default<T: Idx>(
 /// * `smoc`: the Spatial MOC to be print;
 /// * `size`: the `(X, Y)` number of pixels in the image; 
 /// * `proj`: a projection, if different from Mollweide;
-/// * `proj_center_deg`: the `(lon, lat)` coordinates of the center of the projection, in degrees, 
+/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians, 
 ///                      if different from `(0, 0)`;
 /// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values 
 ///                  which depends on the projection. For unbounded projections, de default value
@@ -66,7 +88,7 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
   smoc: &RangeMOC<T, Hpx::<T>>,
   img_size: (u16, u16),
   proj: P,
-  proj_center_deg: Option<(f64, f64)>,
+  proj_center: Option<(f64, f64)>,
   proj_bounds: Option<(RangeInclusive<f64>, RangeInclusive<f64>)>,
 ) -> Vec<u8> {
   let (size_x, size_y) = img_size;
@@ -79,8 +101,8 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
 
   let img2proj = ReversedEastPngImgXY2ProjXY::from((size_x, size_y), (&proj_range_x, &proj_range_y));
   let mut img2cel = Img2Celestial::new(img2proj, CenteredProjection::new(proj));
-  if let Some((lon, lat)) = proj_center_deg {
-    img2cel.set_proj_center_from_lonlat(&LonLat::new(lon.to_radians(), lat.to_radians()));
+  if let Some((lon, lat)) = proj_center {
+    img2cel.set_proj_center_from_lonlat(&LonLat::new(lon, lat));
   }
 
   let hpx = nested::get(Hpx::<u64>::MAX_DEPTH);
@@ -89,7 +111,7 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
     for x in 0..size_x {
       if let Some(lonlat) = img2cel.img2lonlat(&ImgXY::new(x as f64, y as f64)) {
         let idx = hpx.hash(lonlat.lon(), lonlat.lat());
-        if smoc.contains_depth_max_val(&T::from_u64_idx(idx)) {
+        if smoc.contains_val(&T::from_u64_idx(idx)) {
           // in the moc
           v.push(255);
           v.push(0);
@@ -136,16 +158,71 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
 /// * `smoc`: the Spatial MOC to be print;
 /// * `size`: the `(X, Y)` number of pixels in the image; 
 /// * `proj`: a projection, if different from Mollweide;
-/// * `proj_center_deg`: the `(lon, lat)` coordinates of the center of the projection, in degrees, 
+/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians, 
 ///                      if different from `(0, 0)`;
 /// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values 
 ///                  which depends on the projection. For unbounded projections, de default value
 ///                  is `(-PI..PI, -PI..PI)`.
+/// * `writer`: the writer in which the image is going to be written
+pub fn to_png<T: Idx, P: CanonicalProjection, W: Write>(
+  smoc: &RangeMOC<T, Hpx::<T>>,
+  img_size: (u16, u16),
+  proj: Option<P>,
+  proj_center: Option<(f64, f64)>,
+  proj_bounds: Option<(RangeInclusive<f64>, RangeInclusive<f64>)>,
+  writer: W
+) -> Result<(), io::Error> {
+  let (xsize, ysize) = img_size;
+  let data = if let Some(proj) = proj {
+    to_img(smoc, img_size, proj, proj_center, proj_bounds)
+  } else {
+    to_img_default(smoc, img_size, proj_center, proj_bounds)
+  };
+  let mut encoder = png::Encoder::new(writer, xsize as u32, ysize as u32); // Width is 2 pixels and height is 1.
+  encoder.set_color(png::ColorType::Rgba);
+  encoder.set_depth(png::BitDepth::Eight);
+  let mut writer = encoder.write_header()?;
+  writer.write_image_data(&data).expect("Wrong encoding");
+  Ok(())
+}
+
+/// Automatically determines the center of the projection and if the projection to be used
+/// is an allsky (Mollweide) ou bound limited (Sinus) projection.
+/// In the first case, the image size along the x-axis is `2 * size_y`, and `size_y` 
+/// # Params
+/// * `smoc`: the Spatial MOC to be print;
+/// * `img_size_y`: the size of the image along the y-axis.
+pub fn to_png_auto<T: Idx, W: Write>(
+  smoc: &RangeMOC<T, Hpx::<T>>,
+  img_size_y: u16,
+  writer: W
+) -> Result<(u16, u16), io::Error> {
+  let (data, img_size) = to_img_auto(smoc, img_size_y);
+  let mut encoder = png::Encoder::new(writer, img_size.0 as u32, img_size.1 as u32);
+  encoder.set_color(png::ColorType::Rgba);
+  encoder.set_depth(png::BitDepth::Eight);
+  let mut writer = encoder.write_header()?;
+  writer.write_image_data(&data).expect("Wrong encoding");
+  Ok(img_size)
+}
+
+/// # Params
+/// * `smoc`: the Spatial MOC to be print;
+/// * `size`: the `(X, Y)` number of pixels in the image; 
+/// * `proj`: a projection, if different from Mollweide;
+/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians, 
+///                      if different from `(0, 0)`;
+/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values 
+///                  which depends on the projection. For unbounded projections, de default value
+///                  is `(-PI..PI, -PI..PI)`.
+/// * `path`: the path of th PNG file to be written.
+/// * `view`: set to true to visualize the saved image.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn to_png_file<T: Idx, P: CanonicalProjection>(
   smoc: &RangeMOC<T, Hpx::<T>>,
   img_size: (u16, u16),
   proj: Option<P>,
-  proj_center_deg: Option<(f64, f64)>,
+  proj_center: Option<(f64, f64)>,
   proj_bounds: Option<(RangeInclusive<f64>, RangeInclusive<f64>)>,
   path: &Path,
   view: bool,
@@ -154,7 +231,7 @@ pub fn to_png_file<T: Idx, P: CanonicalProjection>(
   {
     let file = File::create(path)?;
     let ref mut writer = BufWriter::new(file);
-    to_png(smoc, img_size, proj, proj_center_deg, proj_bounds, writer)?;
+    to_png(smoc, img_size, proj, proj_center, proj_bounds, writer)?;
   }
   if view {
     show_with_default_app(path.to_string_lossy().as_ref())?;
@@ -162,35 +239,31 @@ pub fn to_png_file<T: Idx, P: CanonicalProjection>(
   Ok(())
 }
 
+/// Automatically determines the center of the projection and if the projection to be used
+/// is an allsky (Mollweide) ou bound limited (Sinus) projection.
+/// In the first case, the image size along the x-axis is `2 * size_y`, and `size_y` 
 /// # Params
 /// * `smoc`: the Spatial MOC to be print;
-/// * `size`: the `(X, Y)` number of pixels in the image; 
-/// * `proj`: a projection, if different from Mollweide;
-/// * `proj_center_deg`: the `(lon, lat)` coordinates of the center of the projection, in degrees, 
-///                      if different from `(0, 0)`;
-/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values 
-///                  which depends on the projection. For unbounded projections, de default value
-///                  is `(-PI..PI, -PI..PI)`.
-pub fn to_png<T: Idx, P: CanonicalProjection, W: Write>(
+/// * `img_size_y`: the size of the image along the y-axis.
+/// * `path`: the path of th PNG file to be written.
+/// * `view`: set to true to visualize the saved image.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn to_png_file_auto<T: Idx>(
   smoc: &RangeMOC<T, Hpx::<T>>,
-  img_size: (u16, u16),
-  proj: Option<P>,
-  proj_center_deg: Option<(f64, f64)>,
-  proj_bounds: Option<(RangeInclusive<f64>, RangeInclusive<f64>)>,
-  writer: W
-) -> Result<(), io::Error> {
-  let (xsize, ysize) = img_size;
-  let data = if let Some(proj) = proj {
-    to_img(smoc, img_size, proj, proj_center_deg, proj_bounds)
-  } else {
-    to_img_default(smoc, img_size, proj_center_deg, proj_bounds)
+  img_size_y: u16,
+  path: &Path,
+  view: bool,
+) -> Result<(u16, u16), io::Error> {
+  // Brackets are important to be sure the file is closed before trying to open it.
+  let img_size = {
+    let file = File::create(path)?;
+    let ref mut writer = BufWriter::new(file);
+    to_png_auto(smoc, img_size_y, writer)?
   };
-  let mut encoder = png::Encoder::new(writer, xsize as u32, ysize as u32); // Width is 2 pixels and height is 1.
-  encoder.set_color(png::ColorType::Rgba);
-  encoder.set_depth(png::BitDepth::Eight);
-  let mut writer = encoder.write_header()?;
-  writer.write_image_data(&data).expect("Wrong encoding");
-  Ok(())
+  if view {
+    show_with_default_app(path.to_string_lossy().as_ref())?;
+  }
+  Ok(img_size)
 }
 
 
@@ -277,15 +350,20 @@ mod tests {
       fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType}
     },
   };
+  use crate::deser::img::to_img_auto;
 
   #[test]
   fn test_img() {
     let path_buf1 = PathBuf::from("resources/V_147_sdss12.moc.fits");
     let path_buf2 = PathBuf::from("../resources/V_147_sdss12.moc.fits");
+    // let path_buf1 = PathBuf::from("resources/V_147_sdss12.moc.u64.fits");
+    // let path_buf2 = PathBuf::from("../resources/V_147_sdss12.moc.u64.fits");
     let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
     let reader = BufReader::new(file);
     match from_fits_ivoa(reader) {
       Ok(MocIdxType::U32(MocQtyType::Hpx(MocType::Cells(moc)))) => {
+        // Ok(MocIdxType::U64(MocQtyType::Hpx(MocType::Ranges(moc)))) => {
+        // let moc = moc.into_range_moc();
         let moc = moc.into_cell_moc_iter().ranges().into_range_moc();
         let view = false;
         let img_size= (1600, 800); 
@@ -330,5 +408,23 @@ mod tests {
     }
   }
 
-  //
+  #[test]
+  fn test_img_auto_allsky() {
+    // let path_buf1 = PathBuf::from("resources/V_147_sdss12.moc.fits");
+    // let path_buf2 = PathBuf::from("../resources/V_147_sdss12.moc.fits");
+    let path_buf1 = PathBuf::from("resources/MOC2.0/SMOC_test.fits");
+    let path_buf2 = PathBuf::from("../resources/MOC2.0/SMOC_test.fits");
+    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let reader = BufReader::new(file);
+    match from_fits_ivoa(reader) {
+      Ok(MocIdxType::U64(MocQtyType::Hpx(MocType::Cells(moc)))) => {
+        let moc = moc.into_cell_moc_iter().ranges().into_range_moc();
+        to_img_auto(&moc, 800);
+        assert!(true);
+      }
+      Err(e) => println!("{}", e),
+      _ => assert!(false),
+    }
+  }
+
 }

@@ -1,8 +1,15 @@
 # `moc-cli` Change Log
 
+## 0.6.0
+
+Released 202X-XX-XX
+
+* Add the `view` command to save PNG files and display S-MOCs.
+
+
 ## 0.5.3
 
-Realeased 2022-11-10
+Released 2022-11-10
 
 * Supports ring indexed skymaps
 * Add `TTYPE1=RANGE` keyword in FITS files (TTYPE is optional in the FITS standard but without
@@ -12,12 +19,12 @@ Realeased 2022-11-10
 
 ## 0.5.2
 
-Realeased 2022-09-12
+Released 2022-09-12
 
 
 ## 0.5.1
 
-Realeased 2022-09-09
+Released 2022-09-09
 
 ### Bug correction
 
@@ -26,7 +33,7 @@ Realeased 2022-09-09
 
 ## 0.5.0-alpha
 
-Realeased 2022-06-17
+Released 2022-06-17
 
 * Add support for frequency MOCs
 * Add 'hprint' (human print) command for time and frequency
@@ -34,7 +41,7 @@ Realeased 2022-06-17
 
 ## 0.4.0
 
-Realeased 2022-04-13
+Released 2022-04-13
 
 * Add `from multi` to build a MOC from muliple regions at once
 * Add `from cones` to build a MOC from multiple cones (possibly a lot of small cones) at once
@@ -44,21 +51,21 @@ Realeased 2022-04-13
 
 ## 0.3.2
 
-Realeased 2022-03-22
+Released 2022-03-22
 
 * No change, new release because of MOCwasm, moc-lib updated
 
 
 ## 0.3.1
 
-Realeased 2022-02-07
+Released 2022-02-07
 
 * No change, new release because of MOCwasm
 
 
 ## 0.3.0
 
-Realeased 2022-02-04
+Released 2022-02-04
 
 * Add moc from ring
 * Add indirect split (in addition to direct split)

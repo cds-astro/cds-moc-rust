@@ -6,7 +6,15 @@ use std::{
   marker::PhantomData
 };
 
-use healpix::nested::bmoc::{BMOC, BMOCBuilderUnsafe};
+use healpix::{
+  Customf64,
+  sph_geom::coo3d::{vec3_of, Vec3, LonLat}, 
+  nested::{
+    self, 
+    bmoc::{BMOC, BMOCBuilderUnsafe}
+  }
+};
+use healpix::sph_geom::coo3d::UnitVect3;
 
 use crate::{
   idx::Idx,
@@ -78,13 +86,59 @@ pub trait CellMOCIterator<T: Idx>: Sized + MOCProperties + Iterator<Item=Cell<T>
   /// If available, this information can be used for fast rejection tests.
   fn peek_last(&self) -> Option<&Cell<T>>;
   
+  /// Returns the mean center of the MOC: `(lon, lat)` in radians.
+  fn mean_center(self) -> (f64, f64) {
+    let mut x = 0_f64;
+    let mut y = 0_f64;
+    let mut z = 0_f64;
+    let depth_max = self.depth_max();
+    for Cell { depth, idx } in self {
+      let weight = (1_u64 << ((depth_max - depth) << 1)) as f64;
+      let (lon, lat) = nested::center(depth, idx.to_u64());
+      // println!("depth: {}; idx: {}; weight: {}: center: ({}, {})", 
+      //         depth, idx, weight, lon.to_degrees(), lat.to_degrees());
+      let unit_vec = vec3_of(lon, lat);
+      x += unit_vec.x() * weight; // we could optimize since multiplication by a power of 2
+      y += unit_vec.y() * weight; // we could optimize since multiplication by a power of 2
+      z += unit_vec.z() * weight; // we could optimize since multiplication by a power of 2
+    }
+    let norm = (x.pow2() + y.pow2() + z.pow2()).sqrt();
+    let LonLat{ lon, lat } = UnitVect3::new_unsafe(x / norm, y / norm, z/ norm ).lonlat();
+    (lon, lat)
+  }
+  
+  /// Returns the upper bound on the largest distance, in radians, from the given center to the MOC border.
+  fn max_distance_from(self, from_lon: f64, from_lat: f64) -> f64 {
+    /// Returns `(s/2)^2` with `s` the segment (i.e. the Euclidean distance) between
+    /// the two given points  `P1` and `P2` on the unit-sphere.
+    /// We recall that `s = 2 sin(ad/2)` with `ad` the angular distance between the two points.
+    /// # Input
+    /// - `dlon` the longitude difference, i.e. (P2.lon - P1.lon), in radians
+    /// - `dlat` the latitude difference, i.e. (P2.lat - P1.lat), in radians
+    /// - `cos_lat1` cosine of the latitude of the first point
+    /// - `cos_lat2` cosine of the latitude of the second point
+    fn squared_half_segment(dlon: f64, dlat: f64, cos_lat1: f64, cos_lat2: f64) -> f64 {
+      dlat.half().sin().pow2() + cos_lat1 * cos_lat2 * dlon.half().sin().pow2()
+    }
+    // let dmax_center_to_vertex = healpix::largest_center_to_vertex_distance(self.depth_max(), from_lon, from_lat);
+    let cos_from_lat = from_lat.cos();
+    let shs_max = self.flat_map(move | Cell { depth, idx } |
+      nested::vertices(depth, idx.to_u64()).map(
+        |(lon, lat)| squared_half_segment(lon - from_lon, lat - from_lat, cos_from_lat, lat.cos())
+      )
+    ).fold(0_f64, f64::max);
+    shs_max.sqrt().asin().twice() // + dmax_center_to_vertex
+  }
+  
   fn cellranges(self) -> CellOrCellRangeMOCIteratorFromCells<T, Self::Qty, Self> {
     CellOrCellRangeMOCIteratorFromCells::new(self)
   }
+  
   fn ranges(self) -> RangeMOCIteratorFromCells<T, Self::Qty, Self> {
     let last: Option<Range<T>> =  self.peek_last().map(|cell| MocRange::<T, Self::Qty>::from(cell).0);
     RangeMOCIteratorFromCells::new(self, last)
   }
+  
   fn to_json_aladin<W: Write>(self, fold: Option<usize>, writer: W) -> std::io::Result<()> {
     deser::json::to_json_aladin(self, &fold, "", writer)
   }

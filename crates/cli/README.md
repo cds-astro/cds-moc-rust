@@ -319,6 +319,15 @@ POLYGON lon1_deg lat1_deg lon2_deg lat2_deg ... lonn_deg latn_deg
 POLYGON complement lon1_deg lat1_deg lon2_deg lat2_deg ... lonn_deg latn_deg
 ```
 
+
+## View a MOC
+
+```bash
+moc view CDS-I-125A-catalog_MOC.fits toto.png allsky 800
+moc view CDS-I-125A-catalog_MOC.fits toto.png auto 800
+moc view CDS-I-125A-catalog_MOC.fits toto.png custom -l 180.0 -b -45.0 sfl 1600 800
+```
+
 ## Performances hint
 
 ### Build MOC from positions

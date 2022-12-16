@@ -4,13 +4,16 @@ use std::error::Error;
 use structopt::StructOpt;
 use structopt::clap::AppSettings;
 
-use moc_cli::info::Info;
-use moc_cli::constants::Constants;
-use moc_cli::from::From;
-use moc_cli::op::Op;
-use moc_cli::filter::Filter;
-use moc_cli::convert::Convert;
-use moc_cli::hprint::HumanPrint;
+use moc_cli::{
+  info::Info,
+  constants::Constants,
+  from::From,
+  op::Op,
+  filter::Filter,
+  convert::Convert,
+  hprint::HumanPrint,
+  view::View
+};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "moc", global_settings = &[AppSettings::ColoredHelp, AppSettings::AllowNegativeNumbers])]
@@ -38,7 +41,10 @@ enum Args {
   Filter(Filter),
   #[structopt(name = "hprint")]
   /// Print a MOC to a human readable form
-  HumanPrint(HumanPrint)
+  HumanPrint(HumanPrint),
+  #[structopt(name = "view")]
+  /// Save a PNG of a S-MOC and visualize it.
+  View(View)
 }
 
 impl Args {
@@ -51,6 +57,7 @@ impl Args {
       Args::Op(op) => op.exec(),
       Args::Filter(filter) => filter.exec(),
       Args::HumanPrint(hprint) => hprint.exec(),
+      Args::View(view) => view.exec(),
     }
   }
 }
