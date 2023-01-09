@@ -11,7 +11,7 @@ use std::{
 use healpix::nested;
 
 use mapproj::{
-  math::{HALF_PI, CustomFloat},
+  math::HALF_PI,
   LonLat, ImgXY, CanonicalProjection, CenteredProjection,
   img2proj::ReversedEastPngImgXY2ProjXY,
   img2celestial::Img2Celestial,
@@ -106,7 +106,7 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
   }
 
   let hpx = nested::get(Hpx::<u64>::MAX_DEPTH);
-  // First check all pixels and see if thier center is in the MOC
+  // First check for each pixel if its center is in the MOC
   for y in 0..size_y {
     for x in 0..size_x {
       if let Some(lonlat) = img2cel.img2lonlat(&ImgXY::new(x as f64, y as f64)) {
@@ -137,10 +137,10 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
   for Cell { depth, idx } in smoc.into_range_moc_iter().cells() {
     let (lon_rad, lat_rad) = nested::center(depth, idx.to_u64());
     if let Some(xy) = img2cel.lonlat2img(&LonLat::new(lon_rad, lat_rad)) {
-      let ix = xy.x();
-      let iy = xy.y();
-      if proj_range_x.contains(&ix) && proj_range_y.contains(&iy) {
-        let from = (iy as usize * size_x as usize + ix as usize) << 2; // <<2 <=> *4
+      let ix =  xy.x() as u16;
+      let iy =  xy.y() as u16;
+      if ix < img_size.0 && iy < img_size.1 {
+        let from = (xy.y() as usize * size_x as usize + ix as usize) << 2; // <<2 <=> *4
         if v[from] == 0 {
           v[from] = 255;
           v[from + 1] = 0;
