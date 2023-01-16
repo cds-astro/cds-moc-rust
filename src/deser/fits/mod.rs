@@ -388,7 +388,7 @@ pub fn rangemoc2d_to_fits_ivoa<T: Idx, W: Write>(
   let depth_max_hpx = moc.depth_max_2();
   let n_ranges = moc.compute_n_ranges();
   let moc_kw_map = build_range_moc2d_keywords(depth_max_time, depth_max_hpx, moc_id, moc_type, PhantomData::<T>);
-  write_fits_header(&mut writer, T::N_BYTES, (n_ranges as u64) << 1, moc_kw_map)?;
+  write_fits_header(&mut writer, T::N_BYTES, n_ranges << 1, moc_kw_map)?;
   let n_ranges_written = write_ranges2d_data(moc.into_range_moc2_iter(), writer)?;
   if n_ranges != n_ranges_written as u64 {
     Err(FitsError::UnexpectedWrittenSize)

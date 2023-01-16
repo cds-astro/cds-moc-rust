@@ -46,28 +46,32 @@ exclude = ["crates/wasm"]
 #  "crates/wasm",
 #]
 
+
 [dependencies]
 num = "0.4"
 nom = "6.1.2"
 quick-error = "2.0.1"
 healpix = { package = "cdshealpix", version = "0.6.3" }
-mapproj = "0.3.0"
+mapproj = "0.3"
 # mapproj = { git = "https://github.com/cds-astro/cds-mapproj-rust/", branch = "main" }
 # mapproj = { path = "../rust-mapproj" }
-
-#healpix = { package = "cdshealpix", path = "../rust-healpix" }
 serde_json = "1.0"
 byteorder = "1.4.3"
 rayon = "1.5.1"
 flate2 = "1.0.22" # Compression/decompression
 png = "0.17" # For png
-# see wasm-bindgen-rayon
-# or use #[cfg(not(target_arch = "wasm32"))]
-# where rayon is used
+slab = { version = "0.4", optional = true }
 
 [dev-dependencies]
 rand = "0.8.3"
 criterion = "0.3"
+
+[features]
+default = []
+storage = ["dep:slab"]
+
+
+
 
 [[bench]]
 name = "ranges2cells"

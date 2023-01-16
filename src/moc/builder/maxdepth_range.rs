@@ -55,7 +55,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMocBuilder<T, Q> {
   }
 
   pub fn into_moc(mut self) -> RangeMOC<T, Q> {
-    (&mut self).drain_buffer();
+    self.drain_buffer();
     let depth = self.depth;
     self.moc.unwrap_or_else(|| RangeMOC::new(depth, Default::default()))
   }

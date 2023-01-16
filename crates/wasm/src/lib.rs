@@ -1117,7 +1117,7 @@ pub fn from_decimal_jd_range(name: &str, depth: u8, jd_ranges: Box<[f64]>) ->  R
 /// Create a new F-MOC from the given list of frequencies (Hz).
 /// # Params
 /// * `name`: the name to be given to the MOC
-/// * `depth`: T-MOC maximum depth in `[0, 61]`
+/// * `depth`: F-MOC maximum depth in `[0, 59]`
 /// * `freq`: array of frequencies in Hz (`f64`)
 #[wasm_bindgen(js_name = "fromHz", catch)]
 pub fn from_hz(name: &str, depth: u8, freq: Box<[f64]>) ->  Result<(), JsValue> {
@@ -1130,7 +1130,7 @@ pub fn from_hz_range(name: &str, depth: u8, freq_ranges: Box<[f64]>) ->  Result<
   let moc = RangeMOC::<u64, Frequency<u64>>::from_freq_ranges_in_hz(
     depth,
     freq_ranges.iter().step_by(2).zip(freq_ranges.iter().skip(1).step_by(2))
-      .map(|(s, e)| Range{ start: *s, end: *e }),
+      .map(|(s, e)| *s..*e ),
     None
   );
   store::add(name, InternalMoc::Frequency(moc))

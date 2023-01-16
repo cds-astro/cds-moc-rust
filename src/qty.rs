@@ -124,7 +124,7 @@ pub trait MocQty<T>: MocableQty where T: Idx
 
     #[inline(always)]
     fn get_lsb(x: T) -> u32 {
-        x.trailing_zeros() as u32
+        x.trailing_zeros()
     }
 
     #[inline(always)]
@@ -140,7 +140,7 @@ pub trait MocQty<T>: MocableQty where T: Idx
         // - 1 (sentinel) - N_D0_BITS = number of bits to code dim
         let depth = Self::div_by_dim(T::N_BITS - uniq.leading_zeros() as u8 - 1 - Self::N_D0_BITS);
         let idx = uniq & !Self::sentinel_bit(depth);
-        (depth as u8, idx)
+        (depth, idx)
     }
 
     /// To generic uniq notation (using a sentinel bit)

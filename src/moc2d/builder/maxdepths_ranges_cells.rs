@@ -294,7 +294,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangesAndFixedDepthCellsSTMocBu
   }
 
   pub fn into_moc(mut self) -> RangeMOC2<T, Q, U, R> {
-    (&mut self).drain_buffer();
+    self.drain_buffer();
     let depth_1 = self.depth_1;
     let depth_2 = self.depth_2;
     self.moc.unwrap_or_else(|| RangeMOC2::new(depth_1, depth_2, Default::default()))

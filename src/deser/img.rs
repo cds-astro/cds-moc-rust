@@ -95,8 +95,8 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
   let mut v: Vec<u8> = Vec::with_capacity((size_x as usize * size_y as usize) << 2);
   
   let (proj_range_x, proj_range_y) = proj_bounds.unwrap_or((
-    proj.bounds().x_bounds().as_ref().cloned().unwrap_or(-PI..=PI),
-    proj.bounds().y_bounds().as_ref().cloned().unwrap_or(-PI..=PI)
+    proj.bounds().x_bounds().as_ref().cloned().unwrap_or_else(|| -PI..=PI),
+    proj.bounds().y_bounds().as_ref().cloned().unwrap_or_else(|| -PI..=PI)
   ));
 
   let img2proj = ReversedEastPngImgXY2ProjXY::from((size_x, size_y), (&proj_range_x, &proj_range_y));
@@ -230,8 +230,8 @@ pub fn to_png_file<T: Idx, P: CanonicalProjection>(
   // Brackets are important to be sure the file is closed before trying to open it.
   {
     let file = File::create(path)?;
-    let ref mut writer = BufWriter::new(file);
-    to_png(smoc, img_size, proj, proj_center, proj_bounds, writer)?;
+    let mut writer = BufWriter::new(file);
+    to_png(smoc, img_size, proj, proj_center, proj_bounds, &mut writer)?;
   }
   if view {
     show_with_default_app(path.to_string_lossy().as_ref())?;
@@ -257,8 +257,8 @@ pub fn to_png_file_auto<T: Idx>(
   // Brackets are important to be sure the file is closed before trying to open it.
   let img_size = {
     let file = File::create(path)?;
-    let ref mut writer = BufWriter::new(file);
-    to_png_auto(smoc, img_size_y, writer)?
+    let mut writer = BufWriter::new(file);
+    to_png_auto(smoc, img_size_y, &mut writer)?
   };
   if view {
     show_with_default_app(path.to_string_lossy().as_ref())?;

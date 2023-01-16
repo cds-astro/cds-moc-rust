@@ -323,10 +323,6 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   
   /// Returns this MOC external border
   pub fn external_border(&self) -> Self {
-    /*minus(
-      self.expanded_iter(),
-      (&self).into_range_moc_iter()
-    ).into_range_moc()*/
     self.external_border_iter().into_range_moc()
   }
 
@@ -349,6 +345,10 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     and(left.into_range_moc_iter(), self.into_range_moc_iter())
   }
 
+  // TODO: FILL HOLES HAVING A SURFACE AREA > xx fraction of the sky
+  // TODO: FILL HOLES => ensures that each disjoint MOC has no hole in it => polygones from MOC
+  // algo: moc union (moc.complement.into_disjoint_mocs removing the largest one)
+  
   /// Split the disjoint MOC into joint MOCs.
   /// # Param
   ///   `includeIndirectNeighbours`: see [this page](http://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/connect.html),
@@ -633,7 +633,8 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// - `a` the semi-major axis of the box (half the box width), in radians
   /// - `b` the semi-minor axis of the box (half the box height), in radians
   /// - `pa` the position angle (i.e. the angle between the north and the semi-major axis, east-of-north), in radians
-  ///
+  /// - `depth`: the MOC depth
+  /// 
   /// # Panics
   /// - if `a` not in `]0, pi/2]`
   /// - if `b` not in `]0, a]`
@@ -671,10 +672,10 @@ impl RangeMOC<u64, Hpx<u64>> {
   }
 
   /// # Input
-  /// - `lon_min` the longitude of the bottom left corner
-  /// - `lat_min` the latitude of the bottom left corner
-  /// - `lon_max` the longitude of the upper left corner
-  /// - `lat_max` the latitude of the upper left corner
+  /// - `lon_min` the longitude of the bottom left corner, in radians
+  /// - `lat_min` the latitude of the bottom left corner, in radians
+  /// - `lon_max` the longitude of the upper left corner, in radians
+  /// - `lat_max` the latitude of the upper left corner, in radians
   /// - `depth`: the MOC depth
   ///
   /// # Remark
@@ -688,63 +689,6 @@ impl RangeMOC<u64, Hpx<u64>> {
   pub fn from_zone(lon_min: f64, lat_min: f64, lon_max: f64, lat_max: f64, depth: u8) -> Self {
     Self::from(zone_coverage(depth, lon_min, lat_min, lon_max, lat_max))
   }
-  
-  // BORDER = NOT(SELF)+EXPAND && SELF
-
-  /* Perform UNIONS
-  pub fn from_fixed_radius_cones
-  pub fn from_multi_cones
-  pub fn from_multi_elliptical_cones*/
-
-  /*
-  /// Add the MOC external border of depth `self.depth_max`.
-  pub fn expanded(&self) -> Self {
-    self.expanded_iter().into_range_moc()
-  }
-
-  pub fn expanded_iter(&self) -> OrRangeIter<u64, Hpx<u64>,
-    RangeRefMocIter<'_, u64, Hpx<u64>>, OwnedOrderedFixedDepthCellsToRanges<u64, Hpx<u64>>> {
-    let mut ext: Vec<u64> = Vec::with_capacity(10 * self.ranges.ranges().0.len()); // constant to be adjusted
-    for Cell { depth, idx } in (&self).into_range_moc_iter().cells() {
-      append_external_edge(depth, idx, self.depth_max - depth, &mut ext);
-    }
-    ext.sort_unstable(); // parallelize with rayon? It is the slowest part!!
-    let ext_range_iter = OwnedOrderedFixedDepthCellsToRanges::new(self.depth_max, ext.into_iter());
-    or((&self).into_range_moc_iter(), ext_range_iter)
-  }
-
-  /// Returns this MOC external border
-  pub fn external_border(&self) -> Self {
-    self.external_border_iter().into_range_moc()
-  }
-
-  /// Returns this MOC external border
-  pub fn external_border_iter(&self) -> MinusRangeIter<
-    u64,
-    Hpx<u64>,
-    OrRangeIter<u64, Hpx<u64>, RangeRefMocIter<'_, u64, Hpx<u64>>, OwnedOrderedFixedDepthCellsToRanges<u64, Hpx<u64>>>,
-    RangeRefMocIter<'_, u64, Hpx<u64>>
-  > {
-    minus(
-      self.expanded_iter(),
-      (&self).into_range_moc_iter()
-    )
-  }
-
-  /// Returns this MOC internal border
-  pub fn internal_border(&self) -> Self {
-    let not = self.not();
-    and(not.expanded_iter(), (&self).into_range_moc_iter()).into_range_moc()
-  }
-
-  pub fn internal_border_iter(&self) -> AndRangeIter<
-    u64, Hpx<u64>,
-    RangeMocIter<u64, Hpx<u64>>,
-    RangeRefMocIter<'_, u64, Hpx<u64>>
-  > {
-    let left = self.not().expanded();
-    and(left.into_range_moc_iter(), (&self).into_range_moc_iter())
-  }*/
 
 }
 

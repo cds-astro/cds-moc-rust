@@ -26,6 +26,8 @@ pub mod moc2d;
 pub mod deser;
 
 pub mod utils;
+#[cfg(feature = "storage")]
+pub mod storage;
 
 // from_fits
 // from_cone
