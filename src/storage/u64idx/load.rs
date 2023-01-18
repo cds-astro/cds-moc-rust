@@ -1,6 +1,6 @@
 
 use std::{
-  io::Cursor,
+  io::BufRead,
   error::Error
 };
 
@@ -20,8 +20,8 @@ use super::common::{SMOC, TMOC, FMOC, STMOC, InternalMoc};
 
 /// Returns an `InternalMoc` from fits reading result.
 /// WARNING: do not use to get a ST-MOC (we so far assume that ST-MOCs are on u64 only).
-pub(crate) fn from_fits_gen<T: Idx>(moc: MocQtyType<T, Cursor<&[u8]>>)
-                         -> Result<InternalMoc, Box<dyn Error>> {
+pub(crate) fn from_fits_gen<T: Idx, R: BufRead>(moc: MocQtyType<T, R>)
+  -> Result<InternalMoc, Box<dyn Error>> {
   match moc {
     MocQtyType::Hpx(moc) => from_fits_hpx(moc),
     MocQtyType::Time(moc) => from_fits_time(moc),
@@ -32,8 +32,8 @@ pub(crate) fn from_fits_gen<T: Idx>(moc: MocQtyType<T, Cursor<&[u8]>>)
 
 /// Returns an `InternalMoc` from fits reading result, knowing the index type is u64.
 /// Remark: to be used for ST-MOC (we so far assume that ST-MOCs are on u64 only).
-pub(crate)  fn from_fits_u64(moc: MocQtyType<u64, Cursor<&[u8]>>)
-                 -> Result<InternalMoc, Box<dyn Error>> {
+pub(crate) fn from_fits_u64<R: BufRead>(moc: MocQtyType<u64, R>)
+  -> Result<InternalMoc, Box<dyn Error>> {
   match moc {
     MocQtyType::Hpx(moc) => from_fits_hpx(moc),
     MocQtyType::Time(moc) => from_fits_time(moc),
@@ -42,9 +42,8 @@ pub(crate)  fn from_fits_u64(moc: MocQtyType<u64, Cursor<&[u8]>>)
   }
 }
 
-fn from_fits_hpx<T: Idx>(
-  moc: MocType<T, Hpx<T>, Cursor<&[u8]>>
-) -> Result<InternalMoc, Box<dyn Error>>
+fn from_fits_hpx<T: Idx, R: BufRead>(moc: MocType<T, Hpx<T>, R>)
+  -> Result<InternalMoc, Box<dyn Error>>
 {
   let moc: SMOC = match moc {
     MocType::Ranges(moc) => convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(moc).into_range_moc(),
@@ -55,8 +54,8 @@ fn from_fits_hpx<T: Idx>(
   Ok(InternalMoc::Space(moc))
 }
 
-fn from_fits_time<T: Idx>(
-  moc: MocType<T, Time<T>, Cursor<&[u8]>>
+fn from_fits_time<T: Idx, R: BufRead>(
+  moc: MocType<T, Time<T>, R>
 ) -> Result<InternalMoc, Box<dyn Error>>
 {
   let moc: TMOC = match moc {
@@ -68,8 +67,8 @@ fn from_fits_time<T: Idx>(
   Ok(InternalMoc::Time(moc))
 }
 
-fn from_fits_freq<T: Idx>(
-  moc: MocType<T, Frequency<T>, Cursor<&[u8]>>
+fn from_fits_freq<T: Idx, R: BufRead>(
+  moc: MocType<T, Frequency<T>, R>
 ) -> Result<InternalMoc, Box<dyn Error>>
 {
   let moc: FMOC = match moc {
@@ -81,8 +80,8 @@ fn from_fits_freq<T: Idx>(
   Ok(InternalMoc::Frequency(moc))
 }
 
-fn from_fits_spacetime(
-  moc2: STMocType<u64, Cursor<&[u8]>>
+fn from_fits_spacetime<R: BufRead>(
+  moc2: STMocType<u64, R>
 ) -> Result<InternalMoc, Box<dyn Error>>
 {
   // TimeSpaceMoc::<u64, u64>::from_ranges_it(it)

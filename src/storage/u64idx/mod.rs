@@ -1,7 +1,7 @@
 //! MOC storage, protected from concurrent access.
 //! The purpose is to be used this common storage in MOCWasm, MOCSet and MOCGui 
 //! to store MOC in memory on the Rust side.
-//! 
+//!
 //! # Note
 //! Internally we use a [slab](https://crates.io/crates/slab) with concurrent access protected
 //! by a [RwLock](https://doc.rust-lang.org/std/sync/struct.RwLock.html).
@@ -11,8 +11,16 @@
 
 
 use std::{
+  fs::File,
   ops::Range,
-  io::{Cursor, BufReader},
+  path::Path,
+  io::{Cursor, BufRead, BufReader},
+};
+
+#[cfg(not(target_arch = "wasm32"))]
+use rayon::iter::{
+  ParallelIterator, IndexedParallelIterator,
+  IntoParallelIterator, IntoParallelRefMutIterator,
 };
 
 use crate::{
@@ -30,6 +38,7 @@ use crate::{
     CellMOC2IntoIterator,
     CellOrCellRangeMOC2IntoIterator,
   },
+  hpxranges2d::TimeSpaceMoc,
   deser::{
     ascii::{from_ascii_ivoa, moc2d_from_ascii_ivoa},
     json::{from_json_aladin, cellmoc2d_from_json_aladin},
@@ -37,9 +46,9 @@ use crate::{
     fits::{
       from_fits_ivoa, MocIdxType,
       multiordermap::from_fits_multiordermap,
-      skymap::from_fits_skymap
-    }
-  }
+      skymap::from_fits_skymap,
+    },
+  },
 };
 
 mod common;
@@ -51,12 +60,12 @@ mod op2;
 use self::{
   common::{
     PI, HALF_PI,
-    InternalMoc,
-    check_depth, lon_deg2rad, lat_deg2rad
+    InternalMoc, SMOC, TMOC, FMOC, STMOC,
+    check_depth, lon_deg2rad, lat_deg2rad,
   },
   load::{from_fits_gen, from_fits_u64},
   op1::{Op1, Op1MultiRes, op1_count_split},
-  op2::Op2
+  op2::Op2,
 };
 
 
@@ -76,7 +85,6 @@ pub struct U64MocStore;
 // * fill holes
 
 impl U64MocStore {
-  
   pub fn get_global_store() -> &'static Self { &GLOBAL_STORE }
 
   /// Remove from the store the MOC at the given index.
@@ -84,23 +92,70 @@ impl U64MocStore {
     store::drop(index).map(|_| ())
   }
 
+  pub fn drop_smoc(&self, index: usize) -> Result<SMOC, String> {
+    store::drop(index)
+      .and_then(|moc| match moc {
+        InternalMoc::Space(moc) => Ok(moc),
+        _ => Err(String::from("MOC at the given index is not a S-MOC"))
+      })
+  }
+  
+  pub fn drop_tmoc(&self, index: usize) -> Result<TMOC, String> {
+    store::drop(index)
+      .and_then(|moc| match moc {
+        InternalMoc::Time(moc) => Ok(moc),
+        _ => Err(String::from("MOC at the given index is not a T-MOC"))
+      })
+  }
+  
+  pub fn drop_fmoc(&self, index: usize) -> Result<FMOC, String> {
+    store::drop(index)
+      .and_then(|moc| match moc {
+        InternalMoc::Frequency(moc) => Ok(moc),
+        _ => Err(String::from("MOC at the given index is not a F-MOC"))
+      })
+  }
+  
+  pub fn drop_stmoc(&self, index: usize) -> Result<STMOC, String> {
+    store::drop(index)
+      .and_then(|moc| match moc {
+        InternalMoc::TimeSpace(moc) => Ok(moc),
+        _ => Err(String::from("MOC at the given index is not a ST-MOC"))
+      })
+  }
+
+
   ///////////////////////
   // LOAD EXISTING MOC //
-  
+
   // - from fits //
-  
-  /// Load a MOC from the ppe-loaded content of a FITS file, and put it in the store 
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
   ///
   /// # Output
   /// - The index in the storage
-  pub fn load_from_fits(&self, content: &[u8]) -> Result<usize, String> {
-    from_fits_ivoa(Cursor::new(content))
+  pub fn load_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+    let file = File::open(&source).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    self.load_from_fits(reader)
+  }
+  
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_from_fits_buff(&self, content: &[u8]) -> Result<usize, String> {
+    self.load_from_fits(Cursor::new(content))
+  }
+
+  pub fn load_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
+    from_fits_ivoa(reader)
       .map_err(|e| e.to_string())
       .and_then(|moc| match moc {
         MocIdxType::U16(moc) => from_fits_gen(moc),
         MocIdxType::U32(moc) => from_fits_gen(moc),
         MocIdxType::U64(moc) => from_fits_u64(moc),
-        }.map_err(|e| e.to_string())
+      }.map_err(|e| e.to_string())
       )
       .and_then(store::add)
   }
@@ -130,9 +185,9 @@ impl U64MocStore {
       asc,
       !not_strict,
       split,
-      revese_recursive_descent
+      revese_recursive_descent,
     ).map_err(|e| e.to_string())
-    .and_then(store::add)
+      .and_then(store::add)
   }
 
   /// Create o S-MOC from a FITS skymap plus other parameters.
@@ -163,13 +218,13 @@ impl U64MocStore {
       asc,
       !not_strict,
       split,
-      revese_recursive_descent
+      revese_recursive_descent,
     ).map_err(|e| e.to_string())
       .and_then(store::add)
   }
 
   // - from ascii  //
-  
+
   pub fn load_smoc_from_ascii(&self, content: &str) -> Result<usize, String> {
     from_ascii_ivoa::<u64, Hpx::<u64>>(content)
       .map_err(|e| e.to_string())
@@ -196,7 +251,7 @@ impl U64MocStore {
         store::add(moc)
       })
   }
-  
+
   pub fn load_stmoc_from_ascii(&self, content: &str) -> Result<usize, String> {
     moc2d_from_ascii_ivoa::<u64, Time::<u64>, u64, Hpx::<u64>>(content)
       .map_err(|e| e.to_string())
@@ -205,7 +260,7 @@ impl U64MocStore {
         store::add(moc2)
       })
   }
-  
+
   // - from json //
 
   pub fn load_smoc_from_json(&self, content: &str) -> Result<usize, String> {
@@ -218,7 +273,7 @@ impl U64MocStore {
   }
 
   pub fn load_tmoc_from_json(&self, content: &str) -> Result<usize, String> {
-   from_json_aladin::<u64, Time::<u64>>(content)
+    from_json_aladin::<u64, Time::<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cells| {
         let moc = cells.into_cell_moc_iter().ranges().into_range_moc();
@@ -243,14 +298,14 @@ impl U64MocStore {
         store::add(moc2)
       })
   }
-  
+
   // TODO: faire les from_xxx_file et ne pas compiler si WASM
 
 
   ///////////////////////
   // SAVE EXISTING MOC //
 
-  
+
   // to_png
 
   /// # Params
@@ -275,28 +330,52 @@ impl U64MocStore {
             writer.write_image_data(&data)
               .map_err(|e| e.to_string())
           ).map(move |_| buff.into_boxed_slice())
-      },
+      }
       _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
     };
     store::exec_on_one_readonly_moc(moc_index, op)
   }
-  
+
   /// Returns the ASCII serialization of the given MOC.
   /// # Args
   ///
-  pub fn to_ascii(moc_index: usize, fold: Option<usize>) -> Result<String, String> {
+  pub fn to_ascii_str(moc_index: usize, fold: Option<usize>) -> Result<String, String> {
     // from_str creates a copy :o/
     store::exec_on_one_readonly_moc(
-      moc_index, 
-      move |moc| moc.to_ascii(fold)
+      moc_index,
+      move |moc| moc.to_ascii_str(fold),
+    )
+  }
+
+  /// Write the ASCII serialization of the given MOC in the given path.
+  /// # Args
+  ///
+  pub fn to_ascii_file(moc_index: usize, destination: &Path, fold: Option<usize>) -> Result<(), String> {
+    // from_str creates a copy :o/
+    store::exec_on_one_readonly_moc(
+      moc_index,
+      move |moc| moc.to_ascii_file(destination, fold),
     )
   }
 
   // Instead of returning a String, we should probably return a map of (depth, array of indices) values :o/
-  pub fn to_json(moc_index: usize, fold: Option<usize>) -> Result<String, String> {
+  /// Returns the JSON serialization of the given MOC.
+  /// # Args
+  ///
+  pub fn to_json_str(moc_index: usize, fold: Option<usize>) -> Result<String, String> {
     store::exec_on_one_readonly_moc(
-      moc_index, 
-      move |moc| moc.to_json(fold)
+      moc_index,
+      move |moc| moc.to_json_str(fold),
+    )
+  }
+
+  /// Write the KSON serialization of the given MOC in the given path.
+  /// # Args
+  ///
+  pub fn to_json_file(moc_index: usize, destination: &Path, fold: Option<usize>) -> Result<(), String> {
+    store::exec_on_one_readonly_moc(
+      moc_index,
+      move |moc| moc.to_json_file(destination, fold),
     )
   }
 
@@ -304,12 +383,24 @@ impl U64MocStore {
   /// # Args
   /// * `name`: name of the MOC in the internal store
   /// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard. 
-  pub fn to_fits(moc_index: usize, force_v1_compatibility: Option<bool>) -> Result<Box<[u8]>, String> {
+  pub fn to_fits_buff(moc_index: usize, force_v1_compatibility: Option<bool>) -> Result<Box<[u8]>, String> {
     store::exec_on_one_readonly_moc(
       moc_index,
-      move |moc| moc.to_fits(force_v1_compatibility.unwrap_or(false))
+      move |moc| moc.to_fits_buff(force_v1_compatibility.unwrap_or(false)),
     )
   }
+
+  /// Returns in memory the FITS serialization of the MOC of given `name` in the given path.
+  /// # Args
+  /// * `name`: name of the MOC in the internal store
+  /// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard. 
+  pub fn to_fits_file(moc_index: usize, destination: &Path, force_v1_compatibility: Option<bool>) -> Result<(), String> {
+    store::exec_on_one_readonly_moc(
+      moc_index,
+      move |moc| moc.to_fits_file(destination, force_v1_compatibility.unwrap_or(false)),
+    )
+  }
+
   
 
   //////////////////
@@ -317,16 +408,8 @@ impl U64MocStore {
 
   // * S-MOC CREATION //
 
-  
-  
-  // - from file //
-  
-  
-  
-  // - regular //
-  
   /// Create and store a MOC from the given cone.
-  /// 
+  ///
   /// # Input
   /// * `lon_deg` the longitude of the center of the cone, in degrees
   /// * `lat_deg` the latitude of the center of the cone, in degrees
@@ -334,17 +417,17 @@ impl U64MocStore {
   /// * `depth`: the MOC depth
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
-  /// 
+  ///
   /// # Output
   /// - The index in the storage
   pub fn from_cone(
     &self,
-    lon_deg: f64, 
-    lat_deg: f64, 
-    radius_deg: f64, 
-    depth: u8, 
-    delta_depth:u8,
-  ) ->  Result<usize, String> {
+    lon_deg: f64,
+    lat_deg: f64,
+    radius_deg: f64,
+    depth: u8,
+    delta_depth: u8,
+  ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon = lon_deg2rad(lon_deg)?;
     let lat = lat_deg2rad(lat_deg)?;
@@ -359,7 +442,7 @@ impl U64MocStore {
   }
 
   /// Create and store a MOC from the given ring.
-  /// 
+  ///
   /// # Input
   /// * `lon_deg` the longitude of the center of the ring, in degrees
   /// * `lat_deg` the latitude of the center of the ring, in degrees
@@ -368,7 +451,7 @@ impl U64MocStore {
   /// * `depth`: the MOC depth
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
-  /// 
+  ///
   /// # Output
   /// - The index in the storage
   pub fn from_ring(
@@ -378,8 +461,8 @@ impl U64MocStore {
     internal_radius_deg: f64,
     external_radius_deg: f64,
     depth: u8,
-    delta_depth:u8,
-  ) ->  Result<usize, String> {
+    delta_depth: u8,
+  ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon = lon_deg2rad(lon_deg)?;
     let lat = lat_deg2rad(lat_deg)?;
@@ -399,7 +482,7 @@ impl U64MocStore {
   }
 
   /// Create and store a MOC from the given elliptical cone.
-  /// 
+  ///
   /// # Input
   /// * `lon_deg` the longitude of the center of the elliptical cone, in degrees
   /// * `lat_deg` the latitude of the center of the elliptical cone, in degrees
@@ -409,19 +492,19 @@ impl U64MocStore {
   /// * `depth`: the MOC depth
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
-  /// 
+  ///
   /// # Output
   /// - The index in the storage
   pub fn from_elliptical_cone(
     &self,
     lon_deg: f64,
     lat_deg: f64,
-    a_deg: f64, 
+    a_deg: f64,
     b_deg: f64,
     pa_deg: f64,
     depth: u8,
-    delta_depth:u8,
-  ) ->  Result<usize, String> {
+    delta_depth: u8,
+  ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon = lon_deg2rad(lon_deg)?;
     let lat = lat_deg2rad(lat_deg)?;
@@ -442,28 +525,28 @@ impl U64MocStore {
   }
 
   /// Create and store a MOC from the given zone.
-  /// 
+  ///
   /// # Input
   /// * `lon_deg_min` the longitude of the bottom left corner, in degrees
   /// * `lat_deg_min` the latitude of the bottom left corner, in degrees
   /// * `lon_deg_max` the longitude of the upper left corner, in degrees
   /// * `lat_deg_max` the latitude of the upper left corner, in degrees
   /// * `depth`: the MOC depth
-  /// 
+  ///
   /// # Output
   /// - The index in the storage
-  /// 
+  ///
   /// # Remark
   /// - If `lon_min > lon_max` then we consider that the zone crosses the primary meridian.
   /// - The north pole is included only if `lon_min == 0 && lat_max == pi/2`
   pub fn from_zone(
     &self,
-    lon_deg_min: f64, 
+    lon_deg_min: f64,
     lat_deg_min: f64,
-    lon_deg_max: f64, 
+    lon_deg_max: f64,
     lat_deg_max: f64,
     depth: u8,
-  ) ->  Result<usize, String> {
+  ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon_min = lon_deg2rad(lon_deg_min)?;
     let lat_min = lat_deg2rad(lat_deg_min)?;
@@ -474,7 +557,7 @@ impl U64MocStore {
   }
 
   /// Create and store a MOC from the given box.
-  /// 
+  ///
   /// # Input
   /// * `lon_deg` the longitude of the center of the box, in degrees
   /// * `lat_deg` the latitude of the center of the box, in degrees
@@ -482,18 +565,18 @@ impl U64MocStore {
   /// * `b_deg` the semi-minor axis of the box (half the box height), in degrees
   /// * `pa_deg` the position angle (i.e. the angle between the north and the semi-major axis, east-of-north), in radians
   /// * `depth`: the MOC depth
-  /// 
+  ///
   /// # Output
   /// - The index in the storage
   pub fn from_box(
     &self,
-    lon_deg: f64, 
+    lon_deg: f64,
     lat_deg: f64,
     a_deg: f64,
-    b_deg: f64, 
+    b_deg: f64,
     pa_deg: f64,
     depth: u8,
-  ) ->  Result<usize, String> {
+  ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon = lon_deg2rad(lon_deg)?;
     let lat = lat_deg2rad(lat_deg)?;
@@ -513,12 +596,12 @@ impl U64MocStore {
   }
 
   /// Create and store a new MOC from the given polygon vertices.
-  /// 
+  ///
   /// # Params
   /// * `vertices`: vertices coordinates, in degrees
   /// * `complement`: reverse the default inside/outside of the polygon
   /// * `depth`: MOC maximum depth in `[0, 29]`
-  /// 
+  ///
   /// # Output
   /// - The index in the storage
   pub fn from_polygon(
@@ -526,7 +609,7 @@ impl U64MocStore {
     mut vertices: Vec<(f64, f64)>,
     complement: bool,
     depth: u8,
-  ) ->  Result<usize, String> {
+  ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     // An other solution would be to go unsafe to transmute in Box<[[f64; 2]]> ...
     for (lon_deg, lat_deg) in vertices.iter_mut() {
@@ -545,7 +628,7 @@ impl U64MocStore {
   ///
   /// # Output
   /// - The index in the storage
-  pub fn from_coo<T>(&self, depth: u8, coos_deg: T) ->  Result<usize, String> 
+  pub fn from_coo<T>(&self, depth: u8, coos_deg: T) -> Result<usize, String>
     where
       T: Iterator<Item=(f64, f64)>
   {
@@ -553,21 +636,21 @@ impl U64MocStore {
     let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_coos(
       depth,
       coos_deg.filter_map(|(lon_deg, lat_deg)| {
-          let lon = lon_deg2rad(lon_deg);
-          let lat = lat_deg2rad(lat_deg);
-          match (lon, lat) {
-            (Ok(lon), Ok(lat)) => Some((lon, lat)),
-            _ => None,
-          }
-        }),
-      None
+        let lon = lon_deg2rad(lon_deg);
+        let lat = lat_deg2rad(lat_deg);
+        match (lon, lat) {
+          (Ok(lon), Ok(lat)) => Some((lon, lat)),
+          _ => None,
+        }
+      }),
+      None,
     );
     store::add(moc)
   }
 
   /// Create and store a new MOC from the given list of cone centers and radii
   /// Adapted for a large number of small cones (a few cells each).
-  /// 
+  ///
   /// # Params
   /// * `depth`: MOC maximum depth in `[0, 29]`
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
@@ -577,17 +660,17 @@ impl U64MocStore {
   /// # Output
   /// - The index in the storage
   pub fn from_small_cones<T>(
-    &self, 
+    &self,
     depth: u8,
     delta_depth: u8,
-    coos_and_radius_deg: T
-  ) ->  Result<usize, String> 
+    coos_and_radius_deg: T,
+  ) -> Result<usize, String>
     where
       T: Iterator<Item=((f64, f64), f64)>
   {
     check_depth::<Hpx<u64>>(depth)?;
     let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
-    let coos_rad = coos_and_radius_deg.filter_map(|((lon_deg, lat_deg), radius_deg) | {
+    let coos_rad = coos_and_radius_deg.filter_map(|((lon_deg, lat_deg), radius_deg)| {
       let lon = lon_deg2rad(lon_deg);
       let lat = lat_deg2rad(lat_deg);
       match (lon, lat) {
@@ -601,7 +684,7 @@ impl U64MocStore {
 
   /// Create and store a new MOC from the given list of cone centers and radii
   /// Adapted for a reasonable number of possibly large cones.
-  /// 
+  ///
   /// # Params
   /// * `depth`: MOC maximum depth in `[0, 29]`
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
@@ -611,17 +694,17 @@ impl U64MocStore {
   /// # Output
   /// - The index in the storage
   pub fn from_large_cones<T>(
-    &self, 
+    &self,
     depth: u8,
     delta_depth: u8,
-    coos_and_radius_deg: T
+    coos_and_radius_deg: T,
   ) -> Result<usize, String>
     where
       T: Iterator<Item=((f64, f64), f64)>
   {
     check_depth::<Hpx<u64>>(depth)?;
     let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
-    let coos_rad = coos_and_radius_deg.filter_map(|((lon_deg, lat_deg), radius_deg) | {
+    let coos_rad = coos_and_radius_deg.filter_map(|((lon_deg, lat_deg), radius_deg)| {
       let lon = lon_deg2rad(lon_deg);
       let lat = lat_deg2rad(lat_deg);
       match (lon, lat) {
@@ -657,7 +740,7 @@ impl U64MocStore {
     not_strict: bool,
     split: bool,
     revese_recursive_descent: bool,
-    uniq_vals: T
+    uniq_vals: T,
   ) -> Result<usize, String>
     where
       T: Iterator<Item=(u64, f64)>
@@ -667,29 +750,29 @@ impl U64MocStore {
       valued_cells_to_moc_with_opt::<u64, f64>(
         depth,
         uniq_vals.map(|(uniq, dens)| {
-            let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
-            if cdepth > depth {
-              Err(format!("Too deep cell depth. Expected: <= {}; Actual: {}", depth, cdepth))
-            } else {
-              let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
-              Ok((uniq, dens * n_sub_cells * area_per_cell, dens))
-            }
-          }).collect::<Result<_, String>>()?,
-        from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent
+          let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
+          if cdepth > depth {
+            Err(format!("Too deep cell depth. Expected: <= {}; Actual: {}", depth, cdepth))
+          } else {
+            let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
+            Ok((uniq, dens * n_sub_cells * area_per_cell, dens))
+          }
+        }).collect::<Result<_, String>>()?,
+        from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent,
       )
     } else {
       valued_cells_to_moc_with_opt::<u64, f64>(
         depth,
         uniq_vals.map(|(uniq, val)| {
-            let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
-            if cdepth > depth {
-              Err(format!("Too deep cell depth. Expected: <= {}; Actual: {}", depth, cdepth))
-            } else {
-              let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
-              Ok((uniq, val, val / (n_sub_cells * area_per_cell)))
-            }
-          }).collect::<Result<_, String>>()?,
-        from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent
+          let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
+          if cdepth > depth {
+            Err(format!("Too deep cell depth. Expected: <= {}; Actual: {}", depth, cdepth))
+          } else {
+            let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
+            Ok((uniq, val, val / (n_sub_cells * area_per_cell)))
+          }
+        }).collect::<Result<_, String>>()?,
+        from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent,
       )
     };
     let moc = RangeMOC::new(depth, ranges);
@@ -698,13 +781,13 @@ impl U64MocStore {
 
 
   // - SMOC MutliOrder
-  
-  
+
+
   // - SMOC SkyMaps
 
 
   // * T-MOC CREATION //
-  
+
   /// Create a new T-MOC from the given list of decimal Julian Days (JD) times.
   /// # Params
   /// * `name`: the name to be given to the MOC
@@ -718,26 +801,26 @@ impl U64MocStore {
   /// The other approach is to use a couple of `f64`: one for the integer part of the JD, the
   /// other for the fractional part of the JD.
   /// We will add such a method later if required by users.
-  pub fn from_decimal_jd_values<T>(&self, depth: u8, jd: T) ->  Result<usize, String> 
+  pub fn from_decimal_jd_values<T>(&self, depth: u8, jd: T) -> Result<usize, String>
     where
       T: Iterator<Item=f64>
   {
     check_depth::<Time<u64>>(depth)?;
     let moc = RangeMOC::<u64, Time<u64>>::from_microsec_since_jd0(
-      depth, jd.map(|jd| (jd * JD_TO_USEC) as u64), None
+      depth, jd.map(|jd| (jd * JD_TO_USEC) as u64), None,
     );
     store::add(moc)
   }
 
-  pub fn from_decimal_jd_ranges<T>(&self, depth: u8, jd_ranges: T) -> Result<usize, String> 
+  pub fn from_decimal_jd_ranges<T>(&self, depth: u8, jd_ranges: T) -> Result<usize, String>
     where
-      T: Iterator<Item=Range<f64>> 
+      T: Iterator<Item=Range<f64>>
   {
     check_depth::<Time<u64>>(depth)?;
     let moc = RangeMOC::<u64, Time<u64>>::from_microsec_ranges_since_jd0(
       depth,
       jd_ranges.map(|Range { start: jd_min, end: jd_max }| (jd_min * JD_TO_USEC) as u64..(jd_max * JD_TO_USEC) as u64),
-      None
+      None,
     );
     store::add(moc)
   }
@@ -745,14 +828,14 @@ impl U64MocStore {
   // * F-MOC CREATION //
 
   /// Create an store a new F-MOC from the given list of frequencies (Hz).
-  /// 
+  ///
   /// # Input
   /// * `depth`: F-MOC maximum depth in `[0, 59]`
   /// * `freq`: iterator on frequencies, in Hz (`f64`)
-  /// 
+  ///
   /// # Output
   /// - The index in the storage
-  pub fn from_hz_values<T>(&self, depth: u8, freq: T) ->  Result<usize, String>
+  pub fn from_hz_values<T>(&self, depth: u8, freq: T) -> Result<usize, String>
     where
       T: Iterator<Item=f64>
   {
@@ -761,7 +844,7 @@ impl U64MocStore {
     store::add(moc)
   }
 
-  /// Create an store a new F-MOC from the given list of frequencies (Hz) ranges.
+  /// Create and store a new F-MOC from the given list of frequencies (Hz) ranges.
   ///
   /// # Input
   /// * `depth`: F-MOC maximum depth in `[0, 59]`
@@ -769,7 +852,7 @@ impl U64MocStore {
   ///
   /// # Output
   /// - The index in the storage
-  pub fn from_hz_ranges<T>(&self, depth: u8, freq_ranges: T) ->  Result<usize, String>
+  pub fn from_hz_ranges<T>(&self, depth: u8, freq_ranges: T) -> Result<usize, String>
     where
       T: Iterator<Item=Range<f64>>
   {
@@ -780,11 +863,235 @@ impl U64MocStore {
 
   // * ST-MOC CREATION //
 
+  /// Create a abd store a new ST-MOC from a list of sky coordinates and times.
+  ///
+  /// # Arguments
+  ///
+  /// * `times` - The times expressed in jd coded on doubles (=> not precise to the microsecond).
+  /// * `lon` - The longitudes of the sky coordinates, in radians.
+  /// * `lat` - The latitudes of the sky coordinates, in radians.
+  /// * `dt` - The depth along the time (i.e. `T`) axis.
+  /// * `ds` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn create_from_times_positions_approx(
+    &self,
+    times: Vec<f64>,
+    lon: Vec<f64>,
+    lat: Vec<f64>,
+    time_depth: u8,
+    space_depth: u8,
+  ) -> Result<TimeSpaceMoc<u64, u64>, String> {
+    let times = jd2mas_approx(times);
+    self.create_from_times_positions(times, lon, lat, time_depth, space_depth)
+  }
+
+  /// Create a abd store a new ST-MOC from a list of sky coordinates and times.
+  ///
+  /// # Arguments
+  ///
+  /// * `times` - The times expressed in microsecond since jd=0.
+  /// * `lon` - The longitudes of the sky coordinates, in radians.
+  /// * `lat` - The latitudes of the sky coordinates, in radians.
+  /// * `time_depth` - The depth along the time (i.e. `T`) axis.
+  /// * `space_depth` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn create_from_times_positions(
+    &self,
+    times: Vec<u64>,
+    lon: Vec<f64>,
+    lat: Vec<f64>,
+    time_depth: u8,
+    space_depth: u8,
+  ) -> Result<TimeSpaceMoc<u64, u64>, String> {
+    if time_depth > Time::<u64>::MAX_DEPTH {
+      Err(format!("Time depth must be in [0, {}]", Time::<u64>::MAX_DEPTH))
+    } else if times.len() != lon.len() {
+      Err(format!("Times and longitudes do not have the same size: {} != {}", times.len(), lon.len()))
+    } else {
+      lonlat2hash(space_depth, lon, lat)
+        .map(|ipix| TimeSpaceMoc::<u64, u64>::create_from_times_positions(
+          times, ipix, time_depth, space_depth,
+        ))
+    }
+  }
+
+  /// Create a time-spatial coverage (2D) from a list of sky coordinates
+  /// and ranges of times.
+  ///
+  /// # Arguments
+  ///
+  /// * ``times_start`` - The starting times expressed in jd.
+  /// * ``times_end`` - The ending times expressed in jd.
+  /// * ``lon`` - The longitudes of the sky coordinates.
+  /// * ``lat`` - The latitudes of the sky coordinates.
+  /// * ``dt`` - The depth along the time (i.e. `T`) axis.
+  /// * ``ds`` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  /// # Precondition
+  ///
+  /// * ``lon`` and ``lat`` are expressed in radians.
+  /// They are valid because they come from
+  /// `astropy.units.Quantity` objects.
+  /// * ``times`` are expressed in jd and are coming
+  /// from `astropy.time.Time` objects.
+  ///
+  /// # Errors
+  ///
+  /// If the number of longitudes, latitudes and times do not match.
+  ///
+  pub fn create_from_time_ranges_positions_approx(
+    &self,
+    times_start: Vec<f64>,
+    times_end: Vec<f64>,
+    time_depth: u8,
+    lon: Vec<f64>,
+    lat: Vec<f64>,
+    space_depth: u8,
+  ) -> Result<usize, String> {
+    let times_start = jd2mas_approx(times_start);
+    let times_end = jd2mas_approx(times_end);
+    self.create_from_time_ranges_positions(times_start, times_end, time_depth, lon, lat, space_depth)
+  }
+
+  /// Create a time-spatial coverage (2D) from a list of sky coordinates
+  /// and ranges of times.
+  ///
+  /// # Arguments
+  ///
+  /// * ``times_start`` - The starting times expressed in microseconds since jd=0.
+  /// * ``times_end`` - The ending times expressed in microseconds since jd=0.
+  /// * ``lon`` - The longitudes of the sky coordinates.
+  /// * ``lat`` - The latitudes of the sky coordinates.
+  /// * ``dt`` - The depth along the time (i.e. `T`) axis.
+  /// * ``ds`` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  /// # Precondition
+  ///
+  /// * ``lon`` and ``lat`` are expressed in radians.
+  /// They are valid because they come from
+  /// `astropy.units.Quantity` objects.
+  /// * ``times`` are expressed in jd and are coming
+  /// from `astropy.time.Time` objects.
+  ///
+  /// # Errors
+  ///
+  /// If the number of longitudes, latitudes and times do not match.
+  pub fn create_from_time_ranges_positions(
+    &self,
+    times_start: Vec<u64>,
+    times_end: Vec<u64>,
+    time_depth: u8,
+    lon: Vec<f64>,
+    lat: Vec<f64>,
+    space_depth: u8,
+  ) -> Result<usize, String> {
+    if times_start.len() != lon.len() {
+      Err(format!("Times and coos do not have the same size: {} != {}.", times_start.len(), lon.len()))
+    } else {
+      let ipix = lonlat2hash(space_depth, lon, lat)?;
+      let times = times2hash(time_depth, times_start, times_end)?;
+      let moc =TimeSpaceMoc::<u64, u64>::create_from_time_ranges_positions(
+        times, ipix, time_depth, space_depth
+      );
+      store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2())
+    }
+  }
+
+
+  /// Create a time-spatial coverage (2D) from a list of cones
+  /// and time ranges.
+  ///
+  /// # Arguments
+  ///
+  /// * ``times_start`` - The starting times expressed in jd.
+  /// * ``times_end`` - The ending times expressed in jd.
+  /// * ``lon`` - The longitudes of the sky coordinates.
+  /// * ``lat`` - The latitudes of the sky coordinates.
+  /// * ``radius`` - The radiuses of the cones.
+  /// * ``dt`` - The depth along the time (i.e. `T`) axis.
+  /// * ``ds`` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  /// # Precondition
+  ///
+  /// * ``lon`` and ``lat`` are expressed in radians.
+  /// They are valid because they come from
+  /// `astropy.units.Quantity` objects.
+  /// * ``times`` are expressed in jd and are coming
+  /// from `astropy.time.Time` objects.
+  ///
+  /// # Errors
+  ///
+  /// If the number of longitudes, latitudes and times do not match.
+  ///
+  /// # Remark 
+  ///
+  /// Method kept temporarily to ensure backward compatibility.
+  ///
+  pub fn from_time_ranges_spatial_coverages_approx(
+    &self,
+    times_start: Vec<f64>,
+    times_end: Vec<f64>,
+    time_depth: u8,
+    spatial_coverages: Vec<HpxRanges<u64>>,
+  ) -> Result<TimeSpaceMoc<u64, u64>, String> {
+    let times_start = jd2mas_approx(times_start);
+    let times_end = jd2mas_approx(times_end);
+    self.from_time_ranges_spatial_coverages(
+      times_start, times_end, time_depth, spatial_coverages,
+    )
+  }
+
+  /// Create a time-spatial coverage (2D) from a list of cones
+  /// and time ranges.
+  ///
+  /// # Arguments
+  ///
+  /// * ``times_start`` - The starting times expressed in microseconds since jd=0.
+  /// * ``times_end`` - The ending times expressed in  microseconds since jd=0.
+  /// * ``lon`` - The longitudes of the sky coordinates.
+  /// * ``lat`` - The latitudes of the sky coordinates.
+  /// * ``radius`` - The radiuses of the cones.
+  /// * ``dt`` - The depth along the time (i.e. `T`) axis.
+  /// * ``ds`` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  /// # Precondition
+  ///
+  /// * ``lon`` and ``lat`` are expressed in radians.
+  /// They are valid because they come from
+  /// `astropy.units.Quantity` objects.
+  /// * ``times`` are expressed in jd and are coming
+  /// from `astropy.time.Time` objects.
+  ///
+  /// # Errors
+  ///
+  /// If the number of longitudes, latitudes and times do not match.
+  pub fn from_time_ranges_spatial_coverages(
+    &self,
+    times_start: Vec<u64>,
+    times_end: Vec<u64>,
+    time_depth: u8,
+    spatial_coverages: Vec<HpxRanges<u64>>,
+  ) -> Result<TimeSpaceMoc<u64, u64>, String> {
+    let times = times2hash(time_depth, times_start, times_end)?;
+    Ok(TimeSpaceMoc::<u64, u64>::create_from_time_ranges_spatial_coverage(
+      times, spatial_coverages, time_depth,
+    ))
+  }
 
 
   /////////////////////////
   // OPERATIONS ON 1 MOC //
-  
+
   // return a hierachical view (Json like) for display?
   // (not necessary if display made from rust code too)
 
@@ -801,9 +1108,9 @@ impl U64MocStore {
   pub fn split(&self, index: usize) -> Result<Vec<usize>, String> {
     Op1MultiRes::Split.exec(index)
   }
-  
+
   /// Count the number of joint S-MOC splitting ("direct") the given disjoint S-MOC.
-  pub fn split_count(&self,index: usize) -> Result<u32, String> {
+  pub fn split_count(&self, index: usize) -> Result<u32, String> {
     op1_count_split(index, false)
   }
 
@@ -814,7 +1121,7 @@ impl U64MocStore {
   pub fn split_indirect(&self, index: usize) -> Result<Vec<usize>, String> {
     Op1MultiRes::SplitIndirect.exec(index)
   }
-  
+
   /// Count the number of joint S-MOC splitting ("direct") the given disjoint S-MOC.
   pub fn split_indirect_count(&self, index: usize) -> Result<u32, String> {
     op1_count_split(index, true)
@@ -822,7 +1129,7 @@ impl U64MocStore {
 
 
   pub fn degrade(&self, index: usize, new_depth: u8) -> Result<usize, String> {
-    Op1::Degrade{ new_depth }.exec(index)
+    Op1::Degrade { new_depth }.exec(index)
   }
 
   pub fn extend(&self, index: usize) -> Result<usize, String> {
@@ -847,7 +1154,6 @@ impl U64MocStore {
   pub fn or(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     self.union(left_index, right_index)
   }
-  
   pub fn union(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     Op2::Union.exec(left_index, right_index)
   }
@@ -855,7 +1161,6 @@ impl U64MocStore {
   pub fn and(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     self.intersection(left_index, right_index)
   }
-
   pub fn intersection(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     Op2::Intersection.exec(left_index, right_index)
   }
@@ -863,7 +1168,6 @@ impl U64MocStore {
   pub fn xor(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     self.difference(left_index, right_index)
   }
-
   pub fn difference(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     Op2::Difference.exec(left_index, right_index)
   }
@@ -871,6 +1175,7 @@ impl U64MocStore {
   pub fn minus(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     Op2::Minus.exec(left_index, right_index)
   }
+  
 
   ////////////////////////
   // ST-MOC projections //
@@ -891,7 +1196,7 @@ impl U64MocStore {
   // FILTER OPERATIONS //
 
   //////////////////////////////////////////////////////
-// Filter/Contains (returning an array of boolean?) //
+  // Filter/Contains (returning an array of boolean?) //
 
   /// Returns an array of boolean (u8 set to 1 or 0) telling if the pairs of coordinates
   /// in the input slice are in (true=1) or out of (false=0) the S-MOC.
@@ -906,7 +1211,7 @@ impl U64MocStore {
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
   pub fn filter_pos<T>(&self, moc_index: usize, coos_deg: T) -> Result<Vec<u8>, String>
     where
-      T: Iterator<Item=(f64, f64)> 
+      T: Iterator<Item=(f64, f64)>
   {
     let filter = |moc: &InternalMoc| match moc {
       InternalMoc::Space(moc) => {
@@ -915,18 +1220,18 @@ impl U64MocStore {
         let shift = Hpx::<u64>::shift_from_depth_max(depth) as u32;
         Ok(
           coos_deg.map(|(lon_deg, lat_deg)| {
-              let lon = lon_deg2rad(lon_deg);
-              let lat = lat_deg2rad(lat_deg);
-              match (lon, lat) {
-                (Ok(lon), Ok(lat)) => {
-                  let icell = layer.hash(lon, lat) << shift;
-                  if moc.contains_val(&icell) { 1_u8 } else { 0_u8 }
-                },
-                _ => 0_u8,
+            let lon = lon_deg2rad(lon_deg);
+            let lat = lat_deg2rad(lat_deg);
+            match (lon, lat) {
+              (Ok(lon), Ok(lat)) => {
+                let icell = layer.hash(lon, lat) << shift;
+                if moc.contains_val(&icell) { 1_u8 } else { 0_u8 }
               }
-            }).collect::<Vec<u8>>()
+              _ => 0_u8,
+            }
+          }).collect::<Vec<u8>>()
         )
-      },
+      }
       _ => Err(String::from("Can't filter coos on a MOC different from a S-MOC")),
     };
     store::exec_on_one_readonly_moc(moc_index, filter)
@@ -942,7 +1247,7 @@ impl U64MocStore {
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
-  pub fn filter_time<T>(moc_index: usize, jds: T) ->  Result<Vec<u8>, String>
+  pub fn filter_time<T>(moc_index: usize, jds: T) -> Result<Vec<u8>, String>
     where
       T: Iterator<Item=f64>
   {
@@ -950,17 +1255,82 @@ impl U64MocStore {
       InternalMoc::Time(moc) => {
         Ok(
           jds.map(|jd| {
-              let usec = (jd * JD_TO_USEC) as u64;
-              moc.contains_val(&usec) as u8
-            }).collect::<Vec<u8>>()
+            let usec = (jd * JD_TO_USEC) as u64;
+            moc.contains_val(&usec) as u8
+          }).collect::<Vec<u8>>()
         )
-      },
+      }
       _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
     };
     store::exec_on_one_readonly_moc(moc_index, filter)
   }
-  
 }
+
+
+fn jd2mas_approx(times: Vec<f64>) -> Vec<u64> {
+  let jd2mas = |t: f64| (t * 86400000000_f64).floor() as u64;
+  #[cfg(not(target_arch = "wasm32"))]
+  {
+    times.into_par_iter()
+      .map(jd2mas)
+      .collect::<Vec<_>>()
+  }
+  #[cfg(target_arch = "wasm32")]
+  {
+    times.into_iter()
+      .map(jd2mas)
+      .collect::<Vec<_>>()
+  }
+}
+
+
+fn lonlat2hash(depth: u8, lon: Vec<f64>, lat: Vec<f64>) -> Result<Vec<u64>, String> {
+  if depth > Hpx::<u64>::MAX_DEPTH {
+    Err(format!("Space depth must be in [0, {}]", Hpx::<u64>::MAX_DEPTH))
+  } else if lon.len() != lat.len() {
+    Err(format!("Longitudes and latitudes do not have the same size: {} != {}", lon.len(), lat.len()))
+  } else {
+    let mut ipix = vec![0; lon.len()];
+    let layer = healpix::nested::get(depth);
+    #[cfg(not(target_arch = "wasm32"))]
+    ipix.par_iter_mut()
+      .zip_eq(lon.into_par_iter().zip_eq(lat.into_par_iter()))
+      .for_each(|(p, (l, b))| {
+        *p = layer.hash(l, b);
+      });
+    #[cfg(target_arch = "wasm32")]
+    ipix.iter_mut()
+      .zip(lon.iter().zip(lat.iter()))
+      .for_each(|(p, (l, b))| {
+        *p = layer.hash(l, b);
+      });
+    Ok(ipix)
+  }
+}
+
+fn times2hash(depth: u8, times_start: Vec<u64>, times_end: Vec<u64>) -> Result<Vec<Range<u64>>, String> {
+  if depth > Time::<u64>::MAX_DEPTH {
+    Err(format!("Time depth must be in [0, {}]", Hpx::<u64>::MAX_DEPTH))
+  } else if times_start.len() != times_end.len() {
+    Err(format!("Times start and end do not have the same size: {} != {}", times_start.len(), times_end.len()))
+  } else {
+    let mut times = vec![0..0; times_start.len()];
+    #[cfg(not(target_arch = "wasm32"))]
+    times.par_iter_mut()
+      .zip_eq(times_start.into_par_iter().zip_eq(times_end.into_par_iter()))
+      .for_each(|(t, (t1, t2))| {
+        *t = t1..t2;
+      });
+    #[cfg(target_arch = "wasm32")]
+    times.iter_mut()
+      .zip_eq(times_start.iter().zip_eq(times_end.iter()))
+      .for_each(|(t, (t1, t2))| {
+        *t = t1..t2;
+      });
+    Ok(times)
+  }
+}
+
 
 // See maybe https://github.com/mikaelmello/inquire
 //   to build an interactive prompt ?

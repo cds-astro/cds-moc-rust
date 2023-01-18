@@ -2,6 +2,12 @@
 //! We also take the simple approach to work only on u64 indices
 //! (possibly converting when reading or witting).
 
+use std::{
+  path::Path,
+  fs::File,
+  io::{Write, BufWriter},
+};
+
 use crate::{
   qty::{MocQty, Hpx, Time, Frequency},
   moc::{
@@ -94,96 +100,131 @@ impl InternalMoc {
     }
   }
 
-  pub(crate) fn to_ascii(&self, fold: Option<usize>) -> Result<String, String> {
-    let mut buf: Vec<u8> = Default::default();
-    // Uses unsafe [unchecked_unwrap_ok](https://docs.rs/unreachable/1.0.0/unreachable/trait.UncheckedResultExt.html)
-    // for wasm size optimisation.
-    // We do it because no I/O error can occurs since we are writing in memory.
+  pub(crate) fn to_ascii<W>(&self, fold: Option<usize>, writer: W) -> Result<(), String> 
+    where
+      W: Write
+  {
     match self {
       InternalMoc::Space(moc) =>
         moc.into_range_moc_iter()
           .cells()
           .cellranges()
-          .to_ascii_ivoa(fold, false, &mut buf)
+          .to_ascii_ivoa(fold, false, writer)
           .map_err(|e| e.to_string()),
       InternalMoc::Time(moc) =>
         moc.into_range_moc_iter()
           .cells()
           .cellranges()
-          .to_ascii_ivoa(fold, false, &mut buf)
+          .to_ascii_ivoa(fold, false, writer)
           .map_err(|e| e.to_string()),
       InternalMoc::Frequency(moc) =>
         moc.into_range_moc_iter()
           .cells()
           .cellranges()
-          .to_ascii_ivoa(fold, false, &mut buf)
+          .to_ascii_ivoa(fold, false, writer)
           .map_err(|e| e.to_string()),
       InternalMoc::TimeSpace(moc) =>
         moc.into_range_moc2_iter()
           .into_cellcellrange_moc2_iter()
-          .to_ascii_ivoa(fold, false, &mut buf)
+          .to_ascii_ivoa(fold, false, writer)
           .map_err(|e| e.to_string()),
-    }.map(move |()| unsafe {
-      String::from_utf8_unchecked(buf)
-    })
+    }
   }
 
-  pub(crate) fn to_json(&self, fold: Option<usize>) -> Result<String, String> {
+  pub(crate) fn to_ascii_str(&self, fold: Option<usize>) -> Result<String, String> {
     let mut buf: Vec<u8> = Default::default();
-    // Uses unsafe [unchecked_unwrap_ok](https://docs.rs/unreachable/1.0.0/unreachable/trait.UncheckedResultExt.html)
-    // for wasm size optimisation.
-    // We do it because no I/O error can occurs since we are writing in memory.
+    self.to_ascii(fold, &mut buf)
+      .map(move |()| unsafe { String::from_utf8_unchecked(buf) })
+  }
+
+  pub(crate) fn to_ascii_file(&self, destination: &Path, fold: Option<usize>) -> Result<(), String> {
+    let file = File::create(destination).map_err(|e| e.to_string())?;
+    let writer = BufWriter::new(file);
+    self.to_ascii(fold, writer)
+  }
+  
+  pub(crate) fn to_json<W>(&self, fold: Option<usize>, writer: W) -> Result<(), String>
+    where
+      W: Write
+  {
     match self {
       InternalMoc::Space(moc) =>
         moc.into_range_moc_iter()
           .cells()
-          .to_json_aladin(fold, &mut buf),
+          .to_json_aladin(fold, writer),
       InternalMoc::Time(moc) =>
         moc.into_range_moc_iter()
           .cells()
-          .to_json_aladin(fold, &mut buf),
+          .to_json_aladin(fold, writer),
       InternalMoc::Frequency(moc) =>
         moc.into_range_moc_iter()
           .cells()
-          .to_json_aladin(fold, &mut buf),
+          .to_json_aladin(fold, writer),
       InternalMoc::TimeSpace(moc) =>
         moc.into_range_moc2_iter()
           .into_cell_moc2_iter()
-          .to_json_aladin(&fold, &mut buf),
-    }.map(move |()| unsafe {
-      String::from_utf8_unchecked(buf)
-    }).map_err(|e| e.to_string())
+          .to_json_aladin(&fold, writer),
+    }.map_err(|e| e.to_string())
+  }
+
+  pub(crate) fn to_json_str(&self, fold: Option<usize>) -> Result<String, String> {
+    let mut buf: Vec<u8> = Default::default();
+    self.to_json(fold, &mut buf)
+      .map(move |()| unsafe { String::from_utf8_unchecked(buf) })
+  }
+
+  pub(crate) fn to_json_file(&self, destination: &Path, fold: Option<usize>) -> Result<(), String> {
+    let file = File::create(destination).map_err(|e| e.to_string())?;
+    let writer = BufWriter::new(file);
+    self.to_json(fold, writer)
   }
 
   /// # Params
   /// * `force_v1_compatibility`: set to `true` to save a S-MOC using NUNIQ (to be compatible with 
   ///    MOC standard v1).
-  pub(crate) fn to_fits(&self, force_v1_compatibility: bool) -> Result<Box<[u8]>, String> {
-    let mut buf: Vec<u8> = Default::default();
-    // Uses unsafe [unchecked_unwrap_ok](https://docs.rs/unreachable/1.0.0/unreachable/trait.UncheckedResultExt.html)
-    // for wasm size optimisation.
-    // We do it because no I/O error can occurs since we are writing in memory.
+  pub(crate) fn to_fits<W>(&self, force_v1_compatibility: bool, writer: W) -> Result<(), String>
+    where
+      W: Write
+  {
     match self {
       InternalMoc::Space(moc) =>
         if force_v1_compatibility {
           moc.into_range_moc_iter()
             .cells()
-            .hpx_cells_to_fits_ivoa(None, None, &mut buf)
+            .hpx_cells_to_fits_ivoa(None, None, writer)
         } else {
           moc.into_range_moc_iter()
-            .to_fits_ivoa(None, None, &mut buf)
+            .to_fits_ivoa(None, None, writer)
         },
       InternalMoc::Time(moc) =>
         moc.into_range_moc_iter()
-          .to_fits_ivoa(None, None, &mut buf),
+          .to_fits_ivoa(None, None, writer),
       InternalMoc::Frequency(moc) =>
         moc.into_range_moc_iter()
-          .to_fits_ivoa(None, None, &mut buf),
+          .to_fits_ivoa(None, None,writer),
       InternalMoc::TimeSpace(moc) =>
-        ranges2d_to_fits_ivoa(moc.into_range_moc2_iter(), None, None, &mut buf),
-    }.map(|()| buf.into_boxed_slice())
-      .map_err(|e| e.to_string())
+        ranges2d_to_fits_ivoa(moc.into_range_moc2_iter(), None, None, writer),
+    }.map_err(|e| e.to_string())
   }
+
+  /// # Params
+  /// * `force_v1_compatibility`: set to `true` to save a S-MOC using NUNIQ (to be compatible with 
+  ///    MOC standard v1).
+  pub(crate) fn to_fits_buff(&self, force_v1_compatibility: bool) -> Result<Box<[u8]>, String> {
+    let mut buf: Vec<u8> = Default::default();
+    self.to_fits(force_v1_compatibility, &mut buf)
+      .map(|()| buf.into_boxed_slice())
+  }
+
+  /// # Params
+  /// * `force_v1_compatibility`: set to `true` to save a S-MOC using NUNIQ (to be compatible with 
+  ///    MOC standard v1).
+  pub(crate) fn to_fits_file(&self,  destination: &Path, force_v1_compatibility: bool) -> Result<(), String> {
+    let file = File::create(destination).map_err(|e| e.to_string())?;
+    let writer = BufWriter::new(file);
+    self.to_fits(force_v1_compatibility, writer)
+  }
+  
 }
 
 pub(crate) fn check_depth<Q: MocQty<u64>>(depth: u8) -> Result<(), String> {
