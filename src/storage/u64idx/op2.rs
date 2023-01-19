@@ -1,3 +1,4 @@
+//! Module containing operations between 2 MOCs generating a MOC.
 
 use crate::{
   qty::{Hpx, Time},
@@ -12,7 +13,7 @@ use crate::{
 
 use super::{
   store,
-  common::{SMOC, TMOC, STMOC, InternalMoc}
+  common::{SMOC, TMOC, FMOC, STMOC, InternalMoc}
 };
 
 #[derive(Copy, Clone)]
@@ -46,6 +47,17 @@ impl Op2 {
       Op2::Minus => Ok(left.minus(right)),
       Op2::TFold => Err(String::from("TimeFold operation not available on 2 T-MOCs.")),
       Op2::SFold => Err(String::from("SpaceFold operation not available on 2 T-MOCs.")),
+    }
+  }
+
+  fn perform_op_on_fmoc(self, left: &FMOC, right: &FMOC) -> Result<FMOC, String> {
+    match self {
+      Op2::Intersection => Ok(left.and(right)),
+      Op2::Union => Ok(left.or(right)),
+      Op2::Difference => Ok(left.xor(right)),
+      Op2::Minus => Ok(left.minus(right)),
+      Op2::TFold => Err(String::from("TimeFold operation not available on 2 F-MOCs.")),
+      Op2::SFold => Err(String::from("SpaceFold operation not available on 2 F-MOCs.")),
     }
   }
   
@@ -100,6 +112,7 @@ impl Op2 {
       move |left, right| match (left, right) {
         (InternalMoc::Space(l), InternalMoc::Space(r)) => self.perform_op_on_smoc(l, r).map(InternalMoc::Space),
         (InternalMoc::Time(l), InternalMoc::Time(r)) => self.perform_op_on_tmoc(l, r).map(InternalMoc::Time),
+        (InternalMoc::Frequency(l), InternalMoc::Frequency(r)) => self.perform_op_on_fmoc(l, r).map(InternalMoc::Frequency),
         (InternalMoc::TimeSpace(l), InternalMoc::TimeSpace(r)) => self.perform_op_on_stmoc(l, r).map(InternalMoc::TimeSpace),
         (InternalMoc::Space(l), InternalMoc::TimeSpace(r)) => self.perform_space_fold(l, r).map(InternalMoc::Time),
         (InternalMoc::Time(l), InternalMoc::TimeSpace(r)) => self.perform_time_fold(l, r).map(InternalMoc::Space),

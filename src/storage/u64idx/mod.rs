@@ -56,6 +56,7 @@ mod load;
 mod store;
 mod op1;
 mod op2;
+mod opn;
 
 use self::{
   common::{
@@ -66,6 +67,7 @@ use self::{
   load::{from_fits_gen, from_fits_u64},
   op1::{Op1, Op1MultiRes, op1_count_split},
   op2::Op2,
+  opn::OpN,
 };
 
 
@@ -1175,7 +1177,25 @@ impl U64MocStore {
   pub fn minus(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     Op2::Minus.exec(left_index, right_index)
   }
-  
+
+  /////////////////////////////////////////////////////
+  // LOGICAL OPERATIONS BETWEEN >2 MOCs of same type //
+
+  pub fn multi_union(&self, indices: &[usize]) -> Result<usize, String> {
+    OpN::Union.exec(indices)
+  }
+
+  pub fn multi_intersecion(&self, indices: &[usize]) -> Result<usize, String> {
+    OpN::Intersection.exec(indices)
+
+  }
+
+  pub fn multi_multi_difference(&self, indices: &[usize]) -> Result<usize, String> {
+    OpN::Difference.exec(indices)
+
+  }
+
+
 
   ////////////////////////
   // ST-MOC projections //

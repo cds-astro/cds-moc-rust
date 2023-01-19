@@ -51,6 +51,19 @@ fn exec_on_two_readonly_mocs<T, F>(il: usize, ir: usize, op: F) -> Result<T, Str
     )
 }
 
+fn exec_on_n_readonly_mocs<T, F>(indices: &[usize], op: F) -> Result<T, String>
+  where
+    F: Fn(Vec<&InternalMoc>) -> Result<T, String>
+{
+  exec_on_readonly_store(|store| {
+      let mocs: Vec<&InternalMoc> = indices.iter().cloned()
+        .map(|i| store.get(i).ok_or_else(|| format!("MOC at index '{}' not found", i)))
+        .collect::<Result<_, _>>()?;
+      op(mocs)
+    }
+  )
+}
+
 
 /// Add a new MOC to the store, retrieve the index at which it has been inserted
 pub(crate) fn add<T: Into<InternalMoc>>(moc: T) -> Result<usize, String> {
@@ -130,6 +143,17 @@ pub(crate) fn op2<F>(left_index: usize, right_index: usize, op: F) -> Result<usi
 {
   // Exec first the read operation (that may take some time) using only a read lock
   let moc = exec_on_two_readonly_mocs(left_index, right_index, op)?;
+  // Then use the write lock only to store the result (short operation)
+  add(moc)
+}
+
+/// Perform an operation between 2 MOCs and store the resulting MOC.
+pub(crate) fn opn<F>(indices: &[usize], op: F) -> Result<usize, String>
+  where
+    F: Fn(Vec<&InternalMoc>) -> Result<InternalMoc, String>
+{
+  // Exec first the read operation (that may take some time) using only a read lock
+  let moc = exec_on_n_readonly_mocs(indices, op)?;
   // Then use the write lock only to store the result (short operation)
   add(moc)
 }
