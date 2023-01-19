@@ -64,7 +64,11 @@ use self::{
     InternalMoc, SMOC, TMOC, FMOC, STMOC,
     check_depth, lon_deg2rad, lat_deg2rad,
   },
-  load::{from_fits_gen, from_fits_u64},
+  load::{
+    from_fits_gen, from_fits_u64, 
+    smoc_from_fits_gen, tmoc_from_fits_gen, fmoc_from_fits_gen,
+    stmoc_from_fits_u64
+  },
   op1::{Op1, Op1MultiRes, op1_count_split},
   op2::Op2,
   opn::OpN,
@@ -88,6 +92,22 @@ pub struct U64MocStore;
 
 impl U64MocStore {
   pub fn get_global_store() -> &'static Self { &GLOBAL_STORE }
+
+  pub fn insert_smoc(&self, moc: SMOC) -> Result<usize, String> {
+    store::add(moc)
+  }
+
+  pub fn insert_tmoc(&self, moc: TMOC) -> Result<usize, String> {
+    store::add(moc)
+  }
+
+  pub fn insert_fmoc(&self, moc: FMOC) -> Result<usize, String> {
+    store::add(moc)
+  }
+
+  pub fn insert_stmoc(&self, moc: STMOC) -> Result<usize, String> {
+    store::add(moc)
+  }
 
   /// Remove from the store the MOC at the given index.
   pub fn drop(&self, index: usize) -> Result<(), String> {
@@ -153,15 +173,144 @@ impl U64MocStore {
   pub fn load_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
     from_fits_ivoa(reader)
       .map_err(|e| e.to_string())
-      .and_then(|moc| match moc {
-        MocIdxType::U16(moc) => from_fits_gen(moc),
-        MocIdxType::U32(moc) => from_fits_gen(moc),
-        MocIdxType::U64(moc) => from_fits_u64(moc),
-      }.map_err(|e| e.to_string())
+      .and_then(
+        |moc| match moc {
+          MocIdxType::U16(moc) => from_fits_gen(moc),
+          MocIdxType::U32(moc) => from_fits_gen(moc),
+          MocIdxType::U64(moc) => from_fits_u64(moc),
+        }.map_err(|e| e.to_string())
       )
       .and_then(store::add)
   }
 
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_smoc_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+    let file = File::open(&source).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    self.load_smoc_from_fits(reader)
+  }
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_smoc_from_fits_buff(&self, content: &[u8]) -> Result<usize, String> {
+    self.load_smoc_from_fits(Cursor::new(content))
+  }
+
+  pub fn load_smoc_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
+    from_fits_ivoa(reader)
+      .map_err(|e| e.to_string())
+      .and_then(
+        |moc| match moc {
+          MocIdxType::U16(moc) => smoc_from_fits_gen(moc),
+          MocIdxType::U32(moc) => smoc_from_fits_gen(moc),
+          MocIdxType::U64(moc) => smoc_from_fits_gen(moc),
+        }.map_err(|e| e.to_string())
+      )
+      .and_then(store::add)
+  }
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_tmoc_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+    let file = File::open(&source).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    self.load_tmoc_from_fits(reader)
+  }
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_tmoc_from_fits_buff(&self, content: &[u8]) -> Result<usize, String> {
+    self.load_tmoc_from_fits(Cursor::new(content))
+  }
+
+  pub fn load_tmoc_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
+    from_fits_ivoa(reader)
+      .map_err(|e| e.to_string())
+      .and_then(
+        |moc| match moc {
+          MocIdxType::U16(moc) => tmoc_from_fits_gen(moc),
+          MocIdxType::U32(moc) => tmoc_from_fits_gen(moc),
+          MocIdxType::U64(moc) => tmoc_from_fits_gen(moc),
+        }.map_err(|e| e.to_string())
+      )
+      .and_then(store::add)
+  }
+
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_fmoc_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+    let file = File::open(&source).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    self.load_fmoc_from_fits(reader)
+  }
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_fmoc_from_fits_buff(&self, content: &[u8]) -> Result<usize, String> {
+    self.load_fmoc_from_fits(Cursor::new(content))
+  }
+
+  pub fn load_fmoc_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
+    from_fits_ivoa(reader)
+      .map_err(|e| e.to_string())
+      .and_then(
+        |moc| match moc {
+          MocIdxType::U16(moc) => fmoc_from_fits_gen(moc),
+          MocIdxType::U32(moc) => fmoc_from_fits_gen(moc),
+          MocIdxType::U64(moc) => fmoc_from_fits_gen(moc),
+        }.map_err(|e| e.to_string())
+      )
+      .and_then(store::add)
+  }
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_stmoc_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+    let file = File::open(&source).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    self.load_stmoc_from_fits(reader)
+  }
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_stmoc_from_fits_buff(&self, content: &[u8]) -> Result<usize, String> {
+    self.load_stmoc_from_fits(Cursor::new(content))
+  }
+
+  pub fn load_stmoc_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
+    from_fits_ivoa(reader)
+      .map_err(|e| e.to_string())
+      .and_then(
+        |moc| match moc {
+          MocIdxType::U16(_) => Err(String::from("Only u64 ST-MOCs are supported").into()),
+          MocIdxType::U32(_) => Err(String::from("Only u64 ST-MOCs are supported").into()),
+          MocIdxType::U64(moc) => stmoc_from_fits_u64(moc),
+        }.map_err(|e| e.to_string())
+      )
+      .and_then(store::add)
+  }
+  
+  
+  
   /// Create o S-MOC from a FITS multi-order map plus other parameters.
   /// # Args
   /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
@@ -1194,9 +1343,7 @@ impl U64MocStore {
     OpN::Difference.exec(indices)
 
   }
-
-
-
+  
   ////////////////////////
   // ST-MOC projections //
 

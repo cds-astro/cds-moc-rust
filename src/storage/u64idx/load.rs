@@ -30,6 +30,48 @@ pub(crate) fn from_fits_gen<T: Idx, R: BufRead>(moc: MocQtyType<T, R>)
   }
 }
 
+pub(crate) fn smoc_from_fits_gen<T: Idx, R: BufRead>(moc: MocQtyType<T, R>)
+ -> Result<InternalMoc, Box<dyn Error>> {
+  match moc {
+    MocQtyType::Hpx(moc) => from_fits_hpx(moc),
+    MocQtyType::Time(_) =>  Err(String::from("Wrong MOC type. Expected: S-MOCs. Actual: T-MOC").into()),
+    MocQtyType::Freq(_) =>  Err(String::from("Wrong MOC type. Expected: S-MOCs. Actual: F-MOC").into()),
+    MocQtyType::TimeHpx(_) => Err(String::from("Wrong MOC type. Expected: S-MOCs. Actual: ST-MOC").into()),
+  }
+}
+
+pub(crate) fn tmoc_from_fits_gen<T: Idx, R: BufRead>(moc: MocQtyType<T, R>)
+  -> Result<InternalMoc, Box<dyn Error>> {
+  match moc {
+    MocQtyType::Hpx(_)  =>  Err(String::from("Wrong MOC type. Expected: T-MOCs. Actual: S-MOC").into()),
+    MocQtyType::Time(moc) =>  from_fits_time(moc),
+    MocQtyType::Freq(_) =>  Err(String::from("Wrong MOC type. Expected: T-MOCs. Actual: F-MOC").into()),
+    MocQtyType::TimeHpx(_) => Err(String::from("Wrong MOC type. Expected: T-MOCs. Actual: ST-MOC").into()),
+  }
+}
+
+pub(crate) fn fmoc_from_fits_gen<T: Idx, R: BufRead>(moc: MocQtyType<T, R>)
+  -> Result<InternalMoc, Box<dyn Error>> {
+  match moc {
+    MocQtyType::Hpx(_)  =>  Err(String::from("Wrong MOC type. Expected: F-MOCs. Actual: S-MOC").into()),
+    MocQtyType::Time(_) =>  Err(String::from("Wrong MOC type. Expected: F-MOCs. Actual: T-MOC").into()),
+    MocQtyType::Freq(moc) =>  from_fits_freq(moc),
+    MocQtyType::TimeHpx(_) => Err(String::from("Wrong MOC type. Expected: T-MOCs. Actual: ST-MOC").into()),
+  }
+}
+
+pub(crate) fn stmoc_from_fits_u64<R: BufRead>(moc: MocQtyType<u64, R>)
+  -> Result<InternalMoc, Box<dyn Error>> {
+  match moc {
+    MocQtyType::Hpx(_)  =>  Err(String::from("Wrong MOC type. Expected: ST-MOCs. Actual: S-MOC").into()),
+    MocQtyType::Time(_) =>  Err(String::from("Wrong MOC type. Expected: ST-MOCs. Actual: T-MOC").into()),
+    MocQtyType::Freq(_) =>  Err(String::from("Wrong MOC type. Expected: ST-MOCs. Actual: T-MOC").into()),
+    MocQtyType::TimeHpx(moc2) => from_fits_spacetime(moc2)
+  }
+}
+
+
+
 /// Returns an `InternalMoc` from fits reading result, knowing the index type is u64.
 /// Remark: to be used for ST-MOC (we so far assume that ST-MOCs are on u64 only).
 pub(crate) fn from_fits_u64<R: BufRead>(moc: MocQtyType<u64, R>)
