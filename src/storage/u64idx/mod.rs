@@ -69,7 +69,7 @@ use self::{
     smoc_from_fits_gen, tmoc_from_fits_gen, fmoc_from_fits_gen,
     stmoc_from_fits_u64
   },
-  op1::{Op1, Op1MultiRes, op1_count_split},
+  op1::{Op1, Op1MultiRes, op1_count_split, op1_stmoc_tmin, op1_stmoc_tmax},
   op2::Op2,
   opn::OpN,
 };
@@ -1409,6 +1409,15 @@ impl U64MocStore {
   pub fn space_fold(&self, space_moc_index: usize, st_moc_index: usize) -> Result<usize, String> {
     Op2::SFold.exec(space_moc_index, st_moc_index)
   }
+
+  pub fn get_stmoc_tmin(&self, index: usize) -> Result<Option<u64>, String> {
+    op1_stmoc_tmin(index)
+  }
+
+  pub fn get_stmoc_tmax(&self, index: usize) -> Result<Option<u64>, String> {
+    op1_stmoc_tmax(index)
+  }
+
 
   ///////////////////////
   // FILTER OPERATIONS //

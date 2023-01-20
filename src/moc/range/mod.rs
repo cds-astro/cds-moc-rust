@@ -95,6 +95,15 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     self.ranges.0.0.len()
   }
   pub fn is_empty(&self) -> bool { self.len() == 0 }
+
+  pub fn first_index(&self) -> Option<T> {
+    self.ranges.0.iter().nth(0).map(|r| r.start)
+  }
+
+  pub fn last_index(&self) -> Option<T> {
+    self.ranges.0.iter().last().map(|r| r.end)
+  }
+
   pub fn moc_ranges(&self) -> &MocRanges<T, Q> {
     &self.ranges
   }

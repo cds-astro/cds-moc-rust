@@ -134,3 +134,27 @@ pub(crate) fn op1_count_split(index: usize, indirect_neigh: bool) -> Result<u32,
     },
   )
 }
+
+pub(crate) fn op1_stmoc_tmin(index: usize) -> Result<Option<u64>, String> {
+  store::exec_on_one_readonly_moc(
+    index,
+    move |moc| match moc {
+      InternalMoc::Space(_) => Err(String::from("Tmin not implemented for S-MOCs.")),
+      InternalMoc::Time(_) => Err(String::from("Tmin not implemented for T-MOCs.")),
+      InternalMoc::Frequency(_) =>  Err(String::from("Tmin not implemented for F-MOCs.")),
+      InternalMoc::TimeSpace(stmoc) => Ok(stmoc.min_index_left()),
+    },
+  )
+}
+
+pub(crate) fn op1_stmoc_tmax(index: usize) -> Result<Option<u64>, String> {
+  store::exec_on_one_readonly_moc(
+    index,
+    move |moc| match moc {
+      InternalMoc::Space(_) => Err(String::from("Tmin not implemented for S-MOCs.")),
+      InternalMoc::Time(_) => Err(String::from("Tmin not implemented for T-MOCs.")),
+      InternalMoc::Frequency(_) =>  Err(String::from("Tmin not implemented for F-MOCs.")),
+      InternalMoc::TimeSpace(stmoc) => Ok(stmoc.max_index_left()),
+    },
+  )
+}

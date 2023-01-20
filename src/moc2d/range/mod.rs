@@ -59,6 +59,14 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2Elem<T, Q, U, R> {
   pub fn eq_without_depth(&self, rhs: &Self) -> bool {
     self.moc_l.eq_without_depth(&rhs.moc_l) && self.moc_r.eq_without_depth(&rhs.moc_r)
   }
+
+  pub fn first_index_left(&self) -> Option<T> {
+    self.moc_l.first_index()
+  }
+
+  pub fn last_index_left(&self) -> Option<T> {
+    self.moc_l.last_index()
+  }
 }
 /*impl<T, Q, U, R> PartialEq for RangeMOC2Elem<T, Q, U, R> {
   where
@@ -142,6 +150,23 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
     Self { depth_max_l, depth_max_r, elems }
   }
 
+  pub fn min_index_left(&self) -> Option<T> {
+    self.elems.first()
+      .and_then(|elem| elem.first_index_left())
+  }
+
+  pub fn max_index_left(&self) -> Option<T> {
+    self.elems.last()
+      .and_then(|elem| elem.last_index_left())
+  }
+
+  pub fn global_range_left(&self) -> Option<Range<T>> {
+    match (self.min_index_left(), self.max_index_left()) {
+      (Some(min), Some(max)) => Some(min..max),
+      _ => None
+    }
+  }
+
   pub fn eq_without_depth(&self, rhs: &Self) -> bool {
     if self.elems.len() != rhs.elems.len() {
       return false;
@@ -195,13 +220,14 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
     op::or::or(self.into_range_moc2_iter(), rhs.into_range_moc2_iter()).into_range_moc2()
   }
   /// So far the internal code resort to the code to perform operation on iterator.
-  /// TODO: make a more performan code based on the particular RangeMOC2 type?
+  /// TODO: make a more performant code based on the particular RangeMOC2 type?
   pub fn or(&self, rhs: &RangeMOC2<T, Q, U, R>) -> RangeMOC2<T, Q, U, R> {
     op::or::or(self.into_range_moc2_iter(), rhs.into_range_moc2_iter()).into_range_moc2()
   }
 }
 
 impl RangeMOC2<u64, Time<u64>, u64, Hpx<u64>> {
+
   pub fn from_time_and_coos<I: Iterator<Item=(u64, f64, f64)>>(
     depth_time: u8, 
     depth_hpx: u8, 
@@ -215,6 +241,7 @@ impl RangeMOC2<u64, Time<u64>, u64, Hpx<u64>> {
       buf_capacity
     )
   }
+
 }
 
 
