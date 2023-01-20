@@ -11,7 +11,7 @@
 
 
 use std::{
-  fs::File,
+  fs::{self, File},
   ops::Range,
   path::Path,
   io::{Cursor, BufRead, BufReader},
@@ -376,6 +376,31 @@ impl U64MocStore {
 
   // - from ascii  //
 
+  pub fn load_smoc_from_ascii_file(&self, path: &Path) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_smoc_from_ascii(&s))
+  }
+
+  pub fn load_tmoc_from_ascii_file(&self, path: &Path) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_tmoc_from_ascii(&s))
+  }
+
+  pub fn load_fmoc_from_ascii_file(&self, path: &Path) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_fmoc_from_ascii(&s))
+  }
+
+  pub fn load_stmoc_from_ascii_file(&self, path: &Path) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_stmoc_from_ascii(&s))
+  }
+
+  
   pub fn load_smoc_from_ascii(&self, content: &str) -> Result<usize, String> {
     from_ascii_ivoa::<u64, Hpx::<u64>>(content)
       .map_err(|e| e.to_string())
@@ -414,6 +439,31 @@ impl U64MocStore {
 
   // - from json //
 
+  pub fn load_smoc_from_json_file(&self, path: &Path) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_smoc_from_json(&s))
+  }
+
+  pub fn load_tmoc_from_json_file(&self, path: &Path) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_tmoc_from_json(&s))
+  }
+
+  pub fn load_fmoc_from_json_file(&self, path: &Path) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_fmoc_from_json(&s))
+  }
+
+  pub fn load_stmoc_from_json_file(&self, path: &Path) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_stmoc_from_json(&s))
+  }
+  
+  
   pub fn load_smoc_from_json(&self, content: &str) -> Result<usize, String> {
     from_json_aladin::<u64, Hpx::<u64>>(content)
       .map_err(|e| e.to_string())
