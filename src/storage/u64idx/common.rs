@@ -137,7 +137,7 @@ impl InternalMoc {
       .map(move |()| unsafe { String::from_utf8_unchecked(buf) })
   }
 
-  pub(crate) fn to_ascii_file(&self, destination: &Path, fold: Option<usize>) -> Result<(), String> {
+  pub(crate) fn to_ascii_file<P: AsRef<Path>>(&self, destination: P, fold: Option<usize>) -> Result<(), String> {
     let file = File::create(destination).map_err(|e| e.to_string())?;
     let writer = BufWriter::new(file);
     self.to_ascii(fold, writer)
@@ -173,7 +173,7 @@ impl InternalMoc {
       .map(move |()| unsafe { String::from_utf8_unchecked(buf) })
   }
 
-  pub(crate) fn to_json_file(&self, destination: &Path, fold: Option<usize>) -> Result<(), String> {
+  pub(crate) fn to_json_file<P: AsRef<Path>>(&self, destination: P, fold: Option<usize>) -> Result<(), String> {
     let file = File::create(destination).map_err(|e| e.to_string())?;
     let writer = BufWriter::new(file);
     self.to_json(fold, writer)
@@ -219,7 +219,7 @@ impl InternalMoc {
   /// # Params
   /// * `force_v1_compatibility`: set to `true` to save a S-MOC using NUNIQ (to be compatible with 
   ///    MOC standard v1).
-  pub(crate) fn to_fits_file(&self,  destination: &Path, force_v1_compatibility: bool) -> Result<(), String> {
+  pub(crate) fn to_fits_file<P: AsRef<Path>>(&self,  destination: P, force_v1_compatibility: bool) -> Result<(), String> {
     let file = File::create(destination).map_err(|e| e.to_string())?;
     let writer = BufWriter::new(file);
     self.to_fits(force_v1_compatibility, writer)

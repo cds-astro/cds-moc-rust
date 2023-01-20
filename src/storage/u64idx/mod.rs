@@ -156,7 +156,7 @@ impl U64MocStore {
   ///
   /// # Output
   /// - The index in the storage
-  pub fn load_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+  pub fn load_from_fits_file<P: AsRef<Path>>(&self, source: P) -> Result<usize, String> {
     let file = File::open(&source).map_err(|e| e.to_string())?;
     let reader = BufReader::new(file);
     self.load_from_fits(reader)
@@ -188,7 +188,7 @@ impl U64MocStore {
   ///
   /// # Output
   /// - The index in the storage
-  pub fn load_smoc_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+  pub fn load_smoc_from_fits_file<P: AsRef<Path>>(&self, source: P) -> Result<usize, String> {
     let file = File::open(&source).map_err(|e| e.to_string())?;
     let reader = BufReader::new(file);
     self.load_smoc_from_fits(reader)
@@ -219,7 +219,7 @@ impl U64MocStore {
   ///
   /// # Output
   /// - The index in the storage
-  pub fn load_tmoc_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+  pub fn load_tmoc_from_fits_file<P: AsRef<Path>>(&self, source: P) -> Result<usize, String> {
     let file = File::open(&source).map_err(|e| e.to_string())?;
     let reader = BufReader::new(file);
     self.load_tmoc_from_fits(reader)
@@ -251,7 +251,7 @@ impl U64MocStore {
   ///
   /// # Output
   /// - The index in the storage
-  pub fn load_fmoc_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+  pub fn load_fmoc_from_fits_file<P: AsRef<Path>>(&self, source: P) -> Result<usize, String> {
     let file = File::open(&source).map_err(|e| e.to_string())?;
     let reader = BufReader::new(file);
     self.load_fmoc_from_fits(reader)
@@ -282,7 +282,7 @@ impl U64MocStore {
   ///
   /// # Output
   /// - The index in the storage
-  pub fn load_stmoc_from_fits_file(&self, source: &Path) -> Result<usize, String> {
+  pub fn load_stmoc_from_fits_file<P: AsRef<Path>>(&self, source: P) -> Result<usize, String> {
     let file = File::open(&source).map_err(|e| e.to_string())?;
     let reader = BufReader::new(file);
     self.load_stmoc_from_fits(reader)
@@ -376,25 +376,25 @@ impl U64MocStore {
 
   // - from ascii  //
 
-  pub fn load_smoc_from_ascii_file(&self, path: &Path) -> Result<usize, String> {
+  pub fn load_smoc_from_ascii_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
     fs::read_to_string(path)
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_smoc_from_ascii(&s))
   }
 
-  pub fn load_tmoc_from_ascii_file(&self, path: &Path) -> Result<usize, String> {
+  pub fn load_tmoc_from_ascii_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
     fs::read_to_string(path)
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_tmoc_from_ascii(&s))
   }
 
-  pub fn load_fmoc_from_ascii_file(&self, path: &Path) -> Result<usize, String> {
+  pub fn load_fmoc_from_ascii_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
     fs::read_to_string(path)
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_fmoc_from_ascii(&s))
   }
 
-  pub fn load_stmoc_from_ascii_file(&self, path: &Path) -> Result<usize, String> {
+  pub fn load_stmoc_from_ascii_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
     fs::read_to_string(path)
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_stmoc_from_ascii(&s))
@@ -439,25 +439,25 @@ impl U64MocStore {
 
   // - from json //
 
-  pub fn load_smoc_from_json_file(&self, path: &Path) -> Result<usize, String> {
+  pub fn load_smoc_from_json_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
     fs::read_to_string(path)
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_smoc_from_json(&s))
   }
 
-  pub fn load_tmoc_from_json_file(&self, path: &Path) -> Result<usize, String> {
+  pub fn load_tmoc_from_json_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
     fs::read_to_string(path)
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_tmoc_from_json(&s))
   }
 
-  pub fn load_fmoc_from_json_file(&self, path: &Path) -> Result<usize, String> {
+  pub fn load_fmoc_from_json_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
     fs::read_to_string(path)
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_fmoc_from_json(&s))
   }
 
-  pub fn load_stmoc_from_json_file(&self, path: &Path) -> Result<usize, String> {
+  pub fn load_stmoc_from_json_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
     fs::read_to_string(path)
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_stmoc_from_json(&s))
@@ -551,7 +551,7 @@ impl U64MocStore {
   /// Write the ASCII serialization of the given MOC in the given path.
   /// # Args
   ///
-  pub fn to_ascii_file(moc_index: usize, destination: &Path, fold: Option<usize>) -> Result<(), String> {
+  pub fn to_ascii_file<P: AsRef<Path>>(moc_index: usize, destination: P, fold: Option<usize>) -> Result<(), String> {
     // from_str creates a copy :o/
     store::exec_on_one_readonly_moc(
       moc_index,
@@ -573,7 +573,7 @@ impl U64MocStore {
   /// Write the KSON serialization of the given MOC in the given path.
   /// # Args
   ///
-  pub fn to_json_file(moc_index: usize, destination: &Path, fold: Option<usize>) -> Result<(), String> {
+  pub fn to_json_file<P: AsRef<Path>>(moc_index: usize, destination: P, fold: Option<usize>) -> Result<(), String> {
     store::exec_on_one_readonly_moc(
       moc_index,
       move |moc| moc.to_json_file(destination, fold),
@@ -595,7 +595,7 @@ impl U64MocStore {
   /// # Args
   /// * `name`: name of the MOC in the internal store
   /// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard. 
-  pub fn to_fits_file(moc_index: usize, destination: &Path, force_v1_compatibility: Option<bool>) -> Result<(), String> {
+  pub fn to_fits_file<P: AsRef<Path>>(moc_index: usize, destination: P, force_v1_compatibility: Option<bool>) -> Result<(), String> {
     store::exec_on_one_readonly_moc(
       moc_index,
       move |moc| moc.to_fits_file(destination, force_v1_compatibility.unwrap_or(false)),
