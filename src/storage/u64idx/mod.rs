@@ -91,6 +91,7 @@ pub struct U64MocStore;
 // * fill holes
 
 impl U64MocStore {
+  
   pub fn get_global_store() -> &'static Self { &GLOBAL_STORE }
 
   pub fn insert_smoc(&self, moc: SMOC) -> Result<usize, String> {
@@ -146,6 +147,24 @@ impl U64MocStore {
       })
   }
 
+  //////////////////
+  // Get MOC info //
+  
+  pub fn get_smoc_depths(&self, index: usize) -> Result<u8, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_smoc_depth)
+  }
+
+  pub fn get_tmoc_depths(&self, index: usize) -> Result<u8, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_tmoc_depth)
+  }
+
+  pub fn get_fmoc_depths(&self, index: usize) -> Result<u8, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_fmoc_depth)
+  }
+
+  pub fn get_stmoc_depths(&self, index: usize) -> Result<(u8, u8), String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_stmoc_time_and_space_depths)
+  }
 
   ///////////////////////
   // LOAD EXISTING MOC //
@@ -1200,7 +1219,7 @@ impl U64MocStore {
     } else {
       let ipix = lonlat2hash(space_depth, lon, lat)?;
       let times = times2hash(time_depth, times_start, times_end)?;
-      let moc =TimeSpaceMoc::<u64, u64>::create_from_time_ranges_positions(
+      let moc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_positions(
         times, ipix, time_depth, space_depth
       );
       store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2())

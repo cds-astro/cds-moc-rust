@@ -122,7 +122,6 @@ impl Op1MultiRes {
   }
 }
 
-
 pub(crate) fn op1_count_split(index: usize, indirect_neigh: bool) -> Result<u32, String> {
   store::exec_on_one_readonly_moc(
     index,

@@ -9,11 +9,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-latest]
-
     steps:
     - uses: actions/checkout@v2
     - name: Run lib tests
-      run: cargo test --workspace --verbose -- --nocapture
+      run: cargo test --all-features --workspace --verbose -- --nocapture
 
 
   test_win: 
@@ -22,9 +21,8 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest]
-
     steps:
     - uses: actions/checkout@v2
     - name: Run lib tests
-      run: cargo test --verbose -- --nocapture
+      run: cargo test --all-features --verbose -- --nocapture
 

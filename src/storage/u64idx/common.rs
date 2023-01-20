@@ -73,12 +73,40 @@ impl From<STMOC> for InternalMoc {
 
 
 impl InternalMoc {
-  pub(crate) fn get_space_time_depths(&self) -> (Option<u8>, Option<u8>) {
+  
+  pub(crate) fn get_smoc_depth(&self) -> Result<u8, String> {
     match self {
-      InternalMoc::Space(moc) => (Some(moc.depth_max()), None),
-      InternalMoc::Time(moc) => (None, Some(moc.depth_max())),
-      InternalMoc::Frequency(_) => (None, None),
-      InternalMoc::TimeSpace(moc2) => (Some(moc2.depth_max_2()), Some(moc2.depth_max_1())),
+      InternalMoc::Space(moc) => Ok(moc.depth_max()),
+      InternalMoc::Time(_) => Err(String::from("Wrong MOC type. Expected: Space. Actual: Time")),
+      InternalMoc::Frequency(_) => Err(String::from("Wrong MOC type. Expected: Space. Actual: Frequency")),
+      InternalMoc::TimeSpace(_) => Err(String::from("Wrong MOC type. Expected: Space. Actual: Space-Time")),
+    }
+  }
+
+  pub(crate) fn get_tmoc_depth(&self) -> Result<u8, String> {
+    match self {
+      InternalMoc::Space(_) => Err(String::from("Wrong MOC type. Expected: Time. Actual: Space")),
+      InternalMoc::Time(moc) => Ok(moc.depth_max()),
+      InternalMoc::Frequency(_ )=> Err(String::from("Wrong MOC type. Expected: Time. Actual: Frequency")),
+      InternalMoc::TimeSpace(_) => Err(String::from("Wrong MOC type. Expected: Time. Actual: Space-Time")),
+    }
+  }
+
+  pub(crate) fn get_fmoc_depth(&self) -> Result<u8, String> {
+    match self {
+      InternalMoc::Space(_) => Err(String::from("Wrong MOC type. Expected: Frequency. Actual: Space")),
+      InternalMoc::Time(_) => Err(String::from("Wrong MOC type. Expected: Frequency. Actual: Time")),
+      InternalMoc::Frequency(moc) => Ok(moc.depth_max()),
+      InternalMoc::TimeSpace(_) => Err(String::from("Wrong MOC type. Expected: Frequency. Actual: Space-Time")),
+    }
+  }
+
+  pub(crate) fn get_stmoc_time_and_space_depths(&self) -> Result<(u8, u8), String> {
+    match self {
+      InternalMoc::Space(_) => Err(String::from("Wrong MOC type. Expected: Space-Time. Actual: Space")),
+      InternalMoc::Time(_) => Err(String::from("Wrong MOC type. Expected: Space-Time. Actual: Time")),
+      InternalMoc::Frequency(_) => Err(String::from("Wrong MOC type. Expected: Space-Time. Actual: Frequency")),
+      InternalMoc::TimeSpace(moc2) => Ok((moc2.depth_max_1(), moc2.depth_max_2())),
     }
   }
 
