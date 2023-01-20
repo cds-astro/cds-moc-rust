@@ -40,6 +40,7 @@ pub(crate) type FMOC = RangeMOC<u64, Frequency<u64>>;
 pub(crate) type STMOC = RangeMOC2<u64, Time<u64>, u64, Hpx<u64>>;
 
 
+#[derive(Debug, PartialEq)]
 pub(crate) enum InternalMoc {
   Space(SMOC),
   Time(TMOC),
@@ -110,6 +111,17 @@ impl InternalMoc {
     }
   }
 
+  pub(crate) fn is_empty(&self) -> Result<bool, String> {
+    Ok(
+        match self {
+        InternalMoc::Space(moc) => moc.is_empty(),
+        InternalMoc::Time(moc) => moc.is_empty(),
+        InternalMoc::Frequency(moc) => moc.is_empty(),
+        InternalMoc::TimeSpace(moc) => moc.is_empty(),
+      }
+    )
+  }
+  
   pub(crate) fn get_nranges(&self) -> u32 {
     match self {
       InternalMoc::Space(moc) => moc.len() as u32,

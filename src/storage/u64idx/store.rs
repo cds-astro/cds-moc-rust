@@ -39,7 +39,7 @@ pub(crate) fn exec_on_one_readonly_moc<T, F>(index: usize, op: F) -> Result<T, S
   )
 }
 
-fn exec_on_two_readonly_mocs<T, F>(il: usize, ir: usize, op: F) -> Result<T, String>
+pub(crate) fn exec_on_two_readonly_mocs<T, F>(il: usize, ir: usize, op: F) -> Result<T, String>
   where
     F: Fn(&InternalMoc, &InternalMoc) -> Result<T, String>
 {

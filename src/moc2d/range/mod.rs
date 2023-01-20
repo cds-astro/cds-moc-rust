@@ -39,6 +39,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2Elem<T, Q, U, R> {
   pub fn new(moc_l: RangeMOC<T, Q>, moc_r: RangeMOC<U, R>) -> Self {
     Self { moc_l , moc_r }
   }
+  
   /// Returns the number of ranges in the first dimension
   pub fn n_ranges_1(&self) -> usize {
     self.moc_l.len()
@@ -150,6 +151,10 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
     Self { depth_max_l, depth_max_r, elems }
   }
 
+  pub fn is_empty(&self) -> bool {
+    self.elems.is_empty()
+  }
+  
   pub fn min_index_left(&self) -> Option<T> {
     self.elems.first()
       .and_then(|elem| elem.first_index_left())

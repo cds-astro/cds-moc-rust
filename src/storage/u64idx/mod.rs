@@ -166,6 +166,18 @@ impl U64MocStore {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_stmoc_time_and_space_depths)
   }
 
+  pub fn is_empty(&self, index: usize) -> Result<bool, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::is_empty)
+  }
+  
+  pub fn eq(&self, left_index: usize, right_index: usize) -> Result<bool, String> {
+    store::exec_on_two_readonly_mocs(
+      left_index,
+      right_index,
+      |l, r| Ok(l == r)
+    )
+  }
+
   ///////////////////////
   // LOAD EXISTING MOC //
 
