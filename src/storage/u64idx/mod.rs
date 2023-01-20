@@ -1253,33 +1253,18 @@ impl U64MocStore {
   /// * ``ds`` - The depth at which HEALPix cell indices
   ///   will be computed.
   ///
-  /// # Precondition
-  ///
-  /// * ``lon`` and ``lat`` are expressed in radians.
-  /// They are valid because they come from
-  /// `astropy.units.Quantity` objects.
-  /// * ``times`` are expressed in jd and are coming
-  /// from `astropy.time.Time` objects.
-  ///
-  /// # Errors
-  ///
-  /// If the number of longitudes, latitudes and times do not match.
-  ///
-  /// # Remark 
-  ///
-  /// Method kept temporarily to ensure backward compatibility.
-  ///
   pub fn from_time_ranges_spatial_coverages_approx(
     &self,
     times_start: Vec<f64>,
     times_end: Vec<f64>,
     time_depth: u8,
     spatial_coverages: Vec<HpxRanges<u64>>,
-  ) -> Result<TimeSpaceMoc<u64, u64>, String> {
+    space_depth: u8,
+  ) -> Result<usize, String> {
     let times_start = jd2mas_approx(times_start);
     let times_end = jd2mas_approx(times_end);
     self.from_time_ranges_spatial_coverages(
-      times_start, times_end, time_depth, spatial_coverages,
+        times_start, times_end, time_depth, spatial_coverages, space_depth
     )
   }
 
@@ -1314,11 +1299,13 @@ impl U64MocStore {
     times_end: Vec<u64>,
     time_depth: u8,
     spatial_coverages: Vec<HpxRanges<u64>>,
-  ) -> Result<TimeSpaceMoc<u64, u64>, String> {
+    space_depth: u8,
+  ) -> Result<usize, String> {
     let times = times2hash(time_depth, times_start, times_end)?;
-    Ok(TimeSpaceMoc::<u64, u64>::create_from_time_ranges_spatial_coverage(
+    let moc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_spatial_coverage(
       times, spatial_coverages, time_depth,
-    ))
+    );
+    store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2())
   }
 
 
