@@ -513,6 +513,7 @@ impl U64MocStore {
   /// * `smoc`: the Spatial MOC to be print;
   /// * `img_y_size`: the `Y` number of pixels in the image, the image size will be `(2*Y, Y)`;
   pub fn to_png(
+    &self,
     moc_index: usize,
     img_y_size: u16,
   ) -> Result<Box<[u8]>, String> {
@@ -540,7 +541,7 @@ impl U64MocStore {
   /// Returns the ASCII serialization of the given MOC.
   /// # Args
   ///
-  pub fn to_ascii_str(moc_index: usize, fold: Option<usize>) -> Result<String, String> {
+  pub fn to_ascii_str(&self, moc_index: usize, fold: Option<usize>) -> Result<String, String> {
     // from_str creates a copy :o/
     store::exec_on_one_readonly_moc(
       moc_index,
@@ -551,7 +552,7 @@ impl U64MocStore {
   /// Write the ASCII serialization of the given MOC in the given path.
   /// # Args
   ///
-  pub fn to_ascii_file<P: AsRef<Path>>(moc_index: usize, destination: P, fold: Option<usize>) -> Result<(), String> {
+  pub fn to_ascii_file<P: AsRef<Path>>(&self, moc_index: usize, destination: P, fold: Option<usize>) -> Result<(), String> {
     // from_str creates a copy :o/
     store::exec_on_one_readonly_moc(
       moc_index,
@@ -563,7 +564,7 @@ impl U64MocStore {
   /// Returns the JSON serialization of the given MOC.
   /// # Args
   ///
-  pub fn to_json_str(moc_index: usize, fold: Option<usize>) -> Result<String, String> {
+  pub fn to_json_str(&self, moc_index: usize, fold: Option<usize>) -> Result<String, String> {
     store::exec_on_one_readonly_moc(
       moc_index,
       move |moc| moc.to_json_str(fold),
@@ -573,7 +574,7 @@ impl U64MocStore {
   /// Write the KSON serialization of the given MOC in the given path.
   /// # Args
   ///
-  pub fn to_json_file<P: AsRef<Path>>(moc_index: usize, destination: P, fold: Option<usize>) -> Result<(), String> {
+  pub fn to_json_file<P: AsRef<Path>>(&self, moc_index: usize, destination: P, fold: Option<usize>) -> Result<(), String> {
     store::exec_on_one_readonly_moc(
       moc_index,
       move |moc| moc.to_json_file(destination, fold),
@@ -584,7 +585,7 @@ impl U64MocStore {
   /// # Args
   /// * `name`: name of the MOC in the internal store
   /// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard. 
-  pub fn to_fits_buff(moc_index: usize, force_v1_compatibility: Option<bool>) -> Result<Box<[u8]>, String> {
+  pub fn to_fits_buff(&self, moc_index: usize, force_v1_compatibility: Option<bool>) -> Result<Box<[u8]>, String> {
     store::exec_on_one_readonly_moc(
       moc_index,
       move |moc| moc.to_fits_buff(force_v1_compatibility.unwrap_or(false)),
@@ -595,7 +596,7 @@ impl U64MocStore {
   /// # Args
   /// * `name`: name of the MOC in the internal store
   /// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard. 
-  pub fn to_fits_file<P: AsRef<Path>>(moc_index: usize, destination: P, force_v1_compatibility: Option<bool>) -> Result<(), String> {
+  pub fn to_fits_file<P: AsRef<Path>>(&self, moc_index: usize, destination: P, force_v1_compatibility: Option<bool>) -> Result<(), String> {
     store::exec_on_one_readonly_moc(
       moc_index,
       move |moc| moc.to_fits_file(destination, force_v1_compatibility.unwrap_or(false)),
@@ -1464,7 +1465,7 @@ impl U64MocStore {
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
-  pub fn filter_time<T>(moc_index: usize, jds: T) -> Result<Vec<u8>, String>
+  pub fn filter_time<T>(&self, moc_index: usize, jds: T) -> Result<Vec<u8>, String>
     where
       T: Iterator<Item=f64>
   {
