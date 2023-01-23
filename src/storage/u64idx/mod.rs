@@ -60,7 +60,7 @@ mod opn;
 
 use self::{
   common::{
-    PI, HALF_PI,
+    PI, HALF_PI, MocQType,
     InternalMoc, SMOC, TMOC, FMOC, STMOC,
     check_depth, lon_deg2rad, lat_deg2rad,
   },
@@ -149,6 +149,10 @@ impl U64MocStore {
 
   //////////////////
   // Get MOC info //
+  
+  pub fn get_qty_type(&self, index: usize) -> Result<MocQType, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_qty_type)
+  }
   
   pub fn get_smoc_depths(&self, index: usize) -> Result<u8, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_smoc_depth)

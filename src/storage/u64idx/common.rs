@@ -40,6 +40,14 @@ pub(crate) type FMOC = RangeMOC<u64, Frequency<u64>>;
 pub(crate) type STMOC = RangeMOC2<u64, Time<u64>, u64, Hpx<u64>>;
 
 
+#[derive(Copy, Clone)]
+pub enum MocQType {
+  Space,
+  Time,
+  Frequency,
+  SpaceTime,
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) enum InternalMoc {
   Space(SMOC),
@@ -74,6 +82,15 @@ impl From<STMOC> for InternalMoc {
 
 
 impl InternalMoc {
+  
+  pub(crate) fn get_qty_type(&self) -> Result<MocQType, String> {
+    match self {
+      InternalMoc::Space(_) => Ok(MocQType::Space),
+      InternalMoc::Time(_) => Ok(MocQType::Time),
+      InternalMoc::Frequency(_) => Ok(MocQType::Frequency),
+      InternalMoc::TimeSpace(_) => Ok(MocQType::SpaceTime),
+    }
+  }
   
   pub(crate) fn get_smoc_depth(&self) -> Result<u8, String> {
     match self {
