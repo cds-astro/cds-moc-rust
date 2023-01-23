@@ -1116,7 +1116,7 @@ impl U64MocStore {
     lat: Vec<f64>,
     time_depth: u8,
     space_depth: u8,
-  ) -> Result<TimeSpaceMoc<u64, u64>, String> {
+  ) -> Result<usize, String> {
     let times = jd2mas_approx(times);
     self.create_from_times_positions(times, lon, lat, time_depth, space_depth)
   }
@@ -1141,7 +1141,7 @@ impl U64MocStore {
     lat: Vec<f64>,
     time_depth: u8,
     space_depth: u8,
-  ) -> Result<TimeSpaceMoc<u64, u64>, String> {
+  ) -> Result<usize, String> {
     if time_depth > Time::<u64>::MAX_DEPTH {
       Err(format!("Time depth must be in [0, {}]", Time::<u64>::MAX_DEPTH))
     } else if times.len() != lon.len() {
@@ -1149,8 +1149,8 @@ impl U64MocStore {
     } else {
       lonlat2hash(space_depth, lon, lat)
         .map(|ipix| TimeSpaceMoc::<u64, u64>::create_from_times_positions(
-          times, ipix, time_depth, space_depth,
-        ))
+            times, ipix, time_depth, space_depth,
+        )).and_then(|moc| store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2()))
     }
   }
 
