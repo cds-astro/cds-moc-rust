@@ -1,23 +1,28 @@
 
-use std::slice;
-use std::ops::Range;
-use std::vec::{IntoIter};
-
-use crate::idx::Idx;
-use crate::qty::{MocQty, Time, Hpx};
-use crate::moc::{
-  ZSorted, NonOverlapping,
-  RangeMOCIterator, RangeMOCIntoIterator,
-  range::{RangeMOC, RangeMocIter, RangeRefMocIter},
-  adapters::CellMOCIteratorFromRanges,
+use std::{
+  slice,
+  ops::Range,
+  cmp::Ordering,
+  vec::IntoIter,
 };
-use crate::moc2d::{
-  HasTwoMaxDepth, MOC2Properties, 
-  RangeMOC2ElemIt, RangeMOC2Iterator, RangeMOC2IntoIterator,
-  CellMOC2ElemIt, CellMOC2Iterator, CellMOC2IntoIterator,
-  builder::{
-    maxdepths_cell::FixedDepthSTMocBuilder,
-    maxdepths_ranges_cells::RangesAndFixedDepthCellsSTMocBuilder
+
+use crate::{
+  idx::Idx,
+  qty::{MocQty, Time, Hpx},
+  moc::{
+    ZSorted, NonOverlapping,
+    RangeMOCIterator, RangeMOCIntoIterator,
+    range::{RangeMOC, RangeMocIter, RangeRefMocIter},
+    adapters::CellMOCIteratorFromRanges,
+  },
+  moc2d::{
+    HasTwoMaxDepth, MOC2Properties,
+    RangeMOC2ElemIt, RangeMOC2Iterator, RangeMOC2IntoIterator,
+    CellMOC2ElemIt, CellMOC2Iterator, CellMOC2IntoIterator,
+    builder::{
+      maxdepths_cell::FixedDepthSTMocBuilder,
+      maxdepths_ranges_cells::RangesAndFixedDepthCellsSTMocBuilder
+    }
   }
 };
 
@@ -68,6 +73,12 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2Elem<T, Q, U, R> {
   pub fn last_index_left(&self) -> Option<T> {
     self.moc_l.last_index()
   }
+
+  /// The values are the values at Q::MAX_DEPTH and R::MAX_DEPTH respectively
+  pub fn contains_val(&self, val_left: &T, val_right: &U) -> bool {
+    self.moc_l.contains_val(val_left) && self.moc_r.contains_val(val_right)
+  }
+
 }
 /*impl<T, Q, U, R> PartialEq for RangeMOC2Elem<T, Q, U, R> {
   where
@@ -217,6 +228,26 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
   /// The total number of ranges in both dimensions
   pub fn compute_n_ranges(&self) -> u64 {
     self.elems.iter().map(|e| e.n_ranges()).sum()
+  }
+
+  /// The values are the values at Q::MAX_DEPTH and R::MAX_DEPTH respectively
+  pub fn contains_val(&self, val_left: &T, val_right: &U) -> bool {
+    let comp_res = self.elems.binary_search_by(
+      |elem| match (elem.moc_l.first_index(), elem.moc_l.last_index()) {
+        (Some(start), Some(end)) => if *val_left < start {
+          Ordering::Less
+        } else if *val_left >= end{
+          Ordering::Greater
+        } else {
+          Ordering::Equal
+        },
+        _ => Ordering::Less,
+      }
+    );
+    match comp_res {
+      Ok(i) => self.elems[i].contains_val(val_left, val_right), 
+      _ => false
+    }
   }
   
   /// So far the internal code resort to the code to perform operation on iterator.

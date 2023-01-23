@@ -45,7 +45,7 @@ pub enum MocQType {
   Space,
   Time,
   Frequency,
-  SpaceTime,
+  TimeSpace,
 }
 
 #[derive(Debug, PartialEq)]
@@ -88,7 +88,7 @@ impl InternalMoc {
       InternalMoc::Space(_) => Ok(MocQType::Space),
       InternalMoc::Time(_) => Ok(MocQType::Time),
       InternalMoc::Frequency(_) => Ok(MocQType::Frequency),
-      InternalMoc::TimeSpace(_) => Ok(MocQType::SpaceTime),
+      InternalMoc::TimeSpace(_) => Ok(MocQType::TimeSpace),
     }
   }
   

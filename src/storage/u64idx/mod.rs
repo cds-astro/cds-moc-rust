@@ -1458,9 +1458,10 @@ impl U64MocStore {
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
-  pub fn filter_pos<T>(&self, moc_index: usize, coos_deg: T) -> Result<Vec<u8>, String>
+  pub fn filter_pos<T, F, R>(&self, moc_index: usize, coos_deg: T, fn_bool: F) -> Result<Vec<R>, String>
     where
-      T: Iterator<Item=(f64, f64)>
+      T: Iterator<Item=(f64, f64)>,
+      F: Fn(bool) -> R
   {
     let filter = |moc: &InternalMoc| match moc {
       InternalMoc::Space(moc) => {
@@ -1474,11 +1475,11 @@ impl U64MocStore {
             match (lon, lat) {
               (Ok(lon), Ok(lat)) => {
                 let icell = layer.hash(lon, lat) << shift;
-                if moc.contains_val(&icell) { 1_u8 } else { 0_u8 }
+                fn_bool(moc.contains_val(&icell))
               }
-              _ => 0_u8,
+              _ => fn_bool(false),
             }
-          }).collect::<Vec<u8>>()
+          }).collect::<Vec<R>>()
         )
       }
       _ => Err(String::from("Can't filter coos on a MOC different from a S-MOC")),
@@ -1496,23 +1497,74 @@ impl U64MocStore {
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
-  pub fn filter_time<T>(&self, moc_index: usize, jds: T) -> Result<Vec<u8>, String>
+  pub fn filter_time_approx<T, F, R>(&self, moc_index: usize, jds_it: T, fn_bool: F) -> Result<Vec<R>, String>
     where
-      T: Iterator<Item=f64>
+      T: Iterator<Item=f64>,
+      F: Fn(bool) -> R
+  {
+    self.filter_time(
+      moc_index, 
+      jds_it.map(|jd| (jd * JD_TO_USEC) as u64),
+      fn_bool
+    )
+  }
+
+  /// Returns an array of boolean (u8 set to 1 or 0) telling if the time (in Julian Days)
+  /// in the input array are in (true=1) or out of (false=0) the T-MOC of given name.
+  /// # Args
+  /// * `moc_index`: index of the S-MOC to be used for filtering
+  /// * `jds`: array of decimal JD time (`f64`)
+  /// # Remarks
+  /// * the size of the returned boolean (u8) array his the same as the size of the input array.
+  /// * we do not return an iterator to avoid chaining with possibly costly operations
+  ///   while keeping a read lock on the store.
+  /// * similarly, be carefull not to use an input Iterator based on costly operations...
+  pub fn filter_time<T, F, R>(&self, moc_index: usize, usec_it: T, fn_bool: F) -> Result<Vec<R>, String>
+    where
+      T: Iterator<Item=u64>,
+      F: Fn(bool) -> R
   {
     let filter = move |moc: &InternalMoc| match moc {
-      InternalMoc::Time(moc) => {
-        Ok(
-          jds.map(|jd| {
-            let usec = (jd * JD_TO_USEC) as u64;
-            moc.contains_val(&usec) as u8
-          }).collect::<Vec<u8>>()
-        )
-      }
+      InternalMoc::Time(moc) => Ok(usec_it.map(|usec| fn_bool(moc.contains_val(&usec))).collect::<Vec<R>>()),
       _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
     };
     store::exec_on_one_readonly_moc(moc_index, filter)
   }
+
+
+  pub fn filter_timepos_approx<T, F, R>(&self, moc_index: usize, jd_pos_it: T, fn_bool: F) -> Result<Vec<R>, String>
+    where
+      T: Iterator<Item=(f64, (f64, f64))>,
+      F: Fn(bool) -> R
+  {
+    self.filter_timepos(
+      moc_index,
+      jd_pos_it.map(|(jd, pos)| {
+        let usec = (jd * JD_TO_USEC) as u64;
+        (usec, pos)
+      }),
+      fn_bool
+    )
+  }
+  
+  pub fn filter_timepos<T, F, R>(&self, moc_index: usize, usec_pos_it: T, fn_bool: F) -> Result<Vec<R>, String>
+    where
+      T: Iterator<Item=(u64, (f64, f64))>,
+      F: Fn(bool) -> R
+  {
+    let layer = healpix::nested::get(Hpx::<u64>::MAX_DEPTH);
+    let filter = move |moc: &InternalMoc| match moc {
+      InternalMoc::TimeSpace(stmoc) => Ok(
+        usec_pos_it.map(|(usec, (lon, lat))| {
+            let idx = layer.hash(lon, lat);
+            fn_bool(stmoc.contains_val(&usec, &idx))
+          }).collect::<Vec<R>>()
+      ),
+      _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
+    };
+    store::exec_on_one_readonly_moc(moc_index, filter)
+  }
+
 }
 
 
