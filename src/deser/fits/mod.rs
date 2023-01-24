@@ -659,14 +659,13 @@ pub fn from_fits_ivoa_custom<R: BufRead>(mut reader: R, coosys_permissive: bool)
         Some(MocKeywords::Ordering(Ordering::Nuniq)) => load_s_moc_nuniq(reader, n_bytes, n_elems, depth_max, &moc_kws),
         Some(MocKeywords::Ordering(Ordering::Range)) => load_s_moc_range(reader, n_bytes, n_elems, depth_max, &moc_kws),
         Some(MocKeywords::Ordering(Ordering::Range29)) => {
-          // let depth_max_time = depth_max << 1;
           let (depth_max_time, depth_max_hpx) = match (moc_kws.get::<MocOrdT>(), moc_kws.get::<MocOrdS>()) {
             (None, Some(MocKeywords::MOCOrdS(MocOrdS { depth }))) => (depth_max << 1, *depth),
             (Some(MocKeywords::MOCOrdT(MocOrdT { depth })), None) => ((*depth) << 1, depth_max),
             (Some(MocKeywords::MOCOrdT(MocOrdT { depth: tdepth })), Some(MocKeywords::MOCOrdS(MocOrdS { depth: sdepth }))) => ((*tdepth) << 1, *sdepth),
             _ => return Err(FitsError::MissingKeyword(String::from("MOCORD_1 or TORDER"))),
           };
-          load_st_moc_range29(reader, n_bytes, n_elems, depth_max_time, depth_max_hpx, &moc_kws)
+          load_st_moc_range29(reader, n_bytes, n_elems, depth_max_time << 1, depth_max_hpx, &moc_kws)
         },
         _ => Err(FitsError::MissingKeyword(Ordering::keyword_string())),
       }
