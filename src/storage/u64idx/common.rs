@@ -48,12 +48,24 @@ pub enum MocQType {
   TimeSpace,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub(crate) enum InternalMoc {
   Space(SMOC),
   Time(TMOC),
   Frequency(FMOC),
   TimeSpace(STMOC),
+}
+
+impl PartialEq for InternalMoc {
+  fn eq(&self, other: &Self) -> bool {
+    match (self, other) {
+      (InternalMoc::Space(l), InternalMoc::Space(r)) => r == l,
+      (InternalMoc::Time(l), InternalMoc::Time(r)) => r == l,
+      (InternalMoc::Frequency(l), InternalMoc::Frequency(r)) => r == l,
+      (InternalMoc::TimeSpace(l), InternalMoc::TimeSpace(r)) => r == l,
+      _ => false
+    }
+  }
 }
 
 impl From<SMOC> for InternalMoc {
