@@ -665,7 +665,7 @@ pub fn from_fits_ivoa_custom<R: BufRead>(mut reader: R, coosys_permissive: bool)
             (Some(MocKeywords::MOCOrdT(MocOrdT { depth: tdepth })), Some(MocKeywords::MOCOrdS(MocOrdS { depth: sdepth }))) => ((*tdepth) << 1, *sdepth),
             _ => return Err(FitsError::MissingKeyword(String::from("MOCORD_1 or TORDER"))),
           };
-          load_st_moc_range29(reader, n_bytes, n_elems, depth_max_time << 1, depth_max_hpx, &moc_kws)
+          load_st_moc_range29(reader, n_bytes, n_elems, depth_max_time, depth_max_hpx, &moc_kws)
         },
         _ => Err(FitsError::MissingKeyword(Ordering::keyword_string())),
       }
