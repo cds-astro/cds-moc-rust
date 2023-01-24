@@ -1447,14 +1447,13 @@ impl U64MocStore {
   //////////////////////////////////////////////////////
   // Filter/Contains (returning an array of boolean?) //
 
-  /// Returns an array of boolean (u8 set to 1 or 0) telling if the pairs of coordinates
+  /// Returns an array (of boolean or u8 or ...) telling if the pairs of coordinates
   /// in the input slice are in (true=1) or out of (false=0) the S-MOC.
   /// # Args
   /// * `moc_index`: index of the S-MOC to be used for filtering
-  /// * `coos_deg`: list of coordinates in degrees `[lon_1, lat_1, lon_2, lat_2, ..., lon_n, lat_n]`
+  /// * `coos_deg`: iterator on coordinates in degrees `[lon_1, lat_1, lon_2, lat_2, ..., lon_n, lat_n]`
   /// # Remarks
-  /// * The size of the returned boolean (u8) array his half the size of the input array
-  /// (since the later contains pairs of coordinates).
+  /// * the size of the returned array is the same as the number of elements on the input iterator.
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
@@ -1487,16 +1486,16 @@ impl U64MocStore {
     store::exec_on_one_readonly_moc(moc_index, filter)
   }
 
-  /// Returns an array of boolean (u8 set to 1 or 0) telling if the time (in Julian Days)
+  /// Returns an array (of boolean or u8 or ...) telling if the time (in Julian Days)
   /// in the input array are in (true=1) or out of (false=0) the T-MOC of given name.
   /// # Args
   /// * `moc_index`: index of the S-MOC to be used for filtering
-  /// * `jds`: array of decimal JD time (`f64`)
+  /// * `jds`: iterator on decimal JD time (`f64`)
   /// # Remarks
-  /// * the size of the returned boolean (u8) array his the same as the size of the input array.
+  /// * the size of the returned array is the same as the number of elements on the input iterator.
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
-  /// * similarly, be carefull not to use an input Iterator based on costly operations...
+  /// * similarly, be careful not to use an input Iterator based on costly operations...
   pub fn filter_time_approx<T, F, R>(&self, moc_index: usize, jds_it: T, fn_bool: F) -> Result<Vec<R>, String>
     where
       T: Iterator<Item=f64>,
@@ -1509,13 +1508,13 @@ impl U64MocStore {
     )
   }
 
-  /// Returns an array of boolean (u8 set to 1 or 0) telling if the time (in Julian Days)
+  /// Returns an array (of boolean or u8 or ...) telling if the time (in Julian Days)
   /// in the input array are in (true=1) or out of (false=0) the T-MOC of given name.
   /// # Args
   /// * `moc_index`: index of the S-MOC to be used for filtering
-  /// * `jds`: array of decimal JD time (`f64`)
+  /// * `jds`: iterator of times, in microsec since JD=0
   /// # Remarks
-  /// * the size of the returned boolean (u8) array his the same as the size of the input array.
+  /// * the size of the returned array is the same as the number of elements on the input iterator.
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
@@ -1532,6 +1531,16 @@ impl U64MocStore {
   }
 
 
+  /// Returns an array (of boolean or u8 or ...) telling if the pairs of coordinates
+  /// in the input slice are in (true=1) or out of (false=0) the S-MOC.
+  /// # Args
+  /// * `moc_index`: index of the S-MOC to be used for filtering
+  /// * `coos_deg`: list of coordinates in degrees `[lon_1, lat_1, lon_2, lat_2, ..., lon_n, lat_n]`
+  /// # Remarks
+  /// * the size of the returned array is the same as the number of elements on the input iterator.
+  /// * we do not return an iterator to avoid chaining with possibly costly operations
+  ///   while keeping a read lock on the store.
+  /// * similarly, be carefull not to use an input Iterator based on costly operations...
   pub fn filter_timepos_approx<T, F, R>(&self, moc_index: usize, jd_pos_it: T, fn_bool: F) -> Result<Vec<R>, String>
     where
       T: Iterator<Item=(f64, (f64, f64))>,
@@ -1546,7 +1555,19 @@ impl U64MocStore {
       fn_bool
     )
   }
-  
+
+
+  /// Returns an array (of boolean or u8 or ...) telling if the pairs of coordinates
+  /// in the input slice are in (true=1) or out of (false=0) the S-MOC.
+  /// # Args
+  /// * `moc_index`: index of the S-MOC to be used for filtering
+  /// * `usec_pos_it`: iterator on tuples made of a time, in microsec since JD=0, and coordinates 
+  ///                  in degrees `(lon, lat)`
+  /// # Remarks
+  /// * the size of the returned array is the same as the number of elements on the input iterator.
+  /// * we do not return an iterator to avoid chaining with possibly costly operations
+  ///   while keeping a read lock on the store.
+  /// * similarly, be carefull not to use an input Iterator based on costly operations...
   pub fn filter_timepos<T, F, R>(&self, moc_index: usize, usec_pos_it: T, fn_bool: F) -> Result<Vec<R>, String>
     where
       T: Iterator<Item=(u64, (f64, f64))>,

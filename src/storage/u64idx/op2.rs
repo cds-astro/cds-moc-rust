@@ -70,8 +70,8 @@ impl Op2 {
     let result = match self {
       Op2::Intersection => left.intersection(&right),
       Op2::Union => left.union(&right),
-      Op2::Difference => return Err(String::from("Difference (or xor) not implemented yet for ST-MOCs.")),
-      Op2::Minus => left.difference(&right),
+      Op2::Difference => left.difference(&right),
+      Op2::Minus => return Err(String::from("Minus not implemented yet for ST-MOCs.")),
       Op2::TFold => return Err(String::from("TimeFold operation not available on 2 ST-MOCs.")),
       Op2::SFold => return Err(String::from("SpaceFold operation not available on 2 ST-MOCs.")),
     };
