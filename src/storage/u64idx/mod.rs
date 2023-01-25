@@ -154,15 +154,15 @@ impl U64MocStore {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_qty_type)
   }
   
-  pub fn get_smoc_depths(&self, index: usize) -> Result<u8, String> {
+  pub fn get_smoc_depth(&self, index: usize) -> Result<u8, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_smoc_depth)
   }
 
-  pub fn get_tmoc_depths(&self, index: usize) -> Result<u8, String> {
+  pub fn get_tmoc_depth(&self, index: usize) -> Result<u8, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_tmoc_depth)
   }
 
-  pub fn get_fmoc_depths(&self, index: usize) -> Result<u8, String> {
+  pub fn get_fmoc_depth(&self, index: usize) -> Result<u8, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_fmoc_depth)
   }
 
@@ -1407,12 +1407,11 @@ impl U64MocStore {
     OpN::Union.exec(indices)
   }
 
-  pub fn multi_intersecion(&self, indices: &[usize]) -> Result<usize, String> {
+  pub fn multi_intersection(&self, indices: &[usize]) -> Result<usize, String> {
     OpN::Intersection.exec(indices)
-
   }
 
-  pub fn multi_multi_difference(&self, indices: &[usize]) -> Result<usize, String> {
+  pub fn multi_difference(&self, indices: &[usize]) -> Result<usize, String> {
     OpN::Difference.exec(indices)
 
   }
