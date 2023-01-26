@@ -841,18 +841,19 @@ impl U64MocStore {
   ///
   /// # Output
   /// - The index in the storage
-  pub fn from_polygon(
+  pub fn from_polygon<T>(
     &self,
-    mut vertices: Vec<(f64, f64)>,
+    vertices_it: T,
     complement: bool,
     depth: u8,
-  ) -> Result<usize, String> {
+  ) -> Result<usize, String>
+    where
+      T: Iterator<Item=(f64, f64)>
+  {
     check_depth::<Hpx<u64>>(depth)?;
-    // An other solution would be to go unsafe to transmute in Box<[[f64; 2]]> ...
-    for (lon_deg, lat_deg) in vertices.iter_mut() {
-      *lon_deg = lon_deg2rad(*lon_deg)?;
-      *lat_deg = lat_deg2rad(*lat_deg)?;
-    }
+    let vertices: Vec<(f64, f64)> = vertices_it.map(
+      |(lon_deg, lat_deg)| Ok::<(f64, f64), String>((lon_deg2rad(lon_deg)?, lat_deg2rad(lat_deg)?))
+    ).collect::<Result<_, _>>()?;
     let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_polygon(&vertices, complement, depth);
     store::add(moc)
   }
