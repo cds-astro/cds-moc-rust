@@ -142,7 +142,7 @@ impl InternalMoc {
 
   pub(crate) fn is_empty(&self) -> Result<bool, String> {
     Ok(
-        match self {
+      match self {
         InternalMoc::Space(moc) => moc.is_empty(),
         InternalMoc::Time(moc) => moc.is_empty(),
         InternalMoc::Frequency(moc) => moc.is_empty(),
@@ -151,13 +151,15 @@ impl InternalMoc {
     )
   }
   
-  pub(crate) fn get_nranges(&self) -> u32 {
-    match self {
-      InternalMoc::Space(moc) => moc.len() as u32,
-      InternalMoc::Time(moc) => moc.len() as u32,
-      InternalMoc::Frequency(moc) => moc.len() as u32,
-      InternalMoc::TimeSpace(moc2) => moc2.compute_n_ranges() as u32,
-    }
+  pub(crate) fn get_n_ranges(&self) -> Result<u32, String> {
+    Ok(
+      match self {
+        InternalMoc::Space(moc) => moc.len() as u32,
+        InternalMoc::Time(moc) => moc.len() as u32,
+        InternalMoc::Frequency(moc) => moc.len() as u32,
+        InternalMoc::TimeSpace(moc2) => moc2.compute_n_ranges() as u32,
+      }
+    )
   }
 
   pub(crate) fn get_coverage_percentage(&self) -> Option<f64> {

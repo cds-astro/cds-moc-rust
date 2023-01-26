@@ -174,6 +174,17 @@ impl U64MocStore {
   pub fn is_empty(&self, index: usize) -> Result<bool, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::is_empty)
   }
+
+  pub fn get_n_ranges(&self, index: usize) -> Result<u32, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_n_ranges)
+  }
+  
+  pub fn get_coverage_percentage(&self, index: usize) -> Result<f64, String> {
+    store::exec_on_one_readonly_moc(
+      index, 
+      |internal_moc| internal_moc.get_coverage_percentage().ok_or_else(|| String::from("No coverage available for this type of MOC"))
+    )
+  }
   
   pub fn eq(&self, left_index: usize, right_index: usize) -> Result<bool, String> {
     store::exec_on_two_readonly_mocs(
