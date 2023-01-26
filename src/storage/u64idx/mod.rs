@@ -24,6 +24,7 @@ use rayon::iter::{
 };
 
 use crate::{
+  idx::Idx,
   qty::{MocQty, Hpx, Time, Frequency},
   elem::valuedcell::valued_cells_to_moc_with_opt,
   elemset::range::HpxRanges,
@@ -713,8 +714,24 @@ impl U64MocStore {
   //////////////////
   // MOC CREATION //
 
+  
   // * S-MOC CREATION //
 
+
+  pub fn from_hpx_cells<T: Idx, I>(
+    &self,
+    depth: u8,
+    cells_it: I,
+    buf_capacity: Option<usize>
+  ) -> Result<usize, String>
+    where
+      I: Iterator<Item=(u8, T)>
+  {
+    let it = cells_it.map(|(depth, idx)| (depth, idx.to_u64()));
+    let moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_cells(depth, it, buf_capacity);
+    store::add(moc)
+  }
+  
   /// Create and store a MOC from the given cone.
   ///
   /// # Input

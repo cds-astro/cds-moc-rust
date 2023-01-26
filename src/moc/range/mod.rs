@@ -32,7 +32,10 @@ use healpix::{
 use crate::{
   idx::Idx,
   qty::{MocQty, Hpx, Time, Bounded, Frequency},
-  elem::cell::Cell,
+  elem::{
+    cell::Cell, 
+    range::MocRange,
+  },
   elemset::{
     range::MocRanges,
     cell::{MocCells, Cells}
@@ -136,7 +139,6 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   }
 
 
-  /// <=> from HEALPix map, i.e. from a list of HEALPic cell indices at the same depth
   pub fn from_fixed_depth_cells<I: Iterator<Item=T>>(
     depth: u8,
     cells_it: I,
@@ -145,6 +147,15 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     let mut builder = FixedDepthMocBuilder::new(depth, buf_capacity);
     for cell in cells_it {
       builder.push(cell);
+    }
+    builder.into_moc()
+  }
+
+  pub fn from_cells<I: Iterator<Item=(u8, T)>>(depth: u8, cells_it: I, buf_capacity: Option<usize>) -> Self {
+    let mut builder = RangeMocBuilder::new(depth, buf_capacity);
+    let it = cells_it.map(move |depth_idx| MocRange::<T, Q>::from(depth_idx).0);
+    for range in it {
+      builder.push(range);
     }
     builder.into_moc()
   }
@@ -528,7 +539,7 @@ impl RangeMOC<u64, Hpx<u64>> {
       buf_capacity
     )
   }
-
+  
   /// # Input
   /// - `lon` the longitude of the center of the cone, in radians
   /// - `lat` the latitude of the center of the cone, in radians
