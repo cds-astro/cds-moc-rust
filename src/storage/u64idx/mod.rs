@@ -343,18 +343,51 @@ impl U64MocStore {
       )
       .and_then(store::add)
   }
-  
-  
-  
+
+
   /// Create o S-MOC from a FITS multi-order map plus other parameters.
   /// # Args
+  /// * `path`: path of the fits file
   /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
   /// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
   /// * `asc`: Compute cumulative value from ascending density values instead of descending (often = false).
   /// * `not_strict`: Cells overlapping with the upper or the lower cumulative bounds are not rejected (often = false).
   /// * `split`: Split recursively the cells overlapping the upper or the lower cumulative bounds (often = false).
   /// * `revese_recursive_descent`: Perform the recursive descent from the highest to the lowest sub-cell, only with option 'split' (set both flags to be compatibile with Aladin)
-  pub fn from_multiordermap_fits_file(
+  pub fn from_multiordermap_fits_file<P: AsRef<Path>>(
+    &self,
+    path: P,
+    from_threshold: f64,
+    to_threshold: f64,
+    asc: bool,
+    not_strict: bool,
+    split: bool,
+    revese_recursive_descent: bool,
+  ) -> Result<usize, String> {
+    let file = File::open(&path).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    from_fits_multiordermap(
+      reader,
+      from_threshold,
+      to_threshold,
+      asc,
+      !not_strict,
+      split,
+      revese_recursive_descent,
+    ).map_err(|e| e.to_string())
+      .and_then(store::add)
+  }
+  
+  /// Create o S-MOC from a FITS multi-order map plus other parameters.
+  /// # Args
+  /// * `data`: binary content of the fits file
+  /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
+  /// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
+  /// * `asc`: Compute cumulative value from ascending density values instead of descending (often = false).
+  /// * `not_strict`: Cells overlapping with the upper or the lower cumulative bounds are not rejected (often = false).
+  /// * `split`: Split recursively the cells overlapping the upper or the lower cumulative bounds (often = false).
+  /// * `revese_recursive_descent`: Perform the recursive descent from the highest to the lowest sub-cell, only with option 'split' (set both flags to be compatibile with Aladin)
+  pub fn from_multiordermap_fits_file_content(
     &self,
     data: &[u8],
     from_threshold: f64,
@@ -378,6 +411,7 @@ impl U64MocStore {
 
   /// Create o S-MOC from a FITS skymap plus other parameters.
   /// # Args
+  /// * `path`: path of the fits file
   /// * `skip_values_le`: skip cells associated to values lower or equal to the given value 
   /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
   /// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
@@ -385,7 +419,43 @@ impl U64MocStore {
   /// * `not_strict`: Cells overlapping with the upper or the lower cumulative bounds are not rejected (often = false).
   /// * `split`: Split recursively the cells overlapping the upper or the lower cumulative bounds (often = false).
   /// * `revese_recursive_descent`: Perform the recursive descent from the highest to the lowest sub-cell, only with option 'split' (set both flags to be compatibile with Aladin)
-  pub fn from_skymap_fits_file(
+  pub fn from_skymap_fits_file<P: AsRef<Path>>(
+    &self,
+    path: P,
+    skip_values_le: f64,
+    from_threshold: f64,
+    to_threshold: f64,
+    asc: bool,
+    not_strict: bool,
+    split: bool,
+    revese_recursive_descent: bool,
+  ) -> Result<usize, String> {
+    let file = File::open(&path).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    from_fits_skymap(
+      reader,
+      skip_values_le,
+      from_threshold,
+      to_threshold,
+      asc,
+      !not_strict,
+      split,
+      revese_recursive_descent,
+    ).map_err(|e| e.to_string())
+      .and_then(store::add)
+  }
+  
+  /// Create o S-MOC from a FITS skymap plus other parameters.
+  /// # Args
+  /// * `data`: binary content of the fits file
+  /// * `skip_values_le`: skip cells associated to values lower or equal to the given value 
+  /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
+  /// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
+  /// * `asc`: Compute cumulative value from ascending density values instead of descending (often = false).
+  /// * `not_strict`: Cells overlapping with the upper or the lower cumulative bounds are not rejected (often = false).
+  /// * `split`: Split recursively the cells overlapping the upper or the lower cumulative bounds (often = false).
+  /// * `revese_recursive_descent`: Perform the recursive descent from the highest to the lowest sub-cell, only with option 'split' (set both flags to be compatibile with Aladin)
+  pub fn from_skymap_fits_file_content(
     &self,
     data: &[u8],
     skip_values_le: f64,
