@@ -1128,6 +1128,17 @@ impl U64MocStore {
 
   // * T-MOC CREATION //
 
+  pub fn from_microsec_since_jd0<T>(&self, depth: u8, microsec_since_jd0_it: T) -> Result<usize, String>
+    where
+      T: Iterator<Item=u64>
+  {
+    check_depth::<Time<u64>>(depth)?;
+    let moc = RangeMOC::<u64, Time<u64>>::from_microsec_since_jd0(
+      depth, microsec_since_jd0_it, None,
+    );
+    store::add(moc)
+  }
+    
   /// Create a new T-MOC from the given list of decimal Julian Days (JD) times.
   /// # Params
   /// * `name`: the name to be given to the MOC
@@ -1145,24 +1156,28 @@ impl U64MocStore {
     where
       T: Iterator<Item=f64>
   {
+    self.from_microsec_since_jd0(depth, jd.map(|jd| (jd * JD_TO_USEC) as u64))
+  }
+
+  pub fn from_microsec_ranges_since_jd0<T>(&self, depth: u8, microsec_ranges_since_jd0_it: T) -> Result<usize, String>
+    where
+      T: Iterator<Item=Range<u64>>
+  {
     check_depth::<Time<u64>>(depth)?;
-    let moc = RangeMOC::<u64, Time<u64>>::from_microsec_since_jd0(
-      depth, jd.map(|jd| (jd * JD_TO_USEC) as u64), None,
+    let moc = RangeMOC::<u64, Time<u64>>::from_microsec_ranges_since_jd0(
+      depth, microsec_ranges_since_jd0_it, None,
     );
     store::add(moc)
   }
-
+  
   pub fn from_decimal_jd_ranges<T>(&self, depth: u8, jd_ranges: T) -> Result<usize, String>
     where
       T: Iterator<Item=Range<f64>>
   {
-    check_depth::<Time<u64>>(depth)?;
-    let moc = RangeMOC::<u64, Time<u64>>::from_microsec_ranges_since_jd0(
+    self.from_microsec_ranges_since_jd0(
       depth,
       jd_ranges.map(|Range { start: jd_min, end: jd_max }| (jd_min * JD_TO_USEC) as u64..(jd_max * JD_TO_USEC) as u64),
-      None,
-    );
-    store::add(moc)
+    )
   }
 
   // * F-MOC CREATION //
