@@ -1,4 +1,4 @@
-use crate::moc::{RangeMOCIterator, CellMOCIterator, CellMOCIntoIterator};
+use crate::moc::{RangeMOCIterator, CellMOCIterator, CellMOCIntoIterator, RangeMOCIntoIterator};
 
 use super::{
   store,
@@ -120,6 +120,32 @@ impl Op1MultiRes {
       },
     )
   }
+}
+
+/// Returns all the cells at the moc depth
+pub(crate) fn op1_flatten_to_moc_depth(index: usize) -> Result<Vec<u64>, String> {
+  store::exec_on_one_readonly_moc(
+    index,
+    move |moc| match moc {
+      InternalMoc::Space(m) => Ok(m.into_range_moc_iter().flatten_to_fixed_depth_cells().collect()),
+      InternalMoc::Time(m) => Ok(m.into_range_moc_iter().flatten_to_fixed_depth_cells().collect()),
+      InternalMoc::Frequency(m) => Ok(m.into_range_moc_iter().flatten_to_fixed_depth_cells().collect()),
+      InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
+    },
+  )
+}
+
+/// Returns all the cells at the given depth (possibly degrading before flattening)
+pub(crate) fn op1_flatten_to_depth(index: usize, depth: u8) -> Result<Vec<u64>, String> {
+  store::exec_on_one_readonly_moc(
+    index,
+    move |moc| match moc {
+      InternalMoc::Space(m) => Ok(m.into_range_moc_iter().degrade(depth).flatten_to_fixed_depth_cells().collect()),
+      InternalMoc::Time(m) => Ok(m.into_range_moc_iter().degrade(depth).flatten_to_fixed_depth_cells().collect()),
+      InternalMoc::Frequency(m) => Ok(m.into_range_moc_iter().degrade(depth).flatten_to_fixed_depth_cells().collect()),
+      InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
+    },
+  )
 }
 
 pub(crate) fn op1_count_split(index: usize, indirect_neigh: bool) -> Result<u32, String> {

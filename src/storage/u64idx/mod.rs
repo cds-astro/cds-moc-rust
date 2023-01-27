@@ -70,7 +70,11 @@ use self::{
     smoc_from_fits_gen, tmoc_from_fits_gen, fmoc_from_fits_gen,
     stmoc_from_fits_u64
   },
-  op1::{Op1, Op1MultiRes, op1_count_split, op1_stmoc_tmin, op1_stmoc_tmax},
+  op1::{
+    Op1, Op1MultiRes,
+    op1_count_split, op1_stmoc_tmin, op1_stmoc_tmax,
+    op1_flatten_to_moc_depth, op1_flatten_to_depth
+  },
   op2::Op2,
   opn::OpN,
 };
@@ -1423,6 +1427,15 @@ impl U64MocStore {
   }
   pub fn complement(&self, index: usize) -> Result<usize, String> {
     Op1::Complement.exec(index)
+  }
+
+
+  pub fn flatten_to_moc_depth(&self, index: usize) -> Result<Vec<u64>, String> {
+    op1_flatten_to_moc_depth(index)
+  }
+
+  pub fn flatten_to_depth(&self, index: usize, depth: u8) -> Result<Vec<u64>, String> {
+    op1_flatten_to_depth(index, depth)
   }
 
   /// Split the given disjoint S-MOC int joint S-MOCs.
