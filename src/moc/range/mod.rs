@@ -159,6 +159,17 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     }
     builder.into_moc()
   }
+
+  pub fn from_maxdepth_ranges<I>(depth: u8, it: I, buf_capacity: Option<usize>) -> Self
+    where
+      I: Iterator<Item=Range<T>>
+  {
+    let mut builder = RangeMocBuilder::new(depth, buf_capacity);
+    for range in it {
+      builder.push(range.start..range.end);
+    }
+    builder.into_moc()
+  }
   
   /// Flatten the MOC returning an (ordered) iterator of cells at the MOC depth_max depth.
   pub fn flatten_to_fixed_depth_cells<'a>(&'a self) -> DepthMaxCellsFromRanges<T, Q, RangeRefMocIter<'a, T, Q>> {
@@ -731,11 +742,18 @@ impl<T: Idx> RangeMOC<T, Time<T>> {
     where
       I: Iterator<Item=Range<u64>>
   {
+    /*
     let mut builder = RangeMocBuilder::new(depth, buf_capacity);
     for range in it {
       builder.push(T::from_u64_idx(range.start)..T::from_u64_idx(range.end));
     }
     builder.into_moc()
+    */
+    Self::from_maxdepth_ranges(
+      depth, 
+      it.map(|range| T::from_u64_idx(range.start)..T::from_u64_idx(range.end)), 
+      buf_capacity
+    )
   }
 
 }

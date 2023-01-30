@@ -747,6 +747,20 @@ impl U64MocStore {
     store::add(moc)
   }
   
+  pub fn from_hpx_ranges<T: Idx, I>(&self,
+    depth: u8,
+    ranges_it: I,
+    buf_capacity: Option<usize>
+  ) -> Result<usize, String>
+   where
+      I: Iterator<Item=Range<T>>
+  {
+    let it = ranges_it.map(|range| T::to_u64_idx(range.start)..T::to_u64_idx(range.end));
+    let moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_maxdepth_ranges(depth, it, buf_capacity);
+    store::add(moc)
+  }
+
+
   /// Create and store a MOC from the given cone.
   ///
   /// # Input
