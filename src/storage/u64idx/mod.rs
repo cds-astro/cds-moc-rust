@@ -52,7 +52,7 @@ use crate::{
   },
 };
 
-mod common;
+pub mod common;
 mod load;
 mod store;
 mod op1;
