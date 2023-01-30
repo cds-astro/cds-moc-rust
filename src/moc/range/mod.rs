@@ -166,7 +166,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   {
     let mut builder = RangeMocBuilder::new(depth, buf_capacity);
     for range in it {
-      builder.push(range.start..range.end);
+      builder.push(range);
     }
     builder.into_moc()
   }

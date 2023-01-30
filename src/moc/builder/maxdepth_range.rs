@@ -60,25 +60,27 @@ impl<T: Idx, Q: MocQty<T>> RangeMocBuilder<T, Q> {
     self.moc.unwrap_or_else(|| RangeMOC::new(depth, Default::default()))
   }
 
-  pub fn push(&mut self, mut range: Range<T>) {
+  pub fn push(&mut self, mut new_range: Range<T>) {
     // Degrade to the input depth to ensure consistency
     use super::super::range::op::degrade::degrade_range;
-    degrade_range(&mut range, self.one_at_new_depth, self.rm_bits_mask, self.bits_to_be_rm_mask);
+    degrade_range(&mut new_range, self.one_at_new_depth, self.rm_bits_mask, self.bits_to_be_rm_mask);
     if let Some(Range { start, end }) = self.buff.last_mut() {
-      if range.end < *start || *end < range.start {
+      if new_range.end < *start || *end < new_range.start {
         // both ranges do not overlap
-        self.sorted &= range.end < *start;
-        self.buff.push(range);
+        self.sorted &= *end < new_range.start;
+        self.buff.push(new_range);
       } else {
         // merge overlaping ranges
-        if range.start < *start {
+        if new_range.start < *start {
           self.sorted = false; // we could try to look a previous ranges to merge them...
-          *start = range.start;
+          *start = new_range.start;
         }
-        *end = range.end.min(*end);
+        if *end < new_range.end {
+          *end = new_range.end
+        }
       }
     } else {
-      self.buff.push(range);
+      self.buff.push(new_range);
     }
     if self.buff.len() == self.buff.capacity() {
       self.drain_buffer();
