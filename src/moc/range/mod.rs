@@ -56,6 +56,7 @@ use crate::{
     adapters::DepthMaxCellsFromRanges,
     range::op::{
       or::{or, OrRangeIter},
+      merge::merge_sorted,
       minus::{minus, MinusRangeIter},
       and::{and, AndRangeIter},
       xor::xor,
@@ -742,13 +743,6 @@ impl<T: Idx> RangeMOC<T, Time<T>> {
     where
       I: Iterator<Item=Range<u64>>
   {
-    /*
-    let mut builder = RangeMocBuilder::new(depth, buf_capacity);
-    for range in it {
-      builder.push(T::from_u64_idx(range.start)..T::from_u64_idx(range.end));
-    }
-    builder.into_moc()
-    */
     Self::from_maxdepth_ranges(
       depth, 
       it.map(|range| T::from_u64_idx(range.start)..T::from_u64_idx(range.end)), 
@@ -756,6 +750,42 @@ impl<T: Idx> RangeMOC<T, Time<T>> {
     )
   }
 
+  /// Add the MOC external border of depth `self.depth_max`.
+  pub fn expanded(&self) -> Self {
+    let zero =  T::zero();
+    let n_cells_max = Time::<T>::n_cells_max();
+    let one_at_max_depth: T = T::one().unsigned_shl(Time::<T>::shift_from_depth_max(self.depth_max) as u32);
+    merge_sorted(
+      self.depth_max,
+      self.ranges.iter().map(|Range {start, end}| {
+          let start = if *start > zero {
+            *start - one_at_max_depth
+          } else {
+            *start
+          };
+          let end = if *end < n_cells_max {
+            *end + one_at_max_depth
+          } else {
+            *end
+          };
+          start..end
+        }
+      )
+    ).into_range_moc()
+  }
+  
+  pub fn contracted(&self) -> Self {
+    let one_at_max_depth: T = T::one().unsigned_shl(Time::<T>::shift_from_depth_max(self.depth_max) as u32);
+    let two_at_max_depth = one_at_max_depth << 1;
+    let ranges = self.ranges.iter()
+      .filter_map(|Range {start, end}| if (*end - *start) > two_at_max_depth {
+        Some(*start + one_at_max_depth..*end - one_at_max_depth)
+      } else {
+        None        
+      }).collect();
+    Self::new(self.depth_max, MocRanges::new_unchecked(ranges))
+  }
+  
 }
 
 impl<T: Idx> RangeMOC<T, Frequency<T>> {
@@ -783,8 +813,42 @@ impl<T: Idx> RangeMOC<T, Frequency<T>> {
     builder.into_moc()
   }
 
+  /// Add the MOC external border of depth `self.depth_max`.
+  pub fn expanded(&self) -> Self {
+    let zero = T::zero();
+    let n_cells_max = Frequency::<T>::n_cells_max();
+    let one_at_max_depth: T = T::one().unsigned_shl(Frequency::<T>::shift_from_depth_max(self.depth_max) as u32);
+    merge_sorted(
+      self.depth_max,
+      self.ranges.iter().map(|Range { start, end }| {
+        let start = if *start > zero {
+          *start - one_at_max_depth
+        } else {
+          *start
+        };
+        let end = if *end < n_cells_max {
+          *end + one_at_max_depth
+        } else {
+          *end
+        };
+        start..end
+      }
+      )
+    ).into_range_moc()
+  }
+      
+  pub fn contracted(&self) -> Self {
+    let one_at_max_depth: T = T::one().unsigned_shl(Frequency::<T>::shift_from_depth_max(self.depth_max) as u32);
+    let two_at_max_depth = one_at_max_depth << 1;
+    let ranges = self.ranges.iter()
+      .filter_map(|Range {start, end}| if (*end - *start) > two_at_max_depth {
+        Some(*start + one_at_max_depth..*end - one_at_max_depth)
+      } else {
+        None
+      }).collect();
+    Self::new(self.depth_max, MocRanges::new_unchecked(ranges))
+  }
 }
-
 
 impl<T: Idx, Q: MocQty<T>> PartialEq for RangeMOC<T, Q> {
   fn eq(&self, other: &Self) -> bool {
@@ -792,8 +856,6 @@ impl<T: Idx, Q: MocQty<T>> PartialEq for RangeMOC<T, Q> {
     && self.ranges.eq(&other.ranges)
   }
 }
-
-
 
 
 /// Iterator taking the ownership of the `RangeMOC` it iterates over.

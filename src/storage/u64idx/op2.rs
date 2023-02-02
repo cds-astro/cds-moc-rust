@@ -20,7 +20,7 @@ use super::{
 pub(crate) enum Op2 {
   Intersection,
   Union,
-  Difference,
+  SymmetricDifference,
   Minus,
   TFold,
   SFold,
@@ -32,7 +32,7 @@ impl Op2 {
     match self {
       Op2::Intersection => Ok(left.and(right)),
       Op2::Union => Ok(left.or(right)),
-      Op2::Difference => Ok(left.xor(right)),
+      Op2::SymmetricDifference => Ok(left.xor(right)),
       Op2::Minus => Ok(left.minus(right)),
       Op2::TFold => Err(String::from("TimeFold operation not available on 2 S-MOCs.")),
       Op2::SFold => Err(String::from("SpaceFold operation not available on 2 S-MOCs.")),
@@ -43,7 +43,7 @@ impl Op2 {
     match self {
       Op2::Intersection => Ok(left.and(right)),
       Op2::Union => Ok(left.or(right)),
-      Op2::Difference => Ok(left.xor(right)),
+      Op2::SymmetricDifference => Ok(left.xor(right)),
       Op2::Minus => Ok(left.minus(right)),
       Op2::TFold => Err(String::from("TimeFold operation not available on 2 T-MOCs.")),
       Op2::SFold => Err(String::from("SpaceFold operation not available on 2 T-MOCs.")),
@@ -54,7 +54,7 @@ impl Op2 {
     match self {
       Op2::Intersection => Ok(left.and(right)),
       Op2::Union => Ok(left.or(right)),
-      Op2::Difference => Ok(left.xor(right)),
+      Op2::SymmetricDifference => Ok(left.xor(right)),
       Op2::Minus => Ok(left.minus(right)),
       Op2::TFold => Err(String::from("TimeFold operation not available on 2 F-MOCs.")),
       Op2::SFold => Err(String::from("SpaceFold operation not available on 2 F-MOCs.")),
@@ -70,8 +70,8 @@ impl Op2 {
     let result = match self {
       Op2::Intersection => left.intersection(&right),
       Op2::Union => left.union(&right),
-      Op2::Difference => left.difference(&right),
-      Op2::Minus => return Err(String::from("Minus not implemented yet for ST-MOCs.")),
+      Op2::SymmetricDifference => return Err(String::from("Symmetric difference not implemented yet for ST-MOCs.")),
+      Op2::Minus => left.difference(&right),
       Op2::TFold => return Err(String::from("TimeFold operation not available on 2 ST-MOCs.")),
       Op2::SFold => return Err(String::from("SpaceFold operation not available on 2 ST-MOCs.")),
     };

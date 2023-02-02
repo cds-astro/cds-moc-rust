@@ -16,7 +16,7 @@ use super::{
 pub(crate) enum OpN {
   Intersection,
   Union,
-  Difference,
+  SymmetricDifference,
 }
 
 impl OpN {
@@ -26,7 +26,7 @@ impl OpN {
     match self {
       OpN::Intersection => Ok(kway_and_it(it)),
       OpN::Union => Ok(kway_or_it(it)),
-      OpN::Difference => Ok(kway_xor_it(it)),
+      OpN::SymmetricDifference => Ok(kway_xor_it(it)),
     }
   }
 
@@ -35,7 +35,7 @@ impl OpN {
     match self {
       OpN::Intersection => Ok(kway_and_it(it)),
       OpN::Union => Ok(kway_or_it(it)),
-      OpN::Difference => Ok(kway_xor_it(it)),
+      OpN::SymmetricDifference => Ok(kway_xor_it(it)),
     }
   }
 
@@ -44,7 +44,7 @@ impl OpN {
     match self {
       OpN::Intersection => Ok(kway_and_it(it)),
       OpN::Union => Ok(kway_or_it(it)),
-      OpN::Difference => Ok(kway_xor_it(it)),
+      OpN::SymmetricDifference => Ok(kway_xor_it(it)),
     }
   }
 

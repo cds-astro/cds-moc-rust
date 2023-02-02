@@ -145,10 +145,9 @@ impl<T: Idx, Q: MocQty<T>> MocRanges<T, Q> {
         );
         self
     }
-
-
+    
     pub fn coverage_percentage(&self) -> f64 {
-        BorrowedMocRanges::<'_, T, Q>::from( BorrowedRanges::from(&self.0)).coverage_percentage()
+        BorrowedMocRanges::<'_, T, Q>::from(BorrowedRanges::from(&self.0)).coverage_percentage()
     }
     
     pub fn complement(&self) -> Self {
@@ -313,36 +312,20 @@ impl<'a, T: Idx, Q: MocQty<T>> SNORanges<'a, T> for BorrowedMocRanges<'a, T, Q> 
 }
 
 impl<'a, T: Idx,  Q: MocQty<T>> BorrowedMocRanges<'a, T, Q> {
-
+    
     pub fn coverage_percentage(&self) -> f64 {
-        let rsum = self.range_sum();
-        let tot = Q::upper_bound_exclusive();
+        let mut rsum = self.range_sum();
+        let mut tot = Q::upper_bound_exclusive();
         if T::N_BITS > 52 { // 52 = n mantissa bits in a f64
             // Divide by the same power of 2, dropping the LSBs
             let shift = (T::N_BITS - 52) as u32;
-            rsum.unsigned_shr(shift);
-            tot.unsigned_shr(shift);
+            rsum = rsum.unsigned_shr(shift);
+            tot = tot.unsigned_shr(shift);
         }
         rsum.cast_to_f64() / tot.cast_to_f64()
     }
     
 }
-
-
-
-/*
-impl<Q: MocQty<u64>> From<MocRanges<u64, Q>> for Array2<u64> {
-  fn from(input: MocRanges<u64, Q>) -> Self {
-    ranges_to_array2d(input.0)
-  }
-}
-impl<Q: MocQty<i64>> From<MocRanges<i64, Q>> for Array2<i64> {
-  fn from(input: MocRanges<i64, Q>) -> Self {
-    ranges_to_array2d(input.0)
-  }
-}
-*/
-
 
 
 /*

@@ -38,8 +38,8 @@ impl Op1 {
     match self {
       Op1::Complement => Ok(moc.not()),
       Op1::Degrade { new_depth } => Ok(moc.degraded(new_depth)),
-      Op1::Extend => Err(String::from("Extend border not implemented (yet) for T-MOCs.")),
-      Op1::Contract => Err(String::from("Contract border not implemented (yet) for T-MOCs.")),
+      Op1::Extend => Ok(moc.expanded()),
+      Op1::Contract => Ok(moc.contracted()),
       Op1::ExtBorder => Err(String::from("External border not implemented (yet) for T-MOCs.")),
       Op1::IntBorder => Err(String::from("Internal border not implemented (yet) for T-MOCs.")),
     }
@@ -48,8 +48,8 @@ impl Op1 {
     match self {
       Op1::Complement => Ok(moc.not()),
       Op1::Degrade { new_depth } => Ok(moc.degraded(new_depth)),
-      Op1::Extend => Err(String::from("Extend border not implemented (yet) for F-MOCs.")),
-      Op1::Contract => Err(String::from("Contract border not implemented (yet) for F-MOCs.")),
+      Op1::Extend => Ok(moc.expanded()),
+      Op1::Contract => Ok(moc.contracted()),
       Op1::ExtBorder => Err(String::from("External border not implemented (yet) for F-MOCs.")),
       Op1::IntBorder => Err(String::from("Internal border not implemented (yet) for F-MOCs.")),
     }
@@ -87,14 +87,13 @@ pub(crate) enum Op1MultiRes {
 }
 
 impl Op1MultiRes {
-
   fn perform_op_on_smoc(self, moc: &SMOC) -> Result<Vec<InternalMoc>, String> {
     Ok(match self {
       Op1MultiRes::Split => moc.split_into_joint_mocs(false),
-      Op1MultiRes::SplitIndirect =>  moc.split_into_joint_mocs(true),
+      Op1MultiRes::SplitIndirect => moc.split_into_joint_mocs(true),
     }.drain(..)
-     .map(|cell_moc| cell_moc.into_cell_moc_iter().ranges().into_range_moc().into())
-     .collect()
+      .map(|cell_moc| cell_moc.into_cell_moc_iter().ranges().into_range_moc().into())
+      .collect()
     )
   }
   fn perform_op_on_tmoc(self, _moc: &TMOC) -> Result<Vec<InternalMoc>, String> {
@@ -160,26 +159,27 @@ pub(crate) fn op1_count_split(index: usize, indirect_neigh: bool) -> Result<u32,
   )
 }
 
-pub(crate) fn op1_stmoc_tmin(index: usize) -> Result<Option<u64>, String> {
+
+pub(crate) fn op1_1st_axis_min(index: usize) -> Result<Option<u64>, String> {
   store::exec_on_one_readonly_moc(
     index,
-    move |moc| match moc {
-      InternalMoc::Space(_) => Err(String::from("Tmin not implemented for S-MOCs.")),
-      InternalMoc::Time(_) => Err(String::from("Tmin not implemented for T-MOCs.")),
-      InternalMoc::Frequency(_) =>  Err(String::from("Tmin not implemented for F-MOCs.")),
-      InternalMoc::TimeSpace(stmoc) => Ok(stmoc.min_index_left()),
-    },
+    move |moc| Ok(match moc {
+      InternalMoc::Space(moc) => moc.first_index(),
+      InternalMoc::Time(moc) => moc.first_index(),
+      InternalMoc::Frequency(moc) => moc.first_index(),
+      InternalMoc::TimeSpace(stmoc) => stmoc.min_index_left(),
+    }),
   )
 }
 
-pub(crate) fn op1_stmoc_tmax(index: usize) -> Result<Option<u64>, String> {
+pub(crate) fn op1_1st_axis_max(index: usize) -> Result<Option<u64>, String> {
   store::exec_on_one_readonly_moc(
     index,
-    move |moc| match moc {
-      InternalMoc::Space(_) => Err(String::from("Tmin not implemented for S-MOCs.")),
-      InternalMoc::Time(_) => Err(String::from("Tmin not implemented for T-MOCs.")),
-      InternalMoc::Frequency(_) =>  Err(String::from("Tmin not implemented for F-MOCs.")),
-      InternalMoc::TimeSpace(stmoc) => Ok(stmoc.max_index_left()),
-    },
+    move |moc| Ok(match moc {
+      InternalMoc::Space(moc) => moc.last_index(),
+      InternalMoc::Time(moc) => moc.last_index(),
+      InternalMoc::Frequency(moc) => moc.last_index(),
+      InternalMoc::TimeSpace(stmoc) => stmoc.max_index_left(),
+    }),
   )
 }

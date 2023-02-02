@@ -162,6 +162,15 @@ impl InternalMoc {
     )
   }
 
+  pub(crate) fn get_ranges_sum(&self) -> Result<u64, String> {
+    match self {
+      InternalMoc::Space(moc) => Ok(moc.range_sum()),
+      InternalMoc::Time(moc) => Ok(moc.range_sum()),
+      InternalMoc::Frequency(moc) => Ok(moc.range_sum()),
+      InternalMoc::TimeSpace(_) => Err(String::from("RAnge sum not implemented for ST-MOC"))
+    }
+  }
+  
   pub(crate) fn get_coverage_percentage(&self) -> Option<f64> {
     match self {
       InternalMoc::Space(moc) => Some(moc.coverage_percentage() * 100.0),

@@ -72,7 +72,7 @@ use self::{
   },
   op1::{
     Op1, Op1MultiRes,
-    op1_count_split, op1_stmoc_tmin, op1_stmoc_tmax,
+    op1_count_split, op1_1st_axis_min, op1_1st_axis_max,
     op1_flatten_to_moc_depth, op1_flatten_to_depth
   },
   op2::Op2,
@@ -115,6 +115,25 @@ impl U64MocStore {
     store::add(moc)
   }
 
+  pub fn new_empty_smoc(&self, depth: u8) -> Result<usize, String> {
+   let moc = RangeMOC::<u64, Hpx::<u64>>::new_empty(depth);
+    store::add(moc)
+  }
+
+  pub fn new_empty_tmoc(&self, depth: u8) -> Result<usize, String> {
+    let moc = RangeMOC::<u64, Time::<u64>>::new_empty(depth);
+    store::add(moc)
+  }
+
+  pub fn new_empty_fmoc(&self, depth: u8) -> Result<usize, String> {
+    let moc = RangeMOC::<u64, Frequency::<u64>>::new_empty(depth);
+    store::add(moc)
+  }
+
+  /*pub fn insert_stmoc(&self, moc: STMOC) -> Result<usize, String> {
+    store::add(moc)
+  }*/
+
   /// Remove from the store the MOC at the given index.
   pub fn drop(&self, index: usize) -> Result<(), String> {
     store::drop(index).map(|_| ())
@@ -152,6 +171,14 @@ impl U64MocStore {
       })
   }
 
+  pub fn get_1st_axis_min(&self, index: usize) -> Result<Option<u64>, String> {
+    op1_1st_axis_min(index)
+  }
+
+  pub fn get_1st_axis_max(&self, index: usize) -> Result<Option<u64>, String> {
+    op1_1st_axis_max(index)
+  }
+
   //////////////////
   // Get MOC info //
   
@@ -181,6 +208,10 @@ impl U64MocStore {
 
   pub fn get_n_ranges(&self, index: usize) -> Result<u32, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_n_ranges)
+  }
+
+  pub fn get_ranges_sum(&self, index: usize) -> Result<u64, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_ranges_sum)
   }
   
   pub fn get_coverage_percentage(&self, index: usize) -> Result<f64, String> {
@@ -621,14 +652,8 @@ impl U64MocStore {
       })
   }
 
-  // TODO: faire les from_xxx_file et ne pas compiler si WASM
-
-
   ///////////////////////
   // SAVE EXISTING MOC //
-
-
-  // to_png
 
   /// # Params
   /// * `smoc`: the Spatial MOC to be print;
@@ -1531,14 +1556,17 @@ impl U64MocStore {
   }
 
   pub fn xor(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
-    self.difference(left_index, right_index)
+    self.symmetric_difference(left_index, right_index)
   }
-  pub fn difference(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
-    Op2::Difference.exec(left_index, right_index)
+  pub fn symmetric_difference(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
+    Op2::SymmetricDifference.exec(left_index, right_index)
   }
 
   pub fn minus(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     Op2::Minus.exec(left_index, right_index)
+  }
+  pub fn difference(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
+    self.minus(left_index, right_index)
   }
 
   /////////////////////////////////////////////////////
@@ -1551,10 +1579,9 @@ impl U64MocStore {
   pub fn multi_intersection(&self, indices: &[usize]) -> Result<usize, String> {
     OpN::Intersection.exec(indices)
   }
-
-  pub fn multi_difference(&self, indices: &[usize]) -> Result<usize, String> {
-    OpN::Difference.exec(indices)
-
+  
+  pub fn multi_symmetric_difference(&self, indices: &[usize]) -> Result<usize, String> {
+    OpN::SymmetricDifference.exec(indices)
   }
   
   ////////////////////////
@@ -1571,15 +1598,6 @@ impl U64MocStore {
   pub fn space_fold(&self, space_moc_index: usize, st_moc_index: usize) -> Result<usize, String> {
     Op2::SFold.exec(space_moc_index, st_moc_index)
   }
-
-  pub fn get_stmoc_tmin(&self, index: usize) -> Result<Option<u64>, String> {
-    op1_stmoc_tmin(index)
-  }
-
-  pub fn get_stmoc_tmax(&self, index: usize) -> Result<Option<u64>, String> {
-    op1_stmoc_tmax(index)
-  }
-
 
   ///////////////////////
   // FILTER OPERATIONS //

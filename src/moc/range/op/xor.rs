@@ -263,14 +263,7 @@ mod tests {
         let other = load_moc("CDS-I-125A-catalog_MOC.fits");
         (sdss, other)
     }
-
-    /* Not implemented in MOCPy
-    fn xor_ranges(moc_l: RangeMOC<u32, Hpx<u32>>, moc_r: RangeMOC<u32, Hpx<u32>>) -> RangeMOC<u32, Hpx<u32>> {
-        let depth = u8::max(moc_l.depth_max(), moc_r.depth_max());
-        let ranges_l = moc_l.into_moc_ranges();
-        let ranges_r = moc_r.into_moc_ranges();
-        RangeMOC::new(depth, ranges_l.difference(&ranges_r))
-    }*/
+    
 
     // we could also perform the operation without having first collected the iterator we obtain from
     // the FITS file

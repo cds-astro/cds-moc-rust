@@ -91,6 +91,8 @@ pub trait SNORanges<'a, T: Idx>: Sized {
         self.merge(other, |a, b| a && b)
     }*/
 
+    //  = minus
+    // != (symmtric difference = xor)
     fn difference(&self, other: &Self) -> Self::OwnedRanges {
         self.merge(other, |a, b| a && !b)
     }
