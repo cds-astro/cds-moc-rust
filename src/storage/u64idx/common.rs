@@ -326,7 +326,7 @@ pub(crate) fn lon_deg2rad(lon_deg: f64) -> Result<f64, String> {
 
 pub(crate) fn lat_deg2rad(lat_deg: f64) -> Result<f64, String> {
   let lat = lat_deg.to_radians();
-  if lat < -HALF_PI || HALF_PI <= lat {
+  if lat < -HALF_PI || HALF_PI < lat {
     Err(String::from("Latitude must be in [-pi/2, pi/2]"))
   } else {
     Ok(lat)

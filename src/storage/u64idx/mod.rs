@@ -992,9 +992,13 @@ impl U64MocStore {
       T: Iterator<Item=(f64, f64)>
   {
     check_depth::<Hpx<u64>>(depth)?;
-    let vertices: Vec<(f64, f64)> = vertices_it.map(
-      |(lon_deg, lat_deg)| Ok::<(f64, f64), String>((lon_deg2rad(lon_deg)?, lat_deg2rad(lat_deg)?))
-    ).collect::<Result<_, _>>()?;
+    let vertices = vertices_it.map(
+      |(lon_deg, lat_deg)| {
+        let lon = lon_deg2rad(lon_deg)?;
+        let lat = lat_deg2rad(lat_deg)?;
+        Ok((lon, lat))
+      }
+    ).collect::<Result<Vec<(f64, f64)>, String>>()?;
     let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_polygon(&vertices, complement, depth);
     store::add(moc)
   }
@@ -1124,6 +1128,9 @@ impl U64MocStore {
     where
       T: Iterator<Item=(u64, f64)>
   {
+    if to_threshold < from_threshold {
+      return Err(String::from("`cumul_from` has to be < to `cumul_to`."))
+    }
     let area_per_cell = (PI / 3.0) / (1_u64 << (depth << 1) as u32) as f64;  // = 4pi / (12*4^depth)
     let ranges: HpxRanges<u64> = if density {
       valued_cells_to_moc_with_opt::<u64, f64>(

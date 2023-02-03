@@ -126,10 +126,10 @@ pub(crate) fn op1_flatten_to_moc_depth(index: usize) -> Result<Vec<u64>, String>
   store::exec_on_one_readonly_moc(
     index,
     move |moc| match moc {
-      InternalMoc::Space(m) => Ok(m.into_range_moc_iter().flatten_to_fixed_depth_cells().collect()),
-      InternalMoc::Time(m) => Ok(m.into_range_moc_iter().flatten_to_fixed_depth_cells().collect()),
-      InternalMoc::Frequency(m) => Ok(m.into_range_moc_iter().flatten_to_fixed_depth_cells().collect()),
-      InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
+      InternalMoc::Space(m) => Ok(m.flatten_to_fixed_depth_cells().collect()),
+      InternalMoc::Time(m) => Ok(m.flatten_to_fixed_depth_cells().collect()),
+      InternalMoc::Frequency(m) => Ok(m.flatten_to_fixed_depth_cells().collect()),
+      InternalMoc::TimeSpace(_) => Err(String::from("Flatten to MOC depth not implemented for ST-MOCs.")),
     },
   )
 }
@@ -142,7 +142,7 @@ pub(crate) fn op1_flatten_to_depth(index: usize, depth: u8) -> Result<Vec<u64>, 
       InternalMoc::Space(m) => Ok(m.into_range_moc_iter().degrade(depth).flatten_to_fixed_depth_cells().collect()),
       InternalMoc::Time(m) => Ok(m.into_range_moc_iter().degrade(depth).flatten_to_fixed_depth_cells().collect()),
       InternalMoc::Frequency(m) => Ok(m.into_range_moc_iter().degrade(depth).flatten_to_fixed_depth_cells().collect()),
-      InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
+      InternalMoc::TimeSpace(_) => Err(String::from("Flatten to depth not implemented for ST-MOCs.")),
     },
   )
 }
