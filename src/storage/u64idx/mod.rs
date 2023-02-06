@@ -228,7 +228,19 @@ impl U64MocStore {
       |l, r| Ok(l == r)
     )
   }
+  
+  pub fn to_uniq_hpx(&self, index: usize) -> Result<Vec<u64>, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_uniq_hpx)
+  }
 
+  pub fn to_uniq_gen(&self, index: usize) -> Result<Vec<u64>, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_uniq_gen)
+  }
+
+  pub fn to_uniq_zorder(&self, index: usize) -> Result<Vec<u64>, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_uniq_zorder)
+  }
+  
   ///////////////////////
   // LOAD EXISTING MOC //
 

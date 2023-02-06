@@ -180,6 +180,35 @@ impl InternalMoc {
     }
   }
 
+  pub(crate) fn get_uniq_hpx(&self) -> Result<Vec<u64>, String> {
+    match self {
+      InternalMoc::Space(moc) => Ok(moc.into_range_moc_iter().cells().map(|cell| cell.uniq_hpx()).collect()),
+      InternalMoc::Time(_) => Err(String::from("Uniq HPX not possible with Time MOC")),
+      InternalMoc::Frequency(_) => Err(String::from("Uniq HPX not possible with Frequency MOC")),
+      InternalMoc::TimeSpace(_) => Err(String::from("Uniq HPX not possible with Time-Space MOCs")),
+    }
+  }
+  
+  pub(crate) fn get_uniq_gen(&self) -> Result<Vec<u64>, String> {
+    match self {
+      InternalMoc::Space(moc) => Ok(moc.into_range_moc_iter().cells().map(|cell| cell.uniq::<Hpx<u64>>()).collect()),
+      InternalMoc::Time(moc) => Ok(moc.into_range_moc_iter().cells().map(|cell| cell.uniq::<Time<u64>>()).collect()),
+      InternalMoc::Frequency(moc) => Ok(moc.into_range_moc_iter().cells().map(|cell| cell.uniq::<Frequency<u64>>()).collect()),
+      InternalMoc::TimeSpace(_) => Err(String::from("Uniq gen not possible with Time-Space MOCs")),
+    }
+  }
+
+  pub(crate) fn get_uniq_zorder(&self) -> Result<Vec<u64>, String> {
+    match self {
+      InternalMoc::Space(moc) => Ok(moc.into_range_moc_iter().cells().map(|cell| cell.zuniq::<Hpx<u64>>()).collect()),
+      InternalMoc::Time(moc) => Ok(moc.into_range_moc_iter().cells().map(|cell| cell.zuniq::<Time<u64>>()).collect()),
+      InternalMoc::Frequency(moc) => Ok(moc.into_range_moc_iter().cells().map(|cell| cell.zuniq::<Frequency<u64>>()).collect()),
+      InternalMoc::TimeSpace(_) => Err(String::from("Uniq Zorder not possible with Time-Space MOCs")),
+    }
+  }
+  
+  
+
   pub(crate) fn to_ascii<W>(&self, fold: Option<usize>, writer: W) -> Result<(), String> 
     where
       W: Write
