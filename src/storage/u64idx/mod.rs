@@ -190,6 +190,10 @@ impl U64MocStore {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_smoc_depth)
   }
 
+  pub fn get_smoc_copy(&self, index: usize) -> Result<SMOC, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_smoc_copy)
+  }
+
   pub fn get_tmoc_depth(&self, index: usize) -> Result<u8, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_tmoc_depth)
   }
@@ -1455,10 +1459,8 @@ impl U64MocStore {
   ///
   /// * ``times_start`` - The starting times expressed in microseconds since jd=0.
   /// * ``times_end`` - The ending times expressed in  microseconds since jd=0.
-  /// * ``lon`` - The longitudes of the sky coordinates.
-  /// * ``lat`` - The latitudes of the sky coordinates.
-  /// * ``radius`` - The radiuses of the cones.
   /// * ``dt`` - The depth along the time (i.e. `T`) axis.
+  /// 
   /// * ``ds`` - The depth at which HEALPix cell indices
   ///   will be computed.
   ///
@@ -1482,6 +1484,78 @@ impl U64MocStore {
     space_depth: u8,
   ) -> Result<usize, String> {
     let times = times2hash(time_depth, times_start, times_end)?;
+    let moc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_spatial_coverage(
+      times, spatial_coverages, time_depth,
+    );
+    store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2())
+  }
+
+  /// Create a time-spatial coverage (2D) from a list of cones
+  /// and time ranges.
+  ///
+  /// # Arguments
+  ///
+  /// * ``times_start`` - The starting times expressed in jd.
+  /// * ``times_end`` - The ending times expressed in jd.
+  /// * ``lon`` - The longitudes of the sky coordinates.
+  /// * ``lat`` - The latitudes of the sky coordinates.
+  /// * ``radius`` - The radiuses of the cones.
+  /// * ``dt`` - The depth along the time (i.e. `T`) axis.
+  /// * ``ds`` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  pub fn from_time_ranges_spatial_coverages_in_store_approx(
+    &self,
+    times_start: Vec<f64>,
+    times_end: Vec<f64>,
+    time_depth: u8,
+    spatial_coverages: Vec<usize>,
+    space_depth: u8,
+  ) -> Result<usize, String> {
+    let times_start = jd2mas_approx(times_start);
+    let times_end = jd2mas_approx(times_end);
+    self.from_time_ranges_spatial_coverages_in_store(
+      times_start, times_end, time_depth, spatial_coverages, space_depth
+    )
+  }
+  
+  /// Create a time-spatial coverage (2D) from a list of cones
+  /// and time ranges.
+  ///
+  /// # Arguments
+  ///
+  /// * ``times_start`` - The starting times expressed in microseconds since jd=0.
+  /// * ``times_end`` - The ending times expressed in  microseconds since jd=0.
+  /// * ``lon`` - The longitudes of the sky coordinates.
+  /// * ``lat`` - The latitudes of the sky coordinates.
+  /// * ``radius`` - The radiuses of the cones.
+  /// * ``dt`` - The depth along the time (i.e. `T`) axis.
+  /// * ``ds`` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  /// # Precondition
+  ///
+  /// * ``lon`` and ``lat`` are expressed in radians.
+  /// They are valid because they come from
+  /// `astropy.units.Quantity` objects.
+  /// * ``times`` are expressed in jd and are coming
+  /// from `astropy.time.Time` objects.
+  ///
+  /// # Errors
+  ///
+  /// If the number of longitudes, latitudes and times do not match.
+  pub fn from_time_ranges_spatial_coverages_in_store(
+    &self,
+    times_start: Vec<u64>,
+    times_end: Vec<u64>,
+    time_depth: u8,
+    spatial_coverage_indices: Vec<usize>,
+    space_depth: u8,
+  ) -> Result<usize, String> {
+    let times = times2hash(time_depth, times_start, times_end)?;
+    let spatial_coverages: Vec<HpxRanges<u64>> = spatial_coverage_indices.into_iter().map(
+      |index| self.get_smoc_copy(index).map(|moc| moc.into_moc_ranges())
+    ).collect::<Result<_, _>>()?;
     let moc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_spatial_coverage(
       times, spatial_coverages, time_depth,
     );

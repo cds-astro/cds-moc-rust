@@ -113,6 +113,15 @@ impl InternalMoc {
     }
   }
 
+  pub(crate) fn get_smoc_copy(&self) -> Result<SMOC, String> {
+    match self {
+      InternalMoc::Space(moc) => Ok(moc.clone()),
+      InternalMoc::Time(_) => Err(String::from("Wrong MOC type. Expected: Space. Actual: Time")),
+      InternalMoc::Frequency(_) => Err(String::from("Wrong MOC type. Expected: Space. Actual: Frequency")),
+      InternalMoc::TimeSpace(_) => Err(String::from("Wrong MOC type. Expected: Space. Actual: Space-Time")),
+    }
+  }
+
   pub(crate) fn get_tmoc_depth(&self) -> Result<u8, String> {
     match self {
       InternalMoc::Space(_) => Err(String::from("Wrong MOC type. Expected: Time. Actual: Space")),
