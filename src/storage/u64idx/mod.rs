@@ -695,7 +695,27 @@ impl U64MocStore {
               .map_err(|e| e.to_string())
           ).map(move |_| buff.into_boxed_slice())
       }
-      _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
+      _ => Err(String::from("Can't make a PNG for a MOC different from a S-MOC")),
+    };
+    store::exec_on_one_readonly_moc(moc_index, op)
+  }
+
+  /// Returns an RGBA array (each pixel is made of 4 successive u8: RGBA) using the Mollweide projection.
+  pub fn to_image(
+    &self,
+    moc_index: usize,
+    img_y_size: u16,
+  ) -> Result<Box<[u8]>, String> {
+    let xsize = (img_y_size << 1) as usize;
+    let ysize = img_y_size as usize;
+    let op = move |moc: &InternalMoc| match moc {
+      InternalMoc::Space(smoc) => {
+        Ok(
+          to_img_default(smoc, (xsize as u16, ysize as u16), None, None)
+            .into_boxed_slice()
+        )
+      }
+      _ => Err(String::from("Can't make an image for a MOC different from a S-MOC")),
     };
     store::exec_on_one_readonly_moc(moc_index, op)
   }
