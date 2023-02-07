@@ -162,7 +162,7 @@ impl<T: Idx, Q: MocQty<T>> MocRanges<T, Q> {
     pub fn degraded(&self, depth: u8) -> Self {
         let shift = Q::shift_from_depth_max(depth) as u32;
 
-        let mut offset: T = One::one();
+       /* let mut offset: T = One::one();
         offset = offset.unsigned_shl(shift) - One::one();
 
         let mut mask: T = One::one();
@@ -182,31 +182,20 @@ impl<T: Idx, Q: MocQty<T>> MocRanges<T, Q> {
             // if b > a {
             result.push(a..b);
             // }
-        }
+        }*/
 
+        let rm_bits_mask = (!T::zero()).unsigned_shl(shift);
+        let bits_to_be_rm_mask = !rm_bits_mask;
+        let result: Vec<Range<T>> = self.iter().map(|range| {
+            let start = range.start & rm_bits_mask;
+            let end = (range.end + bits_to_be_rm_mask) & rm_bits_mask;
+            start..end
+        }).collect();
         // TODO: change the algo: one can merge while degrading!
         Ranges::new_unchecked(
             MergeOverlappingRangesIter::new(result.iter(), None)
               .collect::<Vec<_>>()
         ).into()
-        /*let shift = Q::shift_from_depth_max(depth) as u32;
-        let one_at_new_depth = T::one().unsigned_shl(shift);
-        let rm_bits_mask = (!T::zero()).unsigned_shl(shift);
-        let bits_to_be_rm_mask = !rm_bits_mask; // If (end & test_end_mask) == 0, do nothing, else + one
-
-        let degrades_ranges_iter = self.iter()
-          .map(|range| {
-            let a: T = range.start & rm_bits_mask;
-            let b: T = if range.end & bits_to_be_rm_mask != T::zero() {
-                (range.end & rm_bits_mask) + one_at_new_depth
-            } else {
-                range.end
-            };
-            a..b
-          });
-        Ranges::new_unchecked(
-            MergeOverlappingRangesIter::new(degrades_ranges_iter, None).collect::<Vec<_>>()
-        ).into()*/
     }
     
     pub fn degrade(&mut self, depth: u8) {
