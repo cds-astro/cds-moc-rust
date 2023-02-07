@@ -1873,7 +1873,7 @@ fn lonlat2hash(depth: u8, lon: Vec<f64>, lat: Vec<f64>) -> Result<Vec<u64>, Stri
       });
     #[cfg(target_arch = "wasm32")]
     ipix.iter_mut()
-      .zip(lon.iter().zip(lat.iter()))
+      .zip(lon.into_iter().zip(lat.into_iter()))
       .for_each(|(p, (l, b))| {
         *p = layer.hash(l, b);
       });
@@ -1896,7 +1896,7 @@ fn times2hash(depth: u8, times_start: Vec<u64>, times_end: Vec<u64>) -> Result<V
       });
     #[cfg(target_arch = "wasm32")]
     times.iter_mut()
-      .zip_eq(times_start.iter().zip_eq(times_end.iter()))
+      .zip(times_start.into_iter().zip(times_end.into_iter()))
       .for_each(|(t, (t1, t2))| {
         *t = t1..t2;
       });

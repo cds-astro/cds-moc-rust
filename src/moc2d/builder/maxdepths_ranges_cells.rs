@@ -240,7 +240,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> SweepLineMOC2ElemBuilder<T, Q, 
 
 pub struct RangesAndFixedDepthCellsSTMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
   depth_1: u8,
-  one_at_new_depth_1: T,
+  // one_at_new_depth_1: T,
   rm_bits_mask_1: T,
   bits_to_be_rm_mask_1: T,
   depth_2: u8,
@@ -253,12 +253,12 @@ pub struct RangesAndFixedDepthCellsSTMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R:
 impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangesAndFixedDepthCellsSTMocBuilder<T, Q, U, R> {
   pub fn new(depth_1: u8, depth_2: u8, buf_capacity: Option<usize>) -> Self {
     let shift = Q::shift_from_depth_max(depth_1) as u32;
-    let one_at_new_depth_1 = T::one().unsigned_shl(shift);
+    // let one_at_new_depth_1 = T::one().unsigned_shl(shift);
     let rm_bits_mask_1 = (!T::zero()).unsigned_shl(shift);
     let bits_to_be_rm_mask_1 = !rm_bits_mask_1;
     RangesAndFixedDepthCellsSTMocBuilder {
       depth_1,
-      one_at_new_depth_1,
+      // one_at_new_depth_1,
       rm_bits_mask_1,
       bits_to_be_rm_mask_1,
       depth_2,
@@ -271,7 +271,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangesAndFixedDepthCellsSTMocBu
 
   pub fn push(&mut self, mut range_1: Range<T>, idx_2: U) {
     use crate::moc::range::op::degrade::degrade_range;
-    degrade_range(&mut range_1, self.one_at_new_depth_1, self.rm_bits_mask_1, self.bits_to_be_rm_mask_1);
+    degrade_range(&mut range_1, /*self.one_at_new_depth_1,*/ self.rm_bits_mask_1, self.bits_to_be_rm_mask_1);
     if let Some((r, h)) = self.buff.last_mut() {
       // Easy merge if needed
       if *h == idx_2 {

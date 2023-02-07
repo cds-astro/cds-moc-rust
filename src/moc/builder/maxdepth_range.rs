@@ -12,7 +12,7 @@ use crate::moc::range::op::{
 
 pub struct RangeMocBuilder<T: Idx, Q: MocQty<T>> {
   depth: u8,
-  one_at_new_depth: T,
+  //one_at_new_depth: T,
   rm_bits_mask: T,
   bits_to_be_rm_mask: T,
   buff: Vec<Range<T>>,
@@ -24,12 +24,12 @@ impl<T: Idx, Q: MocQty<T>> RangeMocBuilder<T, Q> {
 
   pub fn new(depth: u8, buf_capacity: Option<usize>) -> Self {
     let shift = Q::shift_from_depth_max(depth) as u32;
-    let one_at_new_depth = T::one().unsigned_shl(shift);
+    //let one_at_new_depth = T::one().unsigned_shl(shift);
     let rm_bits_mask = (!T::zero()).unsigned_shl(shift);
     let bits_to_be_rm_mask = !rm_bits_mask;
     RangeMocBuilder {
       depth,
-      one_at_new_depth,
+      //one_at_new_depth,
       rm_bits_mask,
       bits_to_be_rm_mask,
       buff: Vec::with_capacity(buf_capacity.unwrap_or(100_000)),
@@ -40,12 +40,12 @@ impl<T: Idx, Q: MocQty<T>> RangeMocBuilder<T, Q> {
 
   pub fn from(buf_capacity: Option<usize>, moc: RangeMOC<T, Q>) -> Self {
     let shift = Q::shift_from_depth_max(moc.depth_max()) as u32;
-    let one_at_new_depth = T::one().unsigned_shl(shift);
+    //let one_at_new_depth = T::one().unsigned_shl(shift);
     let rm_bits_mask = (!T::zero()).unsigned_shl(shift);
     let bits_to_be_rm_mask = !rm_bits_mask;
     RangeMocBuilder {
       depth: moc.depth_max(),
-      one_at_new_depth,
+      //one_at_new_depth,
       rm_bits_mask,
       bits_to_be_rm_mask,
       buff: Vec::with_capacity(buf_capacity.unwrap_or(100_000)),
@@ -63,7 +63,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMocBuilder<T, Q> {
   pub fn push(&mut self, mut new_range: Range<T>) {
     // Degrade to the input depth to ensure consistency
     use super::super::range::op::degrade::degrade_range;
-    degrade_range(&mut new_range, self.one_at_new_depth, self.rm_bits_mask, self.bits_to_be_rm_mask);
+    degrade_range(&mut new_range, /*self.one_at_new_depth,*/ self.rm_bits_mask, self.bits_to_be_rm_mask);
     if let Some(Range { start, end }) = self.buff.last_mut() {
       if new_range.end < *start || *end < new_range.start {
         // both ranges do not overlap
