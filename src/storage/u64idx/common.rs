@@ -6,6 +6,7 @@ use std::{
   path::Path,
   fs::File,
   io::{Write, BufWriter},
+  ops::Range
 };
 
 use crate::{
@@ -176,7 +177,7 @@ impl InternalMoc {
       InternalMoc::Space(moc) => Ok(moc.range_sum()),
       InternalMoc::Time(moc) => Ok(moc.range_sum()),
       InternalMoc::Frequency(moc) => Ok(moc.range_sum()),
-      InternalMoc::TimeSpace(_) => Err(String::from("RAnge sum not implemented for ST-MOC"))
+      InternalMoc::TimeSpace(_) => Err(String::from("Range sum not implemented for ST-MOC"))
     }
   }
   
@@ -215,7 +216,15 @@ impl InternalMoc {
       InternalMoc::TimeSpace(_) => Err(String::from("Uniq Zorder not possible with Time-Space MOCs")),
     }
   }
-  
+
+  pub(crate) fn get_ranges(&self) -> Result<Vec<Range<u64>>, String> {
+    match self {
+      InternalMoc::Space(moc) => Ok(moc.into_range_moc_iter().collect()),
+      InternalMoc::Time(moc) => Ok(moc.into_range_moc_iter().collect()),
+      InternalMoc::Frequency(moc) => Ok(moc.into_range_moc_iter().collect()),
+      InternalMoc::TimeSpace(_) => Err(String::from("Get ranges not possible for Time-Space MOCs")),
+    }
+  }
   
 
   pub(crate) fn to_ascii<W>(&self, fold: Option<usize>, writer: W) -> Result<(), String> 

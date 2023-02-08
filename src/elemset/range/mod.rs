@@ -5,8 +5,6 @@ use std::iter::FromIterator;
 use std::slice::Iter;
 use std::marker::PhantomData;
 
-use num::{One, Zero};
-
 use crate::idx::Idx;
 use crate::qty::{Bounded, MocQty, Hpx, Time};
 use crate::ranges::{Ranges, SNORanges, MergeOverlappingRangesIter, BorrowedRanges};

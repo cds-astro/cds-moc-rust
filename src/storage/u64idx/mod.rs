@@ -244,6 +244,10 @@ impl U64MocStore {
   pub fn to_uniq_zorder(&self, index: usize) -> Result<Vec<u64>, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_uniq_zorder)
   }
+
+  pub fn to_ranges(&self, index: usize) -> Result<Vec<Range<u64>>, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_ranges)
+  }
   
   ///////////////////////
   // LOAD EXISTING MOC //
