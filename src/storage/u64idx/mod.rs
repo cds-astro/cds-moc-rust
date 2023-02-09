@@ -1534,12 +1534,12 @@ impl U64MocStore {
     times_end: Vec<f64>,
     time_depth: u8,
     spatial_coverages: Vec<usize>,
-    space_depth: u8,
+    // space_depth: u8,
   ) -> Result<usize, String> {
     let times_start = jd2mas_approx(times_start);
     let times_end = jd2mas_approx(times_end);
     self.from_time_ranges_spatial_coverages_in_store(
-      times_start, times_end, time_depth, spatial_coverages, space_depth
+      times_start, times_end, time_depth, spatial_coverages//, space_depth
     )
   }
   
@@ -1574,11 +1574,16 @@ impl U64MocStore {
     times_end: Vec<u64>,
     time_depth: u8,
     spatial_coverage_indices: Vec<usize>,
-    space_depth: u8,
+    // space_depth: u8,
   ) -> Result<usize, String> {
     let times = times2hash(time_depth, times_start, times_end)?;
+    let space_depth = spatial_coverage_indices.iter()
+      .filter_map(|index| self.get_smoc_depth(*index).ok())
+      .max()
+      .unwrap_or(0);
     let spatial_coverages: Vec<HpxRanges<u64>> = spatial_coverage_indices.into_iter().map(
       |index| self.get_smoc_copy(index).map(|moc| moc.into_moc_ranges())
+      // |index| self.degrade(index, space_depth).map(|moc| moc.into_moc_ranges())
     ).collect::<Result<_, _>>()?;
     let moc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_spatial_coverage(
       times, spatial_coverages, time_depth,
