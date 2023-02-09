@@ -121,6 +121,34 @@ impl Op1MultiRes {
   }
 }
 
+/// Returns the barycenter of the given MOC, (lon, lat) in radians.
+pub(crate) fn op1_moc_barycenter(index: usize) -> Result<(f64, f64), String> {
+  store::exec_on_one_readonly_moc(
+    index,
+    move |moc| match moc {
+      InternalMoc::Space(moc) => Ok(moc.into_range_moc_iter().cells().mean_center()),
+      InternalMoc::Time(_) => Err(String::from("Barycenter not implemented for T-MOCs.")),
+      InternalMoc::Frequency(_) => Err(String::from("Barycenter not implemented for F-MOCs.")),
+      InternalMoc::TimeSpace(_) => Err(String::from("Barycenter not implemented for ST-MOCs.")),
+    },
+  )
+}
+
+/// Returns the largest distance (in radians) from the given point to a MOC vertex (lon, lat) in radians.
+pub(crate) fn op1_moc_largest_distance_from_coo_to_moc_vertices(
+  index: usize, lon: f64, lat: f64
+) -> Result<f64, String> {
+  store::exec_on_one_readonly_moc(
+    index,
+    move |moc| match moc {
+      InternalMoc::Space(moc) => Ok(moc.into_range_moc_iter().cells().max_distance_from(lon, lat)),
+      InternalMoc::Time(_) => Err(String::from("Barycenter not implemented for T-MOCs.")),
+      InternalMoc::Frequency(_) => Err(String::from("Barycenter not implemented for F-MOCs.")),
+      InternalMoc::TimeSpace(_) => Err(String::from("Barycenter not implemented for ST-MOCs.")),
+    },
+  )
+}
+
 /// Returns all the cells at the moc depth
 pub(crate) fn op1_flatten_to_moc_depth(index: usize) -> Result<Vec<u64>, String> {
   store::exec_on_one_readonly_moc(

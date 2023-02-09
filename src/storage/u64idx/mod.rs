@@ -73,7 +73,8 @@ use self::{
   op1::{
     Op1, Op1MultiRes,
     op1_count_split, op1_1st_axis_min, op1_1st_axis_max,
-    op1_flatten_to_moc_depth, op1_flatten_to_depth
+    op1_flatten_to_moc_depth, op1_flatten_to_depth,
+    op1_moc_barycenter, op1_moc_largest_distance_from_coo_to_moc_vertices
   },
   op2::Op2,
   opn::OpN,
@@ -1598,6 +1599,15 @@ impl U64MocStore {
   // return a hierachical view (Json like) for display?
   // (not necessary if display made from rust code too)
 
+  
+  pub fn barycenter(&self, index: usize) -> Result<(f64, f64), String> {
+    op1_moc_barycenter(index)
+  }
+
+  pub fn largest_distance_from_coo_to_moc_vertices(&self, index: usize, lon: f64, lat: f64) -> Result<f64, String> {
+    op1_moc_largest_distance_from_coo_to_moc_vertices(index, lon, lat)
+  }
+  
   pub fn not(&self, index: usize) -> Result<usize, String> {
     self.complement(index)
   }
