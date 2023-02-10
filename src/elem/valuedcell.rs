@@ -36,7 +36,7 @@ impl DivBy<u64> for f64 {
 /// * `cumul_from` < `cumul_to`
 ///
 /// # Errors
-/// * if `max_depth` is not > to the finest depth found in the `uniq` cells.
+/// * if `max_depth` is not >= to the finest depth found in the `uniq` cells.
 ///
 /// # Args
 /// * `max_depth`: the largest depth of the output MOC, which must be larger or equals to the largest
@@ -46,7 +46,7 @@ impl DivBy<u64> for f64 {
 /// * `cumul_from`: the cumulative value from which cells are put in the MOC
 /// * `cumul_to`: the cumulative value to which cells are put in the MOC
 pub fn valued_cells_to_moc<'a, T, V, I1, I2>(
-    max_depth: u8,
+    mut max_depth: u8,
     uniq: I1,
     values: I2,
     cumul_from: V,
@@ -58,11 +58,14 @@ pub fn valued_cells_to_moc<'a, T, V, I1, I2>(
       I1: Iterator<Item=&'a T>,
       I2: Iterator<Item=&'a V>,
 {
-    let mut valued_uniq_sorted: Vec<(T, V, V)> = uniq.zip(values)
+    let mut valued_uniq_sorted= uniq.zip(values)
         .map(|(uniq, val)| {
             let (depth, _icell) = Hpx::<T>::from_uniq_hpx(*uniq);
-            let n_sub_cells = T::one().unsigned_shl(((max_depth - depth) << 1) as u32);
-            (*uniq, *val, val.div_by(n_sub_cells))
+            if depth > max_depth {
+              max_depth = depth
+            }
+          let n_sub_cells = T::one().unsigned_shl(((max_depth - depth) << 1) as u32);
+          (*uniq, *val, val.div_by(n_sub_cells))
         })
     .collect::<Vec<(T, V, V)>>();
     // We use b.comp(a) instead of a.cmp(b) to get the DESC order
@@ -162,6 +165,12 @@ pub fn valued_cells_to_moc_with_opt<'a, T, V>(
     T: Idx,
     V: 'static + Num + PartialOrd + DivBy<T, Output=V> + Copy + Send + Sync + std::fmt::Debug,
 {
+  let actual_max_depth = uniq_val_dens.iter()
+    .map(|(uniq, _, _)| Hpx::<T>::from_uniq_hpx(*uniq).0)
+    .max()
+    .unwrap_or(0);
+  let max_depth = max_depth.max(actual_max_depth);
+
   if asc {
     uniq_val_dens.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(Equal));
   } else {
