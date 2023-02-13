@@ -2,7 +2,11 @@
 
 ### 0.10.0
 
-Released XXX-XX-XX
+Released 2023-02-13
+
+### Fixed
+
+* Computation of T-MOCs and F-MOCs from ranges
 
 ### Added
 
@@ -16,7 +20,7 @@ Released XXX-XX-XX
   it astropy seems not to be able to read the file)
 * Add the `CellHpxMOCIterator` trait to easily save S-MOC in FITS files compatible with v1.0
   of the MOC standard.
-
+* Add the store features (for MOCPy, MOCWasm, ...)
 
 ## 0.9.0
 
