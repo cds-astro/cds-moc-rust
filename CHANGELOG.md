@@ -1,5 +1,16 @@
 # `moc` Change Log
 
+
+### 0.10.1
+
+Released 2023-02-13
+
+### Fixed
+
+* Remove spurious "WARNING: Keyword 'TTYPE1' found more than once in a same HDU! We use the first occurrence."
+  when readding FITs files
+
+
 ### 0.10.0
 
 Released 2023-02-13

@@ -3,7 +3,7 @@
 
 [package]
 name = "moc"
-version = "0.10.0"
+version = "0.10.1"
 authors = [
   "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>",
   "Matthieu Baumann <baumannmatthieu0@gmail.com>"
