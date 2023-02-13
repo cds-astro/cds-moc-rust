@@ -156,8 +156,8 @@ splitIndirect(name, out_name_prefix)
 # Two MOCs operations
 or/union(left_name, right_name, out_name)
 and/intersection(left_name, right_name, out_name)
-xor/difference(left_name, right_name, out_name)
-minus(left_name, right_name, out_name)
+xor/symmetric_difference(left_name, right_name, out_name)
+minus/difference(left_name, right_name, out_name)
 
 # Operation on ST-MOC
 timeFold(tmoc_name, st_moc_name, out_smoc_name)

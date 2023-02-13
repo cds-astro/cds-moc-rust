@@ -77,9 +77,9 @@ pub enum Op {
   #[structopt(name = "union")]
   /// Performs a logical 'OR' between 2 MOCs (= MOC union)
   Union(Op2Args),
-  #[structopt(name = "diff")]
-  /// Performs a logical 'XOR' between 2 MOCs (= MOC difference)
-  Difference(Op2Args),
+  #[structopt(name = "symdiff")]
+  /// Performs a logical 'XOR' between 2 MOCs (= MOC symetric difference)
+  SymmetricDifference(Op2Args),
   #[structopt(name = "minus")]
   /// Performs the logical operation 'AND(left, NOT(right))' between 2 MOCs (= left minus right)
   Minus(Op2Args),
@@ -113,7 +113,7 @@ impl Op {
       Op::IntBorder(op) => op.exec(Op1::IntBorder),
       Op::Intersection(op) => op.exec(Op2::Intersection),
       Op::Union(op) => op.exec(Op2::Union),
-      Op::Difference(op) => op.exec(Op2::Difference),
+      Op::SymmetricDifference(op) => op.exec(Op2::SymmetricDifference),
       Op::Minus(op) => op.exec(Op2::Minus),
       Op::TimeFold(op) => op.exec(Op2::TimeFold),
       Op::SpaceFold(op) => op.exec(Op2::SpaceFold),
@@ -727,7 +727,7 @@ fn op2_exec_on_fits_tmoc_stmoc_lconv<TL: Idx, TR: Idx + From<TL>>(
 pub enum Op2 {
   Intersection,
   Union,
-  Difference,
+  SymmetricDifference,
   Minus,
   // ST-MOC scpecific
   TimeFold,
@@ -750,7 +750,7 @@ impl Op2 {
     match self {
       Op2::Intersection => output.write_moc(left_moc_it.and(right_moc_it)),
       Op2::Union => output.write_moc(left_moc_it.or(right_moc_it)),
-      Op2::Difference => output.write_moc(left_moc_it.xor(right_moc_it)),
+      Op2::SymmetricDifference => output.write_moc(left_moc_it.xor(right_moc_it)),
       Op2::Minus => output.write_moc(left_moc_it.minus(right_moc_it)),
       Op2::TimeFold | Op2::SpaceFold => Err(String::from("Operation must involve a ST-MOC").into()),
     }
@@ -770,7 +770,7 @@ impl Op2 {
     match self {
       Op2::Intersection => output.write_smoc_possibly_converting_to_u64(left_moc_it.and(right_moc_it)),
       Op2::Union => output.write_smoc_possibly_converting_to_u64(left_moc_it.or(right_moc_it)),
-      Op2::Difference => output.write_smoc_possibly_converting_to_u64(left_moc_it.xor(right_moc_it)),
+      Op2::SymmetricDifference => output.write_smoc_possibly_converting_to_u64(left_moc_it.xor(right_moc_it)),
       Op2::Minus => output.write_smoc_possibly_converting_to_u64(left_moc_it.minus(right_moc_it)),
     }
   }
@@ -789,7 +789,7 @@ impl Op2 {
     match self {
       Op2::Intersection => output.write_tmoc_possibly_converting_to_u64(left_moc_it.and(right_moc_it)),
       Op2::Union => output.write_tmoc_possibly_converting_to_u64(left_moc_it.or(right_moc_it)),
-      Op2::Difference => output.write_tmoc_possibly_converting_to_u64(left_moc_it.xor(right_moc_it)),
+      Op2::SymmetricDifference => output.write_tmoc_possibly_converting_to_u64(left_moc_it.xor(right_moc_it)),
       Op2::Minus => output.write_tmoc_possibly_converting_to_u64(left_moc_it.minus(right_moc_it)),
     }
   }*/
@@ -878,7 +878,7 @@ impl Op2 {
     let result = match self {
       Op2::Intersection => left_stmoc.intersection(&right_stmoc),
       Op2::Union => left_stmoc.union(&right_stmoc),
-      Op2::Difference => return Err(String::from("Difference (or xor) not implemented yet for ST-MOCs.").into()), // todo!()
+      Op2::SymmetricDifference => return Err(String::from("SymmetricDifference (or xor) not implemented yet for ST-MOCs.").into()), // todo!()
       Op2::Minus => left_stmoc.difference(&right_stmoc), // warning method name is misleading
       Op2::TimeFold | Op2::SpaceFold => return Err(String::from("Operation must involve either a S-MOC or a T-MOC").into()),
     };
@@ -896,7 +896,7 @@ impl Op2 {
         )
       },
       Op2::Union => output.write_stmoc(left_stmoc.or(right_stmoc)),
-      Op2::Difference => Err(String::from("Difference (or xor) not implemented yet for ST-MOCs.").into()), // todo!()
+      Op2::SymmetricDifference => Err(String::from("SymmetricDifference (or xor) not implemented yet for ST-MOCs.").into()), // todo!()
       Op2::Minus => {
         let (time_depth_1, hpx_depth_1) = (left_stmoc.depth_max_1(), left_stmoc.depth_max_2());
         let (time_depth_2, hpx_depth_2) = (right_stmoc.depth_max_1(), right_stmoc.depth_max_2());

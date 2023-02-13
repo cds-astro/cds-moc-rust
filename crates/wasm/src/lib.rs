@@ -1293,13 +1293,17 @@ pub fn intersection(left_moc: &str, right_moc: &str, res_name: &str) -> Result<(
 
 #[wasm_bindgen(catch)]
 pub fn xor(left_moc: &str, right_moc: &str, res_name: &str) -> Result<(), JsValue> {
-  op2(left_moc, right_moc, Op2::Difference, res_name)
+  op2(left_moc, right_moc, Op2::SymmetricDifference, res_name)
 }
 #[wasm_bindgen(catch)]
-pub fn difference(left_moc: &str, right_moc: &str, res_name: &str) -> Result<(), JsValue> {
-  op2(left_moc, right_moc, Op2::Difference, res_name)
+pub fn symmetric_difference(left_moc: &str, right_moc: &str, res_name: &str) -> Result<(), JsValue> {
+  op2(left_moc, right_moc, Op2::SymmetricDifference, res_name)
 }
 
+#[wasm_bindgen(catch)]
+pub fn difference(left_moc: &str, right_moc: &str, res_name: &str) -> Result<(), JsValue> {
+  op2(left_moc, right_moc, Op2::Minus, res_name)
+}
 #[wasm_bindgen(catch)]
 pub fn minus(left_moc: &str, right_moc: &str, res_name: &str) -> Result<(), JsValue> {
   op2(left_moc, right_moc, Op2::Minus, res_name)

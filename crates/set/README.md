@@ -524,12 +524,12 @@ The structure of the file is made of two main blocks:
 A fixed size (chosen at creation) buffer of `n` `u64` elements.
 * the first `u64` contains an indication on the buffer size
 * all other `u64` values, one per MOC in the `moc-set`, are made of 3 components:
-    + a `u8` flag taking 4 possible values:
+    + a `u8` flag taking 4 possible values (only 2 bits are used, 6 are remaining):
         - `Valid` MOC
         - `Deprecated` MOC
         - `Removed` MOC
         - `Free` slot
-    + the depth of the MOC, stored on `u8
+    + the depth of the MOC, stored on `u8 (max depth = 64, thus 2 bits are remaining and could be used)
     + the MOC identifier, stored on the 6 remaining bytes.
 
 We stop reading the metadata when we encounter the first `Free` flag.

@@ -4,6 +4,7 @@
 
 Released 202X-XX-XX
 
+* Fix `from timeranges`
 * Add the `view` command to save PNG files and display S-MOCs.
 
 

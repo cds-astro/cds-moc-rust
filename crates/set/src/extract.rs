@@ -109,6 +109,7 @@ pub enum OutputFormat {
     /// Path of the output file
     file: PathBuf
   },
+  // ADD PNG! With option Galactic!
 }
 
 impl OutputFormat {
