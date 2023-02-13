@@ -622,7 +622,7 @@ impl MocKeywords  {
       MocKeywords::PixType(_) => PixType::INDEX,
       // BINTABLE
       MocKeywords::TForm1(_) => TForm1::INDEX,
-      MocKeywords::TType1(_) => PixType::INDEX,
+      MocKeywords::TType1(_) => TType1::INDEX,
       // Skymap
       MocKeywords::Nside(_) => Nside::INDEX,
       MocKeywords::IndexSchema(_) => IndexSchema::INDEX,
