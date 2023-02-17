@@ -10,12 +10,7 @@
 //! very active.
 
 
-use std::{
-  fs::{self, File},
-  ops::Range,
-  path::Path,
-  io::{Cursor, BufRead, BufReader},
-};
+use std::{fs::{self, File}, ops::Range, path::Path, io::{Cursor, BufRead, BufReader}, convert};
 
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::iter::{
@@ -66,7 +61,7 @@ use self::{
     check_depth, lon_deg2rad, lat_deg2rad,
   },
   load::{
-    from_fits_gen, from_fits_u64, 
+    from_fits_gen, from_fits_u64,
     smoc_from_fits_gen, tmoc_from_fits_gen, fmoc_from_fits_gen,
     stmoc_from_fits_u64
   },
@@ -97,7 +92,7 @@ pub struct U64MocStore;
 // * fill holes
 
 impl U64MocStore {
-  
+
   pub fn get_global_store() -> &'static Self { &GLOBAL_STORE }
 
   pub fn insert_smoc(&self, moc: SMOC) -> Result<usize, String> {
@@ -117,7 +112,7 @@ impl U64MocStore {
   }
 
   pub fn new_empty_smoc(&self, depth: u8) -> Result<usize, String> {
-   let moc = RangeMOC::<u64, Hpx::<u64>>::new_empty(depth);
+    let moc = RangeMOC::<u64, Hpx::<u64>>::new_empty(depth);
     store::add(moc)
   }
 
@@ -135,41 +130,62 @@ impl U64MocStore {
     store::add(moc)
   }*/
 
+  /// Copy the moc at the given index
+  pub fn copy(&self, index: usize) -> Result<(), String> {
+    store::copy_moc(index).and_then(convert::identity)
+  }
+  
   /// Remove from the store the MOC at the given index.
   pub fn drop(&self, index: usize) -> Result<(), String> {
-    store::drop(index).map(|_| ())
+    store::drop(index).and_then(convert::identity).map(|_| ())
   }
 
-  pub fn drop_smoc(&self, index: usize) -> Result<SMOC, String> {
-    store::drop(index)
-      .and_then(|moc| match moc {
-        InternalMoc::Space(moc) => Ok(moc),
-        _ => Err(String::from("MOC at the given index is not a S-MOC"))
-      })
+  pub fn drop_smoc(&self, index: usize) -> Result<Option<SMOC>, String> {
+    store::drop(index)?
+      .and_then(|opt_moc|
+        opt_moc.map(|moc|
+          match moc {
+            InternalMoc::Space(moc) => Ok(moc),
+            _ => Err(String::from("MOC at the given index is not a S-MOC"))
+          }
+        ).transpose()
+      )
   }
-  
-  pub fn drop_tmoc(&self, index: usize) -> Result<TMOC, String> {
-    store::drop(index)
-      .and_then(|moc| match moc {
-        InternalMoc::Time(moc) => Ok(moc),
-        _ => Err(String::from("MOC at the given index is not a T-MOC"))
-      })
+
+  pub fn drop_tmoc(&self, index: usize) -> Result<Option<TMOC>, String> {
+    store::drop(index)?
+      .and_then(|opt_moc|
+        opt_moc.map(|moc|
+          match moc {
+            InternalMoc::Time(moc) => Ok(moc),
+            _ => Err(String::from("MOC at the given index is not a T-MOC"))
+          }
+        ).transpose()
+      )
   }
-  
-  pub fn drop_fmoc(&self, index: usize) -> Result<FMOC, String> {
-    store::drop(index)
-      .and_then(|moc| match moc {
-        InternalMoc::Frequency(moc) => Ok(moc),
-        _ => Err(String::from("MOC at the given index is not a F-MOC"))
-      })
+
+  pub fn drop_fmoc(&self, index: usize) -> Result<Option<FMOC>, String> {
+    store::drop(index)?
+      .and_then(|opt_moc|
+        opt_moc.map(|moc|
+          match moc {
+            InternalMoc::Frequency(moc) => Ok(moc),
+            _ => Err(String::from("MOC at the given index is not a F-MOC"))
+          }
+        ).transpose()
+      )
   }
-  
-  pub fn drop_stmoc(&self, index: usize) -> Result<STMOC, String> {
-    store::drop(index)
-      .and_then(|moc| match moc {
-        InternalMoc::TimeSpace(moc) => Ok(moc),
-        _ => Err(String::from("MOC at the given index is not a ST-MOC"))
-      })
+
+  pub fn drop_stmoc(&self, index: usize) -> Result<Option<STMOC>, String> {
+    store::drop(index)?
+      .and_then(|opt_moc|
+        opt_moc.map(|moc|
+          match moc {
+            InternalMoc::TimeSpace(moc) => Ok(moc),
+            _ => Err(String::from("MOC at the given index is not a ST-MOC"))
+          }
+        ).transpose()
+      )
   }
 
   pub fn get_1st_axis_min(&self, index: usize) -> Result<Option<u64>, String> {
@@ -182,11 +198,11 @@ impl U64MocStore {
 
   //////////////////
   // Get MOC info //
-  
+
   pub fn get_qty_type(&self, index: usize) -> Result<MocQType, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_qty_type)
   }
-  
+
   pub fn get_smoc_depth(&self, index: usize) -> Result<u8, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_smoc_depth)
   }
@@ -218,14 +234,14 @@ impl U64MocStore {
   pub fn get_ranges_sum(&self, index: usize) -> Result<u64, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_ranges_sum)
   }
-  
+
   pub fn get_coverage_percentage(&self, index: usize) -> Result<f64, String> {
     store::exec_on_one_readonly_moc(
-      index, 
+      index,
       |internal_moc| internal_moc.get_coverage_percentage().ok_or_else(|| String::from("No coverage available for this type of MOC"))
     )
   }
-  
+
   pub fn eq(&self, left_index: usize, right_index: usize) -> Result<bool, String> {
     store::exec_on_two_readonly_mocs(
       left_index,
@@ -233,7 +249,7 @@ impl U64MocStore {
       |l, r| Ok(l == r)
     )
   }
-  
+
   pub fn to_uniq_hpx(&self, index: usize) -> Result<Vec<u64>, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_uniq_hpx)
   }
@@ -249,7 +265,7 @@ impl U64MocStore {
   pub fn to_ranges(&self, index: usize) -> Result<Vec<Range<u64>>, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_ranges)
   }
-  
+
   ///////////////////////
   // LOAD EXISTING MOC //
 
@@ -264,7 +280,7 @@ impl U64MocStore {
     let reader = BufReader::new(file);
     self.load_from_fits(reader)
   }
-  
+
   /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
   ///
   /// # Output
@@ -445,7 +461,7 @@ impl U64MocStore {
     ).map_err(|e| e.to_string())
       .and_then(store::add)
   }
-  
+
   /// Create o S-MOC from a FITS multi-order map plus other parameters.
   /// # Args
   /// * `data`: binary content of the fits file
@@ -512,7 +528,7 @@ impl U64MocStore {
     ).map_err(|e| e.to_string())
       .and_then(store::add)
   }
-  
+
   /// Create o S-MOC from a FITS skymap plus other parameters.
   /// # Args
   /// * `data`: binary content of the fits file
@@ -573,7 +589,7 @@ impl U64MocStore {
       .and_then(|s| self.load_stmoc_from_ascii(&s))
   }
 
-  
+
   pub fn load_smoc_from_ascii(&self, content: &str) -> Result<usize, String> {
     from_ascii_ivoa::<u64, Hpx::<u64>>(content)
       .map_err(|e| e.to_string())
@@ -635,8 +651,8 @@ impl U64MocStore {
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_stmoc_from_json(&s))
   }
-  
-  
+
+
   pub fn load_smoc_from_json(&self, content: &str) -> Result<usize, String> {
     from_json_aladin::<u64, Hpx::<u64>>(content)
       .map_err(|e| e.to_string())
@@ -790,12 +806,12 @@ impl U64MocStore {
     )
   }
 
-  
+
 
   //////////////////
   // MOC CREATION //
 
-  
+
   // * S-MOC CREATION //
 
 
@@ -812,13 +828,13 @@ impl U64MocStore {
     let moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_cells(depth, it, buf_capacity);
     store::add(moc)
   }
-  
+
   pub fn from_hpx_ranges<T: Idx, I>(&self,
-    depth: u8,
-    ranges_it: I,
-    buf_capacity: Option<usize>
+                                    depth: u8,
+                                    ranges_it: I,
+                                    buf_capacity: Option<usize>
   ) -> Result<usize, String>
-   where
+    where
       I: Iterator<Item=Range<T>>
   {
     let it = ranges_it.map(|range| T::to_u64_idx(range.start)..T::to_u64_idx(range.end));
@@ -1225,7 +1241,7 @@ impl U64MocStore {
     );
     store::add(moc)
   }
-    
+
   /// Create a new T-MOC from the given list of decimal Julian Days (JD) times.
   /// # Params
   /// * `name`: the name to be given to the MOC
@@ -1256,7 +1272,7 @@ impl U64MocStore {
     );
     store::add(moc)
   }
-  
+
   pub fn from_decimal_jd_ranges<T>(&self, depth: u8, jd_ranges: T) -> Result<usize, String>
     where
       T: Iterator<Item=Range<f64>>
@@ -1358,7 +1374,7 @@ impl U64MocStore {
     } else {
       lonlat2hash(space_depth, lon, lat)
         .map(|ipix| TimeSpaceMoc::<u64, u64>::create_from_times_positions(
-            times, ipix, time_depth, space_depth,
+          times, ipix, time_depth, space_depth,
         )).and_then(|moc| store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2()))
     }
   }
@@ -1473,7 +1489,7 @@ impl U64MocStore {
     let times_start = jd2mas_approx(times_start);
     let times_end = jd2mas_approx(times_end);
     self.from_time_ranges_spatial_coverages(
-        times_start, times_end, time_depth, spatial_coverages, space_depth
+      times_start, times_end, time_depth, spatial_coverages, space_depth
     )
   }
 
@@ -1485,7 +1501,7 @@ impl U64MocStore {
   /// * ``times_start`` - The starting times expressed in microseconds since jd=0.
   /// * ``times_end`` - The ending times expressed in  microseconds since jd=0.
   /// * ``dt`` - The depth along the time (i.e. `T`) axis.
-  /// 
+  ///
   /// * ``ds`` - The depth at which HEALPix cell indices
   ///   will be computed.
   ///
@@ -1543,7 +1559,7 @@ impl U64MocStore {
       times_start, times_end, time_depth, spatial_coverages//, space_depth
     )
   }
-  
+
   /// Create a time-spatial coverage (2D) from a list of cones
   /// and time ranges.
   ///
@@ -1599,7 +1615,7 @@ impl U64MocStore {
   // return a hierachical view (Json like) for display?
   // (not necessary if display made from rust code too)
 
-  
+
   pub fn barycenter(&self, index: usize) -> Result<(f64, f64), String> {
     op1_moc_barycenter(index)
   }
@@ -1607,7 +1623,7 @@ impl U64MocStore {
   pub fn largest_distance_from_coo_to_moc_vertices(&self, index: usize, lon: f64, lat: f64) -> Result<f64, String> {
     op1_moc_largest_distance_from_coo_to_moc_vertices(index, lon, lat)
   }
-  
+
   pub fn not(&self, index: usize) -> Result<usize, String> {
     self.complement(index)
   }
@@ -1711,11 +1727,11 @@ impl U64MocStore {
   pub fn multi_intersection(&self, indices: &[usize]) -> Result<usize, String> {
     OpN::Intersection.exec(indices)
   }
-  
+
   pub fn multi_symmetric_difference(&self, indices: &[usize]) -> Result<usize, String> {
     OpN::SymmetricDifference.exec(indices)
   }
-  
+
   ////////////////////////
   // ST-MOC projections //
 
@@ -1792,7 +1808,7 @@ impl U64MocStore {
       F: Fn(bool) -> R
   {
     self.filter_time(
-      moc_index, 
+      moc_index,
       jds_it.map(|jd| (jd * JD_TO_USEC) as u64),
       fn_bool
     )
@@ -1867,9 +1883,9 @@ impl U64MocStore {
     let filter = move |moc: &InternalMoc| match moc {
       InternalMoc::TimeSpace(stmoc) => Ok(
         usec_pos_it.map(|(usec, (lon, lat))| {
-            let idx = layer.hash(lon, lat);
-            fn_bool(stmoc.contains_val(&usec, &idx))
-          }).collect::<Vec<R>>()
+          let idx = layer.hash(lon, lat);
+          fn_bool(stmoc.contains_val(&usec, &idx))
+        }).collect::<Vec<R>>()
       ),
       _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
     };

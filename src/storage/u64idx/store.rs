@@ -8,11 +8,11 @@ use slab::Slab;
 
 use super::common::InternalMoc;
 
-static STORE: RwLock<Slab<InternalMoc>> = RwLock::new(Slab::new());
+static STORE: RwLock<Slab<(u8, InternalMoc)>> = RwLock::new(Slab::new());
 
 fn exec_on_readonly_store<R, F>(op: F) -> Result<R, String>
   where
-    F: FnOnce(RwLockReadGuard<'_, Slab<InternalMoc>>) -> Result<R, String>
+    F: FnOnce(RwLockReadGuard<'_, Slab<(u8, InternalMoc)>>) -> Result<R, String>
 {
   STORE.read()
     .map_err(|e| format!("Read lock poisoned: {}", e))
@@ -21,7 +21,7 @@ fn exec_on_readonly_store<R, F>(op: F) -> Result<R, String>
 
 fn exec_on_readwrite_store<R, F>(op: F) -> Result<R, String>
   where
-    F: FnOnce(RwLockWriteGuard<'_, Slab<InternalMoc>>) -> R
+    F: FnOnce(RwLockWriteGuard<'_, Slab<(u8, InternalMoc)>>) -> R
 {
   STORE.write()
     .map(op)
@@ -35,7 +35,7 @@ pub(crate) fn exec_on_one_readonly_moc<T, F>(index: usize, op: F) -> Result<T, S
   exec_on_readonly_store(
     |store| store.get(index)
       .ok_or_else(|| format!("MOC at index '{}' not found", index))
-      .and_then(op)
+      .and_then(|(_, moc)| op(moc))
   )
 }
 
@@ -44,8 +44,8 @@ pub(crate) fn exec_on_two_readonly_mocs<T, F>(il: usize, ir: usize, op: F) -> Re
     F: Fn(&InternalMoc, &InternalMoc) -> Result<T, String>
 {
   exec_on_readonly_store(|store| {
-        let l = store.get(il).ok_or_else(|| format!("MOC at index '{}' not found", il))?;
-        let r = store.get(ir).ok_or_else(|| format!("MOC at index '{}' not found", ir))?;
+        let (_, l) = store.get(il).ok_or_else(|| format!("MOC at index '{}' not found", il))?;
+        let (_, r) = store.get(ir).ok_or_else(|| format!("MOC at index '{}' not found", ir))?;
         op(l, r)
       }
     )
@@ -57,7 +57,10 @@ fn exec_on_n_readonly_mocs<T, F>(indices: &[usize], op: F) -> Result<T, String>
 {
   exec_on_readonly_store(|store| {
       let mocs: Vec<&InternalMoc> = indices.iter().cloned()
-        .map(|i| store.get(i).ok_or_else(|| format!("MOC at index '{}' not found", i)))
+        .map(|i| store.get(i)
+          .map(|(_, moc)| moc)
+          .ok_or_else(|| format!("MOC at index '{}' not found", i))
+        )
         .collect::<Result<_, _>>()?;
       op(mocs)
     }
@@ -67,12 +70,40 @@ fn exec_on_n_readonly_mocs<T, F>(indices: &[usize], op: F) -> Result<T, String>
 
 /// Add a new MOC to the store, retrieve the index at which it has been inserted
 pub(crate) fn add<T: Into<InternalMoc>>(moc: T) -> Result<usize, String> {
-  exec_on_readwrite_store(|mut store| store.insert(moc.into()))
+  exec_on_readwrite_store(|mut store| store.insert((0, moc.into())))
+}
+
+/// Add a new MOC to the store, retrieve the index at which it has been inserted
+pub(crate) fn copy_moc(index: usize) -> Result<Result<(), String>, String> {
+  exec_on_readwrite_store(|mut store| 
+    store.get_mut(index)
+      .ok_or_else(|| format!("MOC at index '{}' not found", index))
+      .and_then(|entry| if entry.0 == 255 {
+        Err(String::from("Unable to copy MOC: 255 copies already reached"))
+      } else {
+        entry.0 += 1;
+        Ok(())
+      })
+  )
 }
 
 /// Drop and return the content of the store at the given index.
-pub(crate) fn drop(index: usize) -> Result<InternalMoc, String> {
-  exec_on_readwrite_store(move |mut store| store.remove(index))
+pub(crate) fn drop(index: usize) -> Result<Result<Option<InternalMoc>, String>, String> {
+  exec_on_readwrite_store(move |mut store| {
+    let count = store.get_mut(index)
+      .map(|entry| {
+        entry.0 -= 1;
+        entry.0
+      })
+      .ok_or_else(|| format!("MOC at index '{}' not found", index))?;
+    Ok(
+      if count == 0 {
+        Some(store.remove(index).1)
+      } else {
+        None
+      }
+    )
+  })
 }
 
 /*
@@ -130,7 +161,7 @@ pub(crate) fn op1_multi_res<F>(index: usize, op: F) -> Result<Vec<usize>, String
   // Then use the write lock only to store the results (shorter operation)
   exec_on_readwrite_store(
     move |mut store| mocs.drain(..)
-      .map(move |moc| store.insert(moc))
+      .map(move |moc| store.insert((0, moc)))
       .collect()
   )
 }
