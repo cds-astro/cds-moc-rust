@@ -45,6 +45,7 @@ pub struct CellMocIter<T: Idx, Q: MocQty<T>> {
   iter: IntoIter<Cell<T>>,
   _qty: PhantomData<Q>,
 }
+
 impl<T: Idx, Q: MocQty<T>> HasMaxDepth for CellMocIter<T, Q> {
   fn depth_max(&self) -> u8 {
     self.depth_max
@@ -133,3 +134,44 @@ impl<'a, T: Idx, Q: MocQty<T>> CellMOCIntoIterator<T> for &'a CellMOC<T, Q> {
     }
   }
 }
+
+/*
+/// Iterator borrowing the `CellMOC` it iterates over.
+pub struct CellMocIterGen<T: Idx, Q: MocQty<T>, I: Iterator<Item=Cell<T>>> {
+  depth_max: u8,
+  iter: I,
+  _qty: PhantomData<Q>,
+}
+impl<T: Idx, Q: MocQty<T>, I: Iterator<Item=Cell<T>>> CellMocIterGen<T, Q, I> {
+  /// WARNING: you must be sure than the order in the input iterator is correct,
+  /// and that it does not contains duplicates, ... 
+  pub fn new_unsafe(depth_max: u8, iter: I) -> Self {
+    CellMocIterGen {
+      depth_max,
+      iter,
+      _qty: PhantomData
+    }
+  }
+}
+impl<T: Idx, Q: MocQty<T>, I: Iterator<Item=Cell<T>>> HasMaxDepth for CellMocIterGen<T, Q, I> {
+  fn depth_max(&self) -> u8 {
+    self.depth_max
+  }
+}
+impl<T: Idx, Q: MocQty<T>, I: Iterator<Item=Cell<T>>> ZSorted for CellMocIterGen<T, Q, I> { }
+impl<T: Idx, Q: MocQty<T>, I: Iterator<Item=Cell<T>>> NonOverlapping for CellMocIterGen<T, Q, I> { }
+impl<T: Idx, Q: MocQty<T>, I: Iterator<Item=Cell<T>>> MOCProperties for CellMocIterGen<T, Q, I> { }
+impl<T: Idx, Q: MocQty<T>, I: Iterator<Item=Cell<T>>> Iterator for CellMocIterGen<T, Q, I> {
+  type Item = Cell<T>;
+  fn next(&mut self) -> Option<Self::Item> {
+    self.iter.next()
+  }
+}
+impl<T: Idx, Q: MocQty<T>, I: Iterator<Item=Cell<T>>> CellMOCIterator<T> for CellMocIterGen<T, Q, I> {
+  type Qty = Q;
+
+  fn peek_last(&self) -> Option<&Cell<T>> {
+    None
+  }
+}
+*/

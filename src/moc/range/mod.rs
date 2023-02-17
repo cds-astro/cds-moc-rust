@@ -44,7 +44,8 @@ use crate::{
   moc::{
     HasMaxDepth, ZSorted, NonOverlapping, MOCProperties,
     RangeMOCIterator, RangeMOCIntoIterator,
-    CellMOCIterator, CellOrCellRangeMOCIterator,
+    CellMOCIterator, CellMOCIntoIterator,
+    CellOrCellRangeMOCIterator,
     cell::CellMOC,
     builder::{
       fixed_depth::{
@@ -376,10 +377,51 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     let left = self.not().expanded();
     and(left.into_range_moc_iter(), self.into_range_moc_iter())
   }
+  
+  /// Fill the possible holes the MOC contains, except the `except_n_largest` (0 as default)
+  /// `n` largest ones.
+  /// This operation may be an heavy operation, here the algorithm we use:
+  /// * perform a `split_into_joint_mocs` operation on the moc `complement`
+  /// * remove the (1 + except_n_largest) largest sub-mocs
+  /// * perform the union of the moc with the remaining sub-mocs
+  pub fn fill_holes(&self, except_n_largest: Option<usize>) -> Self {
+    let convert = |cell_moc: CellMOC<T, Hpx<T>>| {
+      let range_moc = cell_moc.into_cell_moc_iter().ranges().into_range_moc();
+      let coverage = range_moc.coverage_percentage();
+      Some((coverage, range_moc))
+    };
+    let mut cov_mocs: Vec<(f64, Self)> = self.complement().split_into_joint_mocs_gen(external_edge, convert);
+    // Use b.cmp(a) instead of a.cmp(b)
+    cov_mocs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    self.or(
+      &kway_or(
+        Box::new(
+          cov_mocs.into_iter()
+            .skip(1 + except_n_largest.unwrap_or(0))
+            .map(|(_, moc)| moc)
+        )
+      )
+    )
+  }
 
-  // TODO: FILL HOLES HAVING A SURFACE AREA > xx fraction of the sky
-  // TODO: FILL HOLES => ensures that each disjoint MOC has no hole in it => polygones from MOC
-  // algo: moc union (moc.complement.into_disjoint_mocs removing the largest one)
+  /// Fill the possible holes in MOC whoch are smaller than the given `sky_fraction` (in `[0, 1])
+  /// This operation may be an heavy operation, here the algorithm we use:
+  /// * perform a `split_into_joint_mocs` operation on the moc `complement`
+  /// * remove the sub-mocs covering more than the given sky fraction
+  /// * perform the union of the moc with the remaining sub-mocs
+  pub fn fill_holes_smaller_than(&self, sky_fraction: f64) -> Self {
+    let convert = |cell_moc: CellMOC<T, Hpx<T>>| {
+      let range_moc = cell_moc.into_cell_moc_iter().ranges().into_range_moc();
+      let coverage = range_moc.coverage_percentage();
+      if coverage <= sky_fraction {
+        Some(range_moc)
+      } else {
+        None
+      }
+    };
+    let mocs: Vec<Self> = self.complement().split_into_joint_mocs_gen(external_edge, convert);
+    self.or(&kway_or(Box::new(mocs.into_iter())))
+  }
   
   /// Split the disjoint MOC into joint MOCs.
   /// # Param
@@ -403,8 +445,9 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   /// * and we remove them from the original MOC.
   /// * We continue the process with the updated original MOC
   pub fn split_into_joint_mocs(&self, include_indirect_neighbours: bool) -> Vec<CellMOC<T, Hpx<T>>> {
+    let convert = |cell_moc| Some(cell_moc);
     if include_indirect_neighbours {
-      self.split_into_joint_mocs_gen(external_edge)
+      self.split_into_joint_mocs_gen(external_edge, convert)
     } else {
       self.split_into_joint_mocs_gen(
         |depth, idx, delta_depth| {
@@ -416,14 +459,16 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
             .cloned()
             .collect::<Vec<u64>>()
             .into_boxed_slice()
-        }
+        },
+        convert
       )
     }
   } 
   
-  fn split_into_joint_mocs_gen<F>(&self, fn_neighbours: F) -> Vec<CellMOC<T, Hpx<T>>>
+  fn split_into_joint_mocs_gen<F, M, C>(&self, fn_neighbours: F, convert: C) -> Vec<M>
     where
-      F: Fn(u8, u64, u8) -> Box<[u64]>
+      F: Fn(u8, u64, u8) -> Box<[u64]>,
+      C: Fn(CellMOC<T, Hpx<T>>) -> Option<M>,
   {
     let mut elems: Vec<T> = self.into_range_moc_iter()
       .cells()
@@ -433,7 +478,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     debug_assert!(
       elems.iter().fold((true, T::zero()), |(b, prev), curr| (b & (prev <= *curr), *curr)).0
     );
-    let mut mocs: Vec<CellMOC<T, Hpx<T>>> = Default::default();
+    let mut mocs: Vec<M> = Default::default();
     while !elems.is_empty() {
       let mut stack: Vec<T> = Default::default();
       let first_mut: &mut T = elems.first_mut().unwrap(); // unwrap ok since we tested empty just before
@@ -506,7 +551,9 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
             .collect()
         ))
       );
-      mocs.push(moc);
+      if let Some(moc) = convert(moc) {
+        mocs.push(moc);
+      }
       elems.retain(|zuniq| *zuniq & T::one() == T::zero());
     }
     mocs
