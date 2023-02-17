@@ -70,7 +70,7 @@ fn exec_on_n_readonly_mocs<T, F>(indices: &[usize], op: F) -> Result<T, String>
 
 /// Add a new MOC to the store, retrieve the index at which it has been inserted
 pub(crate) fn add<T: Into<InternalMoc>>(moc: T) -> Result<usize, String> {
-  exec_on_readwrite_store(|mut store| store.insert((0, moc.into())))
+  exec_on_readwrite_store(|mut store| store.insert((1, moc.into())))
 }
 
 /// Add a new MOC to the store, retrieve the index at which it has been inserted
@@ -161,7 +161,7 @@ pub(crate) fn op1_multi_res<F>(index: usize, op: F) -> Result<Vec<usize>, String
   // Then use the write lock only to store the results (shorter operation)
   exec_on_readwrite_store(
     move |mut store| mocs.drain(..)
-      .map(move |moc| store.insert((0, moc)))
+      .map(move |moc| store.insert((1, moc)))
       .collect()
   )
 }

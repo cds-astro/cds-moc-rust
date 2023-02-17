@@ -1,6 +1,15 @@
 # `moc` Change Log
 
 
+## 0.11.1
+
+Released 2023-02-17
+
+### Fixed
+
+* Dumb initialization of the counts in the store
+
+
 ## 0.11.0
 
 Released 2023-02-17
