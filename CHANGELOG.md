@@ -1,7 +1,21 @@
 # `moc` Change Log
 
 
-### 0.10.1
+## 0.11.0
+
+Released 2023-02-17
+
+### Added
+
+* Operations `fill_holes` and `fill_holes_smaller_than`
+* Add reference count in store to handle external MOC copies
+  (e.g. when using python multiprocessing silnetly resorting 
+   on pickle, which cause bugs since the MOC store index is no
+   more uniq and is may be dropped)
+
+
+
+## 0.10.1
 
 Released 2023-02-13
 
@@ -11,7 +25,7 @@ Released 2023-02-13
   when readding FITs files
 
 
-### 0.10.0
+## 0.10.0
 
 Released 2023-02-13
 

@@ -3,10 +3,10 @@
 
 [package]
 name = "moc"
-version = "0.10.1"
+version = "0.11.0"
 authors = [
   "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>",
-  "Matthieu Baumann <baumannmatthieu0@gmail.com>"
+  "Matthieu Baumann <matthieu.baumann@astro.unistra.fr>"
 ]
 description = """
 Library made to create and manipulate HEALPix
