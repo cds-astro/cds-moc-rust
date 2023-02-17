@@ -71,6 +71,24 @@ pub enum Op {
   /// Returns the MOC internal border (made of cell of depth the MOC depth), SMOC only
   IntBorder(Op1Args),
 
+  #[structopt(name = "fillexcept")]
+  /// Fill MOC holes except the given k largest holes
+  FillHolesExceptLargest {
+    #[structopt(short = "-k", long = "--keep-n-largest")]
+    /// Do not fill the given number of largest holes
+    keep_n_largest: Option<usize>,
+    #[structopt(flatten)]
+    op: Op1Args
+  },
+  #[structopt(name = "fillholes")]
+  /// Fill MOC holes smaller than the given sky fraction
+  FillHolesSmallerThan {
+    /// Sky fraction threshold (in `[0, 1]`)
+    sky_fraction: f64,
+    #[structopt(flatten)]
+    op: Op1Args
+  },
+  
   #[structopt(name = "inter")]
   /// Performs a logical 'AND' between 2 MOCs (= MOC intersection)
   Intersection(Op2Args),
@@ -111,6 +129,8 @@ impl Op {
       Op::Contract(op) => op.exec(Op1::Contract),
       Op::ExtBorder(op) => op.exec(Op1::ExtBorder),
       Op::IntBorder(op) => op.exec(Op1::IntBorder),
+      Op::FillHolesExceptLargest{keep_n_largest, op} => op.exec(Op1::FillHolesExceptLargest { keep_n_largest }),
+      Op::FillHolesSmallerThan{ sky_fraction, op } => op.exec(Op1::FillHolesSmallerThan { sky_fraction }),
       Op::Intersection(op) => op.exec(Op2::Intersection),
       Op::Union(op) => op.exec(Op2::Union),
       Op::SymmetricDifference(op) => op.exec(Op2::SymmetricDifference),
@@ -212,6 +232,8 @@ pub enum Op1 {
   Complement,
   Degrade { new_depth: u8 },
   Split { indirect_neigh: bool, count: bool },
+  FillHolesExceptLargest{ keep_n_largest: Option<usize> },
+  FillHolesSmallerThan{ sky_fraction: f64 },
   Extend,
   Contract,
   ExtBorder,
@@ -254,6 +276,12 @@ impl Op1 {
         }
         Ok(())
       },
+      Op1::FillHolesExceptLargest{ keep_n_largest } => out.write_smoc_possibly_converting_to_u64(
+        moc_it.into_range_moc().fill_holes(keep_n_largest).into_range_moc_iter()
+      ),
+      Op1::FillHolesSmallerThan{ sky_fraction } => out.write_smoc_possibly_converting_to_u64(
+        moc_it.into_range_moc().fill_holes_smaller_than(sky_fraction).into_range_moc_iter()
+      ),
       Op1::Extend => out.write_smoc_possibly_converting_to_u64(moc_it.into_range_moc().expanded_iter()),
       Op1::Contract => out.write_smoc_possibly_converting_to_u64(moc_it.into_range_moc().contracted_iter()),
       Op1::ExtBorder => out.write_smoc_possibly_converting_to_u64(moc_it.into_range_moc().external_border_iter()),
@@ -270,6 +298,8 @@ impl Op1 {
       Op1::Complement => out.write_tmoc_possibly_converting_to_u64(moc_it.not()),
       Op1::Degrade  { new_depth } => out.write_tmoc_possibly_converting_to_u64(moc_it.degrade(new_depth)), // out.write_tmoc_converting(moc_it.degrade(new_depth)),
       Op1::Split { .. } => Err(String::from("No 'split' operation on T-MOCs.").into()),
+      Op1::FillHolesExceptLargest{ .. } => Err(String::from("No 'fillexcept' operation on T-MOCs.").into()),
+      Op1::FillHolesSmallerThan{ .. } => Err(String::from("No 'fillholes' operation on T-MOCs.").into()),
       Op1::Extend => Err(String::from("No 'extend' operation on T-MOCs.").into()),
       Op1::Contract => Err(String::from("No 'contract' operation on T-MOCs.").into()),
       Op1::ExtBorder => Err(String::from("No 'extborder' operation on T-MOCs.").into()),
@@ -285,11 +315,13 @@ impl Op1 {
     match self {
       Op1::Complement => out.write_fmoc_possibly_converting_to_u64(moc_it.not()),
       Op1::Degrade  { new_depth } => out.write_fmoc_possibly_converting_to_u64(moc_it.degrade(new_depth)), // out.write_tmoc_converting(moc_it.degrade(new_depth)),
-      Op1::Split { .. } => Err(String::from("No 'split' operation on T-MOCs.").into()),
+      Op1::Split { .. } => Err(String::from("No 'split' operation on F-MOCs.").into()),
+      Op1::FillHolesExceptLargest{ .. } => Err(String::from("No 'fillexcept' operation on F-MOCs.").into()),
+      Op1::FillHolesSmallerThan{ .. } => Err(String::from("No 'fillholes' operation on F-MOCs.").into()),
       Op1::Extend => Err(String::from("No 'extend' operation on T-MOCs.").into()),
-      Op1::Contract => Err(String::from("No 'contract' operation on T-MOCs.").into()),
-      Op1::ExtBorder => Err(String::from("No 'extborder' operation on T-MOCs.").into()),
-      Op1::IntBorder => Err(String::from("No 'intborder' operation on T-MOCs.").into()),
+      Op1::Contract => Err(String::from("No 'contract' operation on F-MOCs.").into()),
+      Op1::ExtBorder => Err(String::from("No 'extborder' operation on F-MOCs.").into()),
+      Op1::IntBorder => Err(String::from("No 'intborder' operation on F-MOCs.").into()),
     }
   }
   
@@ -311,6 +343,8 @@ impl Op1 {
       Op1::Complement => todo!(), // Not yet implemented on ST-MOC!! Do we add time ranges with full space S-MOCs?
       Op1::Degrade  { .. } => todo!(), // Not yet implemented on ST-MOC!! Degrade on T, on S, on both (take two paramaeters)?
       Op1::Split { .. } => Err(String::from("No 'split' operation on ST-MOCs.").into()),
+      Op1::FillHolesExceptLargest{ .. } => Err(String::from("No 'fillexcept' operation on ST-MOCs.").into()),
+      Op1::FillHolesSmallerThan{ .. } => Err(String::from("No 'fillholes' operation on ST-MOCs.").into()),
       Op1::Extend => Err(String::from("No 'extend' operation on ST-MOCs.").into()),
       Op1::Contract => Err(String::from("No 'contract' operation on ST-MOCs.").into()),
       Op1::ExtBorder => Err(String::from("No 'extborder' operation on ST-MOCs.").into()),

@@ -2,10 +2,11 @@
 
 ## 0.6.0
 
-Released 202X-XX-XX
+Released 2023-XX-XX
 
 * Fix `from timeranges`
 * Add the `view` command to save PNG files and display S-MOCs.
+* Add `fillexcept` and `fillholes` operations
 
 
 ## 0.5.3

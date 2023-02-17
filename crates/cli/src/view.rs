@@ -17,12 +17,6 @@ use mapproj::{
     par::Par,
     sfl::Sfl,
   },
-  conic::{
-    cod::Cod,
-    coe::Coe,
-    coo::Coo,
-    cop::Cop,
-  },
   cylindrical::{
     car::Car,
     cea::Cea,
