@@ -1,5 +1,14 @@
 # `moc` Change Log
 
+## 0.11.2
+
+Released 2023-03-06
+
+### Fixed
+
+* Wrong constant (pi/2 instead of pi) when checking elliptical cone position angle
+
+
 
 ## 0.11.1
 

@@ -931,7 +931,7 @@ pub fn from_elliptical_cone(
     Err(JsValue::from_str("Semi-major axis must be in ]0, pi/2]"))
   } else if b <= 0.0 || a <= b {
     Err(JsValue::from_str("Semi-minor axis must be in ]0, a["))
-  } else if pa < 0.0 || HALF_PI <= pa {
+  } else if pa < 0.0 || PI <= pa {
     Err(JsValue::from_str("Position angle must be in [0, pi["))
   } else {
     let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth, 2);

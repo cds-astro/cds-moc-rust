@@ -98,7 +98,8 @@ pub(crate) fn drop(index: usize) -> Result<Result<Option<InternalMoc>, String>, 
       .ok_or_else(|| format!("MOC at index '{}' not found", index))?;
     Ok(
       if count == 0 {
-        Some(store.remove(index).1)
+        let moc = store.remove(index).1;
+        Some(moc)
       } else {
         None
       }

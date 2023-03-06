@@ -1113,7 +1113,7 @@ fn ellipse2moc(
     Err(String::from("Semi-major axis must be in ]0, pi/2]").into())
   } else if b <= 0.0 || a <= b {
     Err(String::from("Semi-minor axis must be in ]0, a[").into())
-  } else if pa <= 0.0 || HALF_PI <= pa {
+  } else if pa <= 0.0 || PI <= pa {
     Err(String::from("Position angle must be in [0, pi[").into())
   } else {
     Ok(RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth, 2))
