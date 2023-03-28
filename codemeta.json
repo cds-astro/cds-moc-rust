@@ -10,7 +10,7 @@
     "downloadUrl": "https://github.com/cds-astro/cds-moc-rust/releases",
     "issueTracker": "https://github.com/cds-astro/cds-moc-rust/issues",
     "name": "MOC Lib Rust, MOCCLi, MOCWasm and MOCSet",
-    "softwareVersion": "0.5.3",
+    "softwareVersion": "0.6.0",
     "description": "Rust implementation of the IVOA MOC standard (MOC Lib Rust); \nassociated command line tool (MOCCli) and\nJavascript/WebAssembly wrapper to manipulate MOCs in Web Browsers (MOCWasm).",
     "applicationCategory": "Astronomy",
     "releaseNotes": "https://github.com/cds-astro/cds-moc-rust/blob/main/CHANGELOG.md",
