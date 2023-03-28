@@ -2,7 +2,7 @@
 
 ## 0.6.0
 
-Released 2023-XX-XX
+Released 2023-03-28
 
 * Fix `from timeranges`
 * Add the `view` command to save PNG files and display S-MOCs.

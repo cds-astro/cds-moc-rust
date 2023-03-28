@@ -1,5 +1,12 @@
 # `moc-set` Change Log
 
+## 0.6.0
+
+Released 2023-03-28
+
+* No modification, release due to new moc-cli release
+
+
 ## 0.5.3
 
 Realeased 2022-11-10
