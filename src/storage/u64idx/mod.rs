@@ -265,6 +265,10 @@ impl U64MocStore {
   pub fn to_ranges(&self, index: usize) -> Result<Vec<Range<u64>>, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_ranges)
   }
+  
+  pub fn to_hz_ranges(&self, index: usize) -> Result<Vec<Range<f64>>, String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_hz_ranges)
+  }
 
   ///////////////////////
   // LOAD EXISTING MOC //

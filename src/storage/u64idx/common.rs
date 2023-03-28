@@ -225,6 +225,17 @@ impl InternalMoc {
       InternalMoc::TimeSpace(_) => Err(String::from("Get ranges not possible for Time-Space MOCs")),
     }
   }
+
+  pub(crate) fn get_hz_ranges(&self) -> Result<Vec<Range<f64>>, String> {
+    match self {
+      InternalMoc::Frequency(moc) => Ok(
+        moc.into_range_moc_iter()
+          .map(|Range { start, end }| Frequency::<u64>::hash2freq(start)..Frequency::<u64>::hash2freq(end))
+          .collect()
+      ),
+      _ => Err(String::from("Get Hz ranges only available for F-MOCs")),
+    }
+  }
   
 
   pub(crate) fn to_ascii<W>(&self, fold: Option<usize>, writer: W) -> Result<(), String> 
