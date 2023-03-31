@@ -1,5 +1,14 @@
 # `moc` Change Log
 
+## 0.11.3 (no bug fix, but minor add)
+
+Released 2023-03-31
+
+### Added
+
+* Methods for frequency MOCs in store
+
+
 ## 0.11.2
 
 Released 2023-03-06
