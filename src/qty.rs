@@ -351,10 +351,10 @@ impl<T: Idx> Frequency<T> {
     /// # Panics
     /// * if `freq` not in `[5.048709793414476e-29, 5.846006549323611e+48[`.
     pub fn freq2hash(freq: f64) -> T {
-        const FREQ_MIN: f64 = 5.048_709_793_414_476e-29; // f64::from_bits(929_u64 << 52);
-        const FREQ_MAX: f64 = 5.846_006_549_323_611e48; // f64::from_bits((1184_u64 << 52) | F64_MANTISSA_BIT_MASK);
+        const FREQ_MIN: f64 = 5.048_709_793_414_476e-29; // f64::from_bits(  929_u64 << 52);
+        const FREQ_MAX: f64 = 5.846_006_549_323_611e48;  // f64::from_bits((1184_u64 << 52) | F64_MANTISSA_BIT_MASK);
         assert!(FREQ_MIN <= freq, "Wrong frequency in Hz. Expected: >= {}. Actual: {}", FREQ_MIN, freq);
-        assert!(freq < FREQ_MAX, "Wrong frequency in Hz. Expected: < {}. Actual: {}", FREQ_MAX, freq);
+        assert!(freq <= FREQ_MAX, "Wrong frequency in Hz. Expected: < {}. Actual: {}", FREQ_MAX, freq);
         // f64: 1 sign bit + 11 exponent bits + 52 fraction bits
         // value = (-1)^sign * 2^(exponent - 1023) * (1 + fraction/2^53)
         // * assert bit sign == 0

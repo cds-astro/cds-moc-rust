@@ -1289,6 +1289,19 @@ impl U64MocStore {
 
   // * F-MOC CREATION //
 
+  pub fn from_fmoc_ranges<T: Idx, I>(
+    &self,
+    depth: u8,
+    ranges_it: I,
+  ) -> Result<usize, String>
+    where
+      I: Iterator<Item=Range<T>>
+  {
+    let it = ranges_it.map(|range| T::to_u64_idx(range.start)..T::to_u64_idx(range.end));
+    let moc: RangeMOC<u64, Frequency::<u64>> = RangeMOC::from_maxdepth_ranges(depth, it, None);
+    store::add(moc)
+  }
+  
   /// Create an store a new F-MOC from the given list of frequencies (Hz).
   ///
   /// # Input
@@ -1840,6 +1853,20 @@ impl U64MocStore {
     store::exec_on_one_readonly_moc(moc_index, filter)
   }
 
+
+  pub fn filter_freq<T, F, R>(&self, moc_index: usize, hz_it: T, fn_bool: F) -> Result<Vec<R>, String>
+    where
+      T: Iterator<Item=f64>,
+      F: Fn(bool) -> R
+  {
+    let filter = move |moc: &InternalMoc| match moc {
+      InternalMoc::Frequency(moc) => Ok(
+        hz_it.map(|hz| fn_bool(moc.contains_val(&Frequency::<u64>::freq2hash(hz)))).collect::<Vec<R>>()
+      ),
+      _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
+    };
+    store::exec_on_one_readonly_moc(moc_index, filter)
+  }
 
   /// Returns an array (of boolean or u8 or ...) telling if the pairs of coordinates
   /// in the input slice are in (true=1) or out of (false=0) the S-MOC.
