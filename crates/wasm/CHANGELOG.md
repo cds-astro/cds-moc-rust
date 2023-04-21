@@ -1,5 +1,18 @@
 # `moc-wasm` Change Log
 
+## 0.7.0
+
+Released 2023-04-21
+
+### ⚠️ BREAKING Changes
+
+The full API has been changed! 
+Instead of relying on functions accessing MOCs by names,
+we use methods on Javascirpt objects (MOC, TMOC, FMOC and STMOC). 
+The internal store is now the same as the one used in [MOCPy](https://github.com/cds-astro/mocpy/).
+See the README file and the example index.html file for more details.
+
+
 ## 0.6.0
 
 Released 2023-03-28
