@@ -21,7 +21,7 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-moclib = { package = "moc", path = "../.." }
+moclib = { package = "moc", path = "../..", features = ["storage"] }
 healpix = { package = "cdshealpix", version = "0.6.3" }
 serde = { version = "1.0.80", features = ["derive"] }
 wasm-bindgen = { version = "0.2.78", features = ["serde-serialize"]  }

@@ -26,7 +26,8 @@ For tools able to display MOCs, see:
 
 ### Try it
 
-From this [demo page](http://cdsxmatch.u-strasbg.fr/lab/moc/).
+From this [demo page (old version)](http://cdsxmatch.u-strasbg.fr/lab/mocwasm/).
+From this [demo page (new version)](http://cdsxmatch.u-strasbg.fr/lab/mocwasm/).
 
 
 ### Put it in your own Web page

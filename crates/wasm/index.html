@@ -19,52 +19,62 @@
       <button onclick="moc.fromLocalFile();">Load FITS</button>
       </br>
       <label>S-MOCs from local FITS/JSON/ASCII:</label>
-      <button onclick="moc.fromLocalFile('space');">Load S-MOC</button>
+      <button onclick="moc.MOC.fromLocalFile();">Load S-MOC</button>
       </br>
       <label>T-MOCs from local FITS/JSON/ASCII:</label>
-      <button onclick="moc.fromLocalFile('time');">Load T-MOC</button>
+      <button onclick="moc.TMOC.fromLocalFile();">Load T-MOC</button>
+      </br>
+      <label>F-MOCs from local FITS/JSON/ASCII:</label>
+      <button onclick="moc.FMOC.fromLocalFile();">Load T-MOC</button>
       </br>
       <label>ST-MOCs from local FITS/JSON/ASCII:</label>
-      <button onclick="moc.fromLocalFile('space-time');">Load ST-MOC</button>
+      <button onclick="moc.STMOC.fromLocalFile();">Load ST-MOC</button>
       </br>
       <label>MOC from local multi-order-map (FITS):</label>
-      <button onclick="moc.fromLocalMultiOrderMap(0.0, 0.9, false, false, false, false);">Load MultiOrderMap</button>
+      <button onclick="moc.MOC.fromLocalMultiOrderMap(0.0, 0.9, false, false, false, false);">Load MultiOrderMap</button>
+      </br>
+      <label>MOC from local skymap (FITS):</label>
+      <button onclick="moc.MOC.fromLocalSkymap(0.0, 0.0, 0.9, false, false, false, false);">Load MultiOrderMap</button>
     </p>
     <p>
       Try copy/paste and exec the following lines of javascript from your web-browser console:
       <pre>
 (async () => {      
   // Load 2MASS and SDSS DR12 MOCs from CDS      
-  await moc.fromFitsUrl('2mass', 'http://alasky.u-strasbg.fr/footprints/tables/vizier/II_246_out/MOC');
-  await moc.fromFitsUrl('sdss12', 'http://alasky.u-strasbg.fr/footprints/tables/vizier/V_147_sdss12/MOC');
-  
-  // List MOCs loaded in the page
-  console.log(moc.list());
-        
+  let moc2mass = await moc.MOC.fromFitsUrl('http://alasky.u-strasbg.fr/footprints/tables/vizier/II_246_out/MOC');
+  console.log("2MASS MOC depth: " + moc2mass.getDepth());
+  console.log("2MASS MOC coverage: " + moc2mass.coveragePercentage() + "%");
+  let mocsdss = await moc.MOC.fromFitsUrl('http://alasky.u-strasbg.fr/footprints/tables/vizier/V_147_sdss12/MOC');
+  console.log("SDSS DR12 MOC depth: " + mocsdss.getDepth());      
+  console.log("SDSS DR12 MOC coverage: " + mocsdss.coveragePercentage() + "%");
+      
   // Init a timer
   console.time('timer');
   // Performs MOC intersection
-  moc.and('2mass', 'sdss12', '2mass_inter_sdss12');
+  let tmass_inter_sdss12 = moc2mass.and(mocsdss);
   // Log time
   console.timeLog('timer', 'Intersection');
   // Performs MOC union
-  moc.or('2mass', 'sdss12', '2mass_union_sdss12');
+  let tmass_union_sdss12 = moc2mass.or(mocsdss);
   // Log time
   console.timeLog('timer', 'Union');
-  // Degrade to order 2 the result of the intersection      
-  moc.degrade('2mass_inter_sdss12', 2, '2mass_inter_sdss12_d2')
+  // Degrade to order 2 the result of the intersection
+  let tmass_union_sdss12_d2 = tmass_union_sdss12.degrade(2);
   // Remove timer
   console.timeEnd('timer');
-        
-  // List MOCs loaded in the page
-  console.log(moc.list());
-        
+  
+  console.log("(2MASS AND SDSS DR12) MOC depth: " + tmass_inter_sdss12.getDepth());
+  console.log("(2MASS AND SDSS DR12) MOC coverage: " + tmass_inter_sdss12.coveragePercentage() + "%");
+  console.log("(2MASS OR SDSS DR12) MOC depth: " + tmass_union_sdss12.getDepth());
+  console.log("(2MASS OR SDSS DR12) MOC coverage: " + tmass_union_sdss12.coveragePercentage() + "%");    
+  console.log("(2MASS OR SDSS DR12) MOC coverage at depth 2: " + tmass_union_sdss12_d2.coveragePercentage() + "%");    
+      
   // Print the ASCII and JSON serializations of '2mass_inter_sdss12_d2'
-  console.log(moc.toAscii('2mass_inter_sdss12_d2'));
-  console.log(moc.toJson('2mass_inter_sdss12_d2'));
+  console.log(tmass_inter_sdss12.toAscii());
+  console.log(tmass_inter_sdss12.toJson());
   
   // Save the result of the intersection in a FITS file
-  moc.toFitsFile('2mass_inter_sdss12');
+  tmass_inter_sdss12.toFitsFile();
   return;
 })();
       </pre>
@@ -76,30 +86,31 @@
 var n;
 (async () => {
   // Load a multi-order map and create a MOC on-the-fly
-  await moc.fromMultiOrderMapFitsUrl('lalmap', 'http://cdsxmatch.u-strasbg.fr/lab/moc/LALInference.multiorder.fits', 0.0, 0.9, false, false, false, false);
-  // List MOCs loaded in the page
-  console.log(moc.list());
+  let lalmap = await moc.MOC.fromMultiOrderMapFitsUrl('http://cdsxmatch.u-strasbg.fr/lab/moc/LALInference.multiorder.fits', 0.0, 0.9, false, false, false, false);
+  
+  console.log("LALMAP MOC depth: " + lalmap.getDepth());
+  console.log("LALMAP MOC coverage: " + lalmap.coveragePercentage() + "%");
 
   // Init a timer
   console.time('timer');
 
   // Count the number of disjoint MOCs in the MOC
-  n = moc.splitCount('lalmap');
+  let n = lalmap.splitCount();
   console.log("n sub_mocs: " + n);
   console.timeLog('timer', 'Spit count'); 
 
   // Do split the MOC in 10 sub-MOCs
-  moc.split('lalmap', 'lalmap_sub');
+  let mocs = lalmap.split();
   console.timeLog('timer', 'Spit'); 
   // Remove timer
   console.timeEnd('timer');
 
   // List MOCs loaded in the page
-  console.log(moc.list()); 
+  console.log(mocs); 
 
   // Get info on sub-MOCs
-  for (let i = 0; i < n; i++) {  
-    console.log("Coverage percentage sub " + i  + ": " + moc.info("lalmap_sub_" + i).coverage_percentage);
+  for (let i = 0; i < mocs.length; i++) {  
+    console.log("Coverage percentage sub " + i  + ": " + mocs[i].coveragePercentage());
   }
   return;
 })();
