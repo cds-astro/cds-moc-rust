@@ -1002,7 +1002,7 @@ impl U64MocStore {
   /// * `lat_deg` the latitude of the center of the box, in degrees
   /// * `a_deg` the semi-major axis of the box (half the box width), in degrees
   /// * `b_deg` the semi-minor axis of the box (half the box height), in degrees
-  /// * `pa_deg` the position angle (i.e. the angle between the north and the semi-major axis, east-of-north), in radians
+  /// * `pa_deg` the position angle (i.e. the angle between the north and the semi-major axis, east-of-north), in degrees
   /// * `depth`: the MOC depth
   ///
   /// # Output
@@ -1163,7 +1163,6 @@ impl U64MocStore {
 
   /// Create a new S-MOC from the given lists of UNIQ and Values.
   /// # Params
-  /// * `name`: the name to be given to the MOC
   /// * `depth`: S-MOC maximum depth in `[0, 29]`, Must be >= largest input cells depth.
   /// * `density`: Input values are densities, i.e. they are not proportional to the area of their associated cells.
   /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
