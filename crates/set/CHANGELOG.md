@@ -1,5 +1,12 @@
 # `moc-set` Change Log
 
+## 0.7.0
+
+Released 2023-04-21
+
+* No modification, release due to new moc-wasm release
+
+
 ## 0.6.0
 
 Released 2023-03-28
