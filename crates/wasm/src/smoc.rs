@@ -225,7 +225,7 @@ impl MOC {
     }
   }
 
-    #[wasm_bindgen(js_name = "toAscii", catch)]
+  #[wasm_bindgen(js_name = "toAscii", catch)]
   /// Returns the ASCII serialization of the MOC.
   ///
   /// # Arguments

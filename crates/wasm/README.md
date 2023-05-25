@@ -58,7 +58,8 @@ Example of web page(s) using MOCwasm:
 
 ### Use it in you project with NPM
 
-TBW
+See the [npm moc-wasm package](https://www.npmjs.com/package/@fxpineau/moc-wasm).
+(Not tested, we need feedbacks!).
 
 
 ## Available JavaScript methods (from v0.7.0)
@@ -291,6 +292,7 @@ wasm-pack publish
 
 ## ToDo list
 
+* [ ] Add `to_png` or `to_image` for `S-MOCs`
 * [ ] Implement `difference (xor)` for `ST-MOCs`
 * [ ] Implement `complement (not)` for `ST-MOCs` (complement on Space only or also on Time with allsky S-MOCs?)
 * [ ] Implement `degradeSpace` (?), `degradeTime` (?), `degradeSpaceAndTime` (?) for `ST-MOCs`
