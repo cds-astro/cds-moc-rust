@@ -19,10 +19,11 @@ use healpix::{
     zone_coverage,
     box_coverage,
     append_external_edge,
-    external_edge, external_edge_struct,
+    external_edge,
+    external_edge_struct,
     bmoc::BMOC,
   },
-  compass_point::Ordinal,
+  compass_point::{MainWind, Ordinal},
   sph_geom::{
     ContainsSouthPoleMethod,
     coo3d::Coo3D
@@ -559,6 +560,50 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     mocs
   }
 
+  /// Returns an iterator over the list of elementary edges (i.e. the edges of the border
+  /// cells at the MOC maximum depth).
+  /// Each edge is a tuple made of 2 points `A` and `B`: `((lonA, latA), (lonB, latB))`
+  /// with longitudes and latitudes in radians.
+  ///
+  /// Algo:
+  /// * for each cell (all at max depth) of the external border
+  ///     + for each of the 4 border, we look if the neighbour cell is in the original MOC
+  ///     + if yes, add the vertex tuples in output
+  pub fn border_elementary_edges(&self) -> impl Iterator<Item=((f64, f64), (f64, f64))> + '_ {
+    let hp = healpix::nested::get(self.depth_max);
+    self.external_border_iter()
+      .cells()
+      .flat_map(move | Cell { depth, idx} | {
+        assert_eq!(depth, self.depth_max);
+        let mut res: Vec<((f64, f64), (f64, f64))> = Vec::with_capacity(4);
+        let h = <T as Idx>::to_u64(idx);
+        let [v_south, v_east, v_north, v_west] = hp.vertices(h);
+        let neigs = hp.neighbours(h, false);
+        if let Some(nh) = neigs.get(MainWind::NE) {
+          if self.contains_depth_max_val(&T::from_u64(*nh)) {
+            res.push((v_north, v_east));
+          }
+        }
+        if let Some(nh) = neigs.get(MainWind::SE) {
+          if self.contains_depth_max_val(&T::from_u64(*nh)) {
+            res.push((v_south, v_east));
+          }
+        }
+        if let Some(nh) = neigs.get(MainWind::NW) {
+          if self.contains_depth_max_val(&T::from_u64(*nh)) {
+            res.push((v_north, v_west));
+          }
+        }
+        if let Some(nh) = neigs.get(MainWind::SW) {
+          if self.contains_depth_max_val(&T::from_u64(*nh)) {
+            res.push((v_south, v_west));
+          }
+        }
+        res
+      }
+    )
+  }
+
 }
 
 
@@ -1084,5 +1129,15 @@ mod tests {
     }
   }
   
+  #[test]
+  fn test_border_elementary_edges() {
+    let moc = RangeMOC::<u64, Hpx::<u64>>::from_coos(8, [(0.0_f64, 0.0_f64)].iter().cloned(), None);
+    let elementary_edges = moc.border_elementary_edges().collect::<Vec<((f64, f64), (f64, f64))>>();
+    assert_eq!(elementary_edges.len(), 4);
+
+    let moc = moc.expanded();
+    let elementary_edges = moc.border_elementary_edges().collect::<Vec<((f64, f64), (f64, f64))>>();
+    assert_eq!(elementary_edges.len(), 12);
+  }
   
 }
