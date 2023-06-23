@@ -1,7 +1,11 @@
 
 use std::{
   slice,
+  error::Error,
+  io::BufReader,
   ops::Range,
+  fs::File,
+  path::Path,
   vec::IntoIter,
   marker::PhantomData,
   convert::{TryInto, TryFrom},
@@ -65,7 +69,10 @@ use crate::{
       multi_op::kway_or
     }
   },
-  deser::ascii::AsciiError
+  deser::{
+    ascii::AsciiError,
+    fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType}
+  }
 };
 
 pub mod op;
@@ -572,9 +579,8 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   pub fn border_elementary_edges(&self) -> impl Iterator<Item=((f64, f64), (f64, f64))> + '_ {
     let hp = healpix::nested::get(self.depth_max);
     self.external_border_iter()
-      .cells()
-      .flat_map(move | Cell { depth, idx} | {
-        assert_eq!(depth, self.depth_max);
+      .flatten_to_fixed_depth_cells()
+      .flat_map(move | idx | {
         let mut res: Vec<((f64, f64), (f64, f64))> = Vec::with_capacity(4);
         let h = <T as Idx>::to_u64(idx);
         let [v_south, v_east, v_north, v_west] = hp.vertices(h);
@@ -632,6 +638,19 @@ impl From<RangeMOC<u64, Hpx<u64>>> for RangeMOC<u16, Hpx<u16>> {
 }
 
 impl RangeMOC<u64, Hpx<u64>> {
+  
+  pub fn from_fits_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
+    let file = File::open(path)?;
+    match from_fits_ivoa(BufReader::new(file))? {
+      MocIdxType::U16(MocQtyType::Hpx(MocType::Cells(moc))) => Ok(moc.into_cell_moc_iter().ranges().convert::<u64, Hpx<u64>>().into_range_moc()),
+      MocIdxType::U32(MocQtyType::Hpx(MocType::Cells(moc))) => Ok(moc.into_cell_moc_iter().ranges().convert::<u64, Hpx<u64>>().into_range_moc()),
+      MocIdxType::U64(MocQtyType::Hpx(MocType::Cells(moc))) => Ok(moc.into_cell_moc_iter().ranges().into_range_moc()),
+      MocIdxType::U16(MocQtyType::Hpx(MocType::Ranges(moc))) => Ok(moc.convert::<u64, Hpx<u64>>().into_range_moc()),
+      MocIdxType::U32(MocQtyType::Hpx(MocType::Ranges(moc))) => Ok(moc.convert::<u64, Hpx<u64>>().into_range_moc()),
+      MocIdxType::U64(MocQtyType::Hpx(MocType::Ranges(moc))) => Ok(moc.into_range_moc()),
+      _ => Err(format!("Unsupported type in FITS file").into()),
+    }
+  }
   
   /// # Panics
   ///   If a `lat` is **not in** `[-pi/2, pi/2]`, this method panics.
@@ -1139,5 +1158,18 @@ mod tests {
     let elementary_edges = moc.border_elementary_edges().collect::<Vec<((f64, f64), (f64, f64))>>();
     assert_eq!(elementary_edges.len(), 12);
   }
-  
+
+  #[test]
+  fn test_border_elementary_edges_2() {
+    let range_moc = RangeMOC::from_fits_file("resources/CDS_P_DESI-Legacy-Surveys_DR10_color.moc.fits").unwrap();
+    let _ = range_moc.border_elementary_edges().collect::<Vec<((f64, f64), (f64, f64))>>();
+
+    let range_moc = range_moc.degraded(5);
+    // println!("{}", range_moc.to_ascii().unwrap());
+    // let ext_border = range_moc.external_border();
+    // println!("{}", ext_border.to_ascii().unwrap());
+    let _ = range_moc.border_elementary_edges().collect::<Vec<((f64, f64), (f64, f64))>>();
+
+    assert!(true)
+  }
 }
