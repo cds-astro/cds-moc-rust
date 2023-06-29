@@ -27,7 +27,7 @@ use healpix::{
     external_edge_struct,
     bmoc::BMOC,
   },
-  compass_point::{MainWind, Ordinal},
+  compass_point::{MainWind, Ordinal, OrdinalSet},
   sph_geom::{
     ContainsSouthPoleMethod,
     coo3d::Coo3D
@@ -76,6 +76,14 @@ use crate::{
 };
 
 pub mod op;
+
+/// Structure made to draw MOCs in AladinLite.
+/// It contains an HEALPix cell and the list of edges to be drawn.
+pub struct CellAndEdges<T: Idx> {
+  pub uniq: T,
+  pub edges: OrdinalSet,
+}
+
 
 /// A MOC made of (ordered and non-overlaping) ranges.
 #[derive(Debug, Clone)]
@@ -191,10 +199,16 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     self.contains_val(&x.unsigned_shl(Q::shift_from_depth_max(self.depth_max) as u32))
   }
 
+  /// The value must be at the Quantity MAX_DEPTH
   pub fn contains_val(&self, x: &T) -> bool {
     self.ranges.contains_val(x)
   }
 
+  pub fn contains_cell(&self, depth: u8, idx: T) -> bool {
+    let range = MocRange::<T, Q>::from((depth, idx));
+    self.ranges.contains_range(&range.0)
+  }
+  
   pub fn append_fixed_depth_cells<I: Iterator<Item=T>>(
     self,
     depth: u8,
@@ -567,6 +581,78 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     mocs
   }
 
+  /// Returns the list of cells (uniq notation) with the list of its edges to be drawn in such
+  /// a way that no edge overlapping occurs. 
+  pub fn all_edges_only_once(&self) -> impl Iterator<Item=CellAndEdges<T>> {
+    let zuniqs: Vec<T> = self.into_range_moc_iter()
+      .cells()
+      .map(|cell| cell.zuniq::<Hpx<T>>())
+      .collect();
+    let mut uniqs: Vec<T> = zuniqs.iter().cloned()
+      .map(|zuniq| Cell::from_zuniq::<Hpx<T>>(zuniq).uniq_hpx())
+      .collect();
+    uniqs.sort();
+
+    // we look only for neighbours having a depth <= the current cell depth
+    // since deeper cells have not yet been iterated over.
+    // We have already iterated on cell of depth < current cell depth
+    // and cell depth == current cell depth && idx < current idx
+    let neig_already_visited = move |depth: u8, org_idx: u64, neig_idx: u64| -> bool {
+      let neig_idx_t = T::from_u64(neig_idx);
+      let neig_zuniq = Hpx::<T>::to_zuniq(depth, neig_idx_t);
+      match zuniqs.binary_search(&neig_zuniq) {
+        Ok(_) => neig_idx < org_idx, // order is the same, but neighbour already visited!
+        Err(i) => {
+          // Test index i
+          if let Some((d, h)) = zuniqs.get(i).map(|zuniq| Hpx::<T>::from_zuniq(*zuniq)) {
+            if d < depth && (neig_idx_t >> ((depth - d) << 1) as usize) == h {
+              return true;
+            } 
+          }
+          // Test index i + 1
+          if let Some((d, h)) = zuniqs.get(i + 1).map(|zuniq| Hpx::<T>::from_zuniq(*zuniq)) {
+            if d < depth && (neig_idx_t >> ((depth - d) << 1) as usize) == h {
+              return true;
+            }
+          }
+          false
+        },
+      } 
+    };
+    
+    uniqs.into_iter().map(move |uniq| {
+      let cell = Cell::from_uniq_hpx(uniq);
+      let idx_u64 = <T as Idx>::to_u64(cell.idx);
+      let neigs_u64 = healpix::nested::neighbours(cell.depth, idx_u64, false);
+      let mut edges = OrdinalSet::new();
+      if let Some(idx_neig_u64) = neigs_u64.get(MainWind::NE) {
+        if neig_already_visited(cell.depth, idx_u64, *idx_neig_u64) {
+          edges.set(Ordinal::NE, true); 
+        }
+      }
+      if let Some(idx_neig_u64) = neigs_u64.get(MainWind::SE) {
+        if neig_already_visited(cell.depth, idx_u64, *idx_neig_u64) {
+          edges.set(Ordinal::SE, true);
+        }
+      }
+      if let Some(idx_neig_u64) = neigs_u64.get(MainWind::NW) {
+        if neig_already_visited(cell.depth, idx_u64, *idx_neig_u64) {
+          edges.set(Ordinal::NW, true);
+        }
+      }
+      if let Some(idx_neig_u64) = neigs_u64.get(MainWind::SW) {
+        if neig_already_visited(cell.depth, idx_u64, *idx_neig_u64) {
+          edges.set(Ordinal::SW, true);
+        }
+      }
+
+      CellAndEdges {
+        uniq,
+        edges,
+      }
+    })
+  }
+  
   /// Returns an iterator over the list of elementary edges (i.e. the edges of the border
   /// cells at the MOC maximum depth).
   /// Each edge is a tuple made of 2 points `A` and `B`: `((lonA, latA), (lonB, latB))`
@@ -576,36 +662,43 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   /// * for each cell (all at max depth) of the external border
   ///     + for each of the 4 border, we look if the neighbour cell is in the original MOC
   ///     + if yes, add the vertex tuples in output
-  pub fn border_elementary_edges(&self) -> impl Iterator<Item=((f64, f64), (f64, f64))> + '_ {
+  pub fn border_elementary_edges(&self) -> impl Iterator<Item=CellAndEdges<T>> + '_ {
     let hp = healpix::nested::get(self.depth_max);
-    self.external_border_iter()
+    self.internal_border_iter()
       .flatten_to_fixed_depth_cells()
-      .flat_map(move | idx | {
-        let mut res: Vec<((f64, f64), (f64, f64))> = Vec::with_capacity(4);
+      .filter_map(move | idx | {
+        let mut edges = OrdinalSet::new();
         let h = <T as Idx>::to_u64(idx);
-        let [v_south, v_east, v_north, v_west] = hp.vertices(h);
         let neigs = hp.neighbours(h, false);
         if let Some(nh) = neigs.get(MainWind::NE) {
-          if self.contains_depth_max_val(&T::from_u64(*nh)) {
-            res.push((v_north, v_east));
+          if !self.contains_depth_max_val(&T::from_u64(*nh)) {
+            edges.set(Ordinal::NE, true);
           }
         }
         if let Some(nh) = neigs.get(MainWind::SE) {
-          if self.contains_depth_max_val(&T::from_u64(*nh)) {
-            res.push((v_south, v_east));
+          if !self.contains_depth_max_val(&T::from_u64(*nh)) {
+            edges.set(Ordinal::SE, true);
           }
         }
         if let Some(nh) = neigs.get(MainWind::NW) {
-          if self.contains_depth_max_val(&T::from_u64(*nh)) {
-            res.push((v_north, v_west));
+          if !self.contains_depth_max_val(&T::from_u64(*nh)) {
+            edges.set(Ordinal::NW, true);
           }
         }
         if let Some(nh) = neigs.get(MainWind::SW) {
-          if self.contains_depth_max_val(&T::from_u64(*nh)) {
-            res.push((v_south, v_west));
+          if !self.contains_depth_max_val(&T::from_u64(*nh)) {
+            edges.set(Ordinal::SW, true);
           }
         }
-        res
+        let uniq = Hpx::<T>::uniq_hpx(self.depth_max, idx);
+        if edges.is_empty() {
+          None
+        } else {
+          Some(CellAndEdges {
+            uniq,
+            edges,
+          })
+        }
       }
     )
   }
@@ -1151,24 +1244,25 @@ mod tests {
   #[test]
   fn test_border_elementary_edges() {
     let moc = RangeMOC::<u64, Hpx::<u64>>::from_coos(8, [(0.0_f64, 0.0_f64)].iter().cloned(), None);
-    let elementary_edges = moc.border_elementary_edges().collect::<Vec<((f64, f64), (f64, f64))>>();
-    assert_eq!(elementary_edges.len(), 4);
+    let elementary_edges = moc.border_elementary_edges().collect::<Vec<CellAndEdges<u64>>>();
+    assert_eq!(elementary_edges.len(), 1);
+    assert_eq!(elementary_edges[0].edges, OrdinalSet::all());
 
     let moc = moc.expanded();
-    let elementary_edges = moc.border_elementary_edges().collect::<Vec<((f64, f64), (f64, f64))>>();
-    assert_eq!(elementary_edges.len(), 12);
+    let elementary_edges = moc.border_elementary_edges().collect::<Vec<CellAndEdges<u64>>>();
+    assert_eq!(elementary_edges.len(), 8);
   }
 
   #[test]
   fn test_border_elementary_edges_2() {
     let range_moc = RangeMOC::from_fits_file("resources/CDS_P_DESI-Legacy-Surveys_DR10_color.moc.fits").unwrap();
-    let _ = range_moc.border_elementary_edges().collect::<Vec<((f64, f64), (f64, f64))>>();
+    let _ = range_moc.border_elementary_edges().collect::<Vec<CellAndEdges<u64>>>();
 
     let range_moc = range_moc.degraded(5);
     // println!("{}", range_moc.to_ascii().unwrap());
     // let ext_border = range_moc.external_border();
     // println!("{}", ext_border.to_ascii().unwrap());
-    let _ = range_moc.border_elementary_edges().collect::<Vec<((f64, f64), (f64, f64))>>();
+    let _ = range_moc.border_elementary_edges().collect::<Vec<CellAndEdges<u64>>>();
 
     assert!(true)
   }
