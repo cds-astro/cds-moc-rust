@@ -1258,7 +1258,8 @@ mod tests {
 
   #[test]
   fn test_border_elementary_edges_2() {
-    let range_moc = RangeMOC::from_fits_file("resources/CDS_P_DESI-Legacy-Surveys_DR10_color.moc.fits").unwrap();
+    let range_moc = RangeMOC::from_fits_file("resources/CDS_P_DESI-Legacy-Surveys_DR10_color.moc.fits")
+      .or_else(|_| RangeMOC::from_fits_file("../resources/CDS_P_DESI-Legacy-Surveys_DR10_color.moc.fits")).unwrap();
     let _ = range_moc.border_elementary_edges().collect::<Vec<CellAndEdges<u64>>>();
 
     let range_moc = range_moc.degraded(5);
