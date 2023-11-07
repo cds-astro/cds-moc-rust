@@ -68,6 +68,9 @@ quick_error! {
     ElemNotFound(elem: String, line: String) {
       display("Element '{}' not found in '{}'.", elem, line)
     }
+    IndexIsNotValid(depth: u8, icell: u64) {
+      display("Too large index '{}' for depth '{}'.", icell, depth)
+    }
     NotValid {
       display("The ascci MOC is not valid (contains overlapping elements)")
     }
@@ -259,15 +262,27 @@ pub fn from_ascii_ivoa<T, Q>(input: &str) -> Result<CellOrCellRangeMOC<T, Q>, As
     Some(token) => Err(AsciiError::WrongFirstTokenDepthExpected(format!("{:?}", token))),
   }?;
   let mut depth_max = cur_depth;
+  let mut curr_end_max =  Q::n_cells(cur_depth);
   let mut moc: Vec<CellOrCellRange<T>> = Vec::with_capacity(tokens.len());
   for token in tokens {
     match token {
       Token::Depth(depth) => {
         cur_depth = depth.to_u8().ok_or_else(|| AsciiError::WrongDepthType(depth.to_string()))?;
         depth_max = depth_max.max(cur_depth);
+        curr_end_max = Q::n_cells(cur_depth);
       },
-      Token::Cell(icell) => moc.push(CellOrCellRange::Cell(Cell::new(cur_depth, icell))),
-      Token::Range{ start, end} => moc.push(CellOrCellRange::CellRange(CellRange::new(cur_depth, start, end))),
+      Token::Cell(icell) => {
+        if icell > curr_end_max {
+          return Err(AsciiError::IndexIsNotValid(cur_depth, icell.to_u64()));
+        }
+        moc.push(CellOrCellRange::Cell(Cell::new(cur_depth, icell)))
+      },
+      Token::Range{ start, end} => {
+        if end > curr_end_max {
+          return Err(AsciiError::IndexIsNotValid(cur_depth, end.to_u64()));
+        }
+        moc.push(CellOrCellRange::CellRange(CellRange::new(cur_depth, start, end)))
+      },
     }
   }
   // Sort the list
@@ -563,8 +578,14 @@ mod tests {
     let smoc_ascii = "5/8-10 42-46 54 8 6/4500 8/45";
     assert!(from_ascii_ivoa::<u64, Hpx::<u64>>(&smoc_ascii).is_err());
   }
-  
-  
+
+  #[test]
+  fn test_from_ascii_ivoa_not_valid_2() {
+    let smoc_ascii = "1/1000";
+    assert!(from_ascii_ivoa::<u64, Hpx::<u64>>(&smoc_ascii).is_err());
+  }
+
+
   #[test]
   fn test_fromto_ascii_ivoa() {
     let rm = RangeMOC::new(29,
