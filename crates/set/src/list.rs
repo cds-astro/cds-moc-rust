@@ -1,20 +1,15 @@
-
-use std::{
-  mem::size_of,
-  error::Error,
-  path::PathBuf
-};
+use std::{error::Error, mem::size_of, path::PathBuf};
 
 use clap::Parser;
 
-use moclib::qty::{MocQty, Hpx};
+use moclib::qty::{Hpx, MocQty};
 
 use crate::MocSetFileReader;
 
 #[derive(Debug, Parser)]
 /// Provide the list of the MOCs in the mocset and the associated flags
 pub struct List {
-  #[clap(parse(from_os_str))]
+  #[clap(value_name = "FILE")]
   /// The moc-set to be read.
   file: PathBuf,
   #[clap(short = 'r', long = "ranges")]
@@ -23,7 +18,6 @@ pub struct List {
 }
 
 impl List {
-  
   pub fn exec(self) -> Result<(), Box<dyn Error>> {
     let moc_set_reader = MocSetFileReader::new(self.file)?;
     let meta_it = moc_set_reader.meta().into_iter();
@@ -41,7 +35,15 @@ impl List {
           size_of::<u64>()
         };
         let n_ranges = byte_size / (elem_byte_size << 1); // x2 since 1 range = 2 elems
-        println!("{},{},{},{},{},{}", id, status.str_value(), depth, n_ranges, byte_range.start, byte_range.end);
+        println!(
+          "{},{},{},{},{},{}",
+          id,
+          status.str_value(),
+          depth,
+          n_ranges,
+          byte_range.start,
+          byte_range.end
+        );
       }
     } else {
       println!("id,status,depth,n_ranges,byte_size");
@@ -56,7 +58,14 @@ impl List {
           size_of::<u64>()
         };
         let n_ranges = byte_size / (elem_byte_size << 1); // x2 since 1 range = 2 elems
-        println!("{},{},{},{},{}", id, status.str_value(), depth, n_ranges, byte_size);
+        println!(
+          "{},{},{},{},{}",
+          id,
+          status.str_value(),
+          depth,
+          n_ranges,
+          byte_size
+        );
       }
     }
     Ok(())

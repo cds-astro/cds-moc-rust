@@ -1,16 +1,10 @@
-
 use std::error::Error;
 
 use clap::Parser;
 
 use moc_set::{
-  mk::Make,
-  append::Append,
-  chgstatus::ChangeStatus,
-  purge::Purge,
-  list::List,
-  query::Query,
-  extract::Extract
+  append::Append, chgstatus::ChangeStatus, extract::Extract, list::List, mk::Make, purge::Purge,
+  query::Query, union::Union,
 };
 
 #[derive(Debug, Parser)]
@@ -30,6 +24,8 @@ enum Args {
   List(List),
   #[clap(name = "query")]
   Query(Query),
+  #[clap(name = "union")]
+  Union(Union),
   #[clap(name = "extract")]
   Extract(Extract),
 }
@@ -43,12 +39,13 @@ impl Args {
       Args::Purge(purge) => purge.exec(),
       Args::List(list) => list.exec(),
       Args::Query(query) => query.exec(),
+      Args::Union(union) => union.exec(),
       Args::Extract(extract) => extract.exec(),
     }
   }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-  let args = Args::from_args();
+  let args = Args::parse();
   args.exec()
 }

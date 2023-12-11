@@ -1,34 +1,27 @@
-
 use std::{
-  io::{
-    Cursor,
-    Seek, SeekFrom,
-    Write, BufWriter
-  },
+  error::Error,
   fs::{self, OpenOptions},
+  io::{BufWriter, Cursor, Seek, SeekFrom, Write},
   path::PathBuf,
-  error::Error
 };
 
-use clap::Parser;
 use byteorder::{LittleEndian, WriteBytesExt};
+use clap::Parser;
 use memmap::MmapMut;
 
-use moclib::qty::{MocQty, Hpx};
+use moclib::qty::{Hpx, MocQty};
 
-use crate::{
-  append_moc_bytes, StatusFlag, MocSetFileReader, MocSetFileWriter, MocSetFileIOHelper
-};
+use crate::{append_moc_bytes, MocSetFileIOHelper, MocSetFileReader, MocSetFileWriter, StatusFlag};
 
 #[derive(Debug, Parser)]
 /// Purge the mocset removing physically the MOCs flagged as 'removed'
 pub struct Purge {
-  #[clap(parse(from_os_str))]
+  #[clap(value_name = "FILE")]
   /// The moc-set file to be purge.
   file: PathBuf,
   #[clap(short = 'n', long = "n128")]
-  /// n x 128 - 1 = number of MOCs that can be stored in this purged moc set, 
-  /// if larger than the current value. 
+  /// n x 128 - 1 = number of MOCs that can be stored in this purged moc set,
+  /// if larger than the current value.
   n128: Option<u64>,
 }
 
@@ -41,24 +34,29 @@ impl Purge {
     // - mv files
     // - remove old file
     // - remove lock
-    
+
     // Acquire a write lock
     let moc_set_writer = MocSetFileWriter::new(self.file.clone())?;
-    
+
     // Create and acquire a temp file
     let mut tmp_file = self.file.clone();
-    assert!(
-      tmp_file.set_extension(
-        tmp_file.extension().map(|e| format!("{:?}.tmp", e)).unwrap_or_else(|| String::from(".tmp"))
-      )
-    );
+    assert!(tmp_file.set_extension(
+      tmp_file
+        .extension()
+        .map(|e| format!("{:?}.tmp", e))
+        .unwrap_or_else(|| String::from(".tmp"))
+    ));
     // TODO/WARNING: part of code duplicated from 'mk.rs' and 'append.rs' => to be clean (e.g. passing a closure)!
     // Prepare file struct helper
     let n128 = self.n128.unwrap_or(1).max(moc_set_writer.n128());
     let mocset_helper = MocSetFileIOHelper::new(n128);
     // Open file
     // - with `create_new`, fails if file already exists
-    let file = OpenOptions::new().read(true).write(true).create_new(true).open(&tmp_file)?;
+    let file = OpenOptions::new()
+      .read(true)
+      .write(true)
+      .create_new(true)
+      .open(&tmp_file)?;
     // Prepare to write
     // - header
     let header_len = mocset_helper.header_byte_size() as u64;
@@ -71,7 +69,7 @@ impl Purge {
     let mut index = Cursor::new(index);
     let mut meta = Cursor::new(meta);
     index.write_u64::<LittleEndian>(from_byte)?; // Starting byte of the data part
-    // - data part
+                                                 // - data part
     let mut file_data = file.try_clone()?;
     file_data.seek(SeekFrom::Start(from_byte))?;
     let mut data_writer = BufWriter::new(file_data);
@@ -89,10 +87,28 @@ impl Purge {
       if status > StatusFlag::Removed {
         if depth <= Hpx::<u32>::MAX_DEPTH {
           let ranges = moc_set_reader.ranges::<u32>(byte_range);
-          from_byte = append_moc_bytes(status, id, depth, ranges.as_bytes(), from_byte, &mut meta, &mut index, &mut data_writer)?;
+          from_byte = append_moc_bytes(
+            status,
+            id,
+            depth,
+            ranges.as_bytes(),
+            from_byte,
+            &mut meta,
+            &mut index,
+            &mut data_writer,
+          )?;
         } else {
           let ranges = moc_set_reader.ranges::<u64>(byte_range);
-          from_byte = append_moc_bytes(status, id, depth, ranges.as_bytes(), from_byte, &mut meta, &mut index, &mut data_writer)?;
+          from_byte = append_moc_bytes(
+            status,
+            id,
+            depth,
+            ranges.as_bytes(),
+            from_byte,
+            &mut meta,
+            &mut index,
+            &mut data_writer,
+          )?;
         }
       }
     }
@@ -102,7 +118,7 @@ impl Purge {
     // Move the new file into the old file. This is an atomic operation so if it succeed
     // then we are sure that everything is ok.
     fs::rename(tmp_file, self.file)?;
-    
+
     // Release the write lock
     moc_set_writer.release()?;
     Ok(())

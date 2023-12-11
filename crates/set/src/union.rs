@@ -1,9 +1,11 @@
 use std::{
+  collections::HashSet,
   error::Error,
   fs::File,
   io::{BufRead, BufReader},
-  path::Path,
-  path::PathBuf,
+  num::ParseIntError,
+  ops::Range,
+  path::{Path, PathBuf},
   str::FromStr,
 };
 
@@ -17,9 +19,9 @@ use moclib::{
     fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType},
     json::from_json_aladin,
   },
-  elemset::range::BorrowedMocRanges,
   idx::Idx,
   moc::{
+    builder::maxdepth_range::RangeMocBuilder,
     range::{
       op::convert::{convert_from_u64, convert_to_u64},
       RangeMOC,
@@ -31,30 +33,53 @@ use moclib::{
   ranges::{BorrowedRanges, Ranges, SNORanges},
 };
 
-use crate::{MocSetFileReader, StatusFlag};
+use crate::{extract::OutputFormat, MocSetFileReader, StatusFlag};
 
 const HALF_PI: f64 = 0.5 * std::f64::consts::PI;
 const TWICE_PI: f64 = 2.0 * std::f64::consts::PI;
 
 #[derive(Debug, Parser)]
-/// Query the mocset
-pub struct Query {
+/// Union of all MOCs in the moc-set matching a given region
+pub struct Union {
   #[clap(value_name = "FILE")]
   /// The moc-set to be read.
   file: PathBuf,
   #[clap(short = 'd', long = "add-deprecated")]
-  /// Also selects MOCs flagged as deprecated
+  /// Also selects MOCs flagged as deprecated (ignored if identifiers are provided)
   include_deprecated: bool,
-  #[clap(short = 'c', long = "print-coverage")]
-  /// Print in output the sky fraction (in '[0.0, 1.0]') covered by each selected MOC
-  print_coverage: bool,
+  /// Depth of the output MOC
+  depth: u8,
   #[clap(subcommand)]
-  /// Sky region that overlap (or is included in) the select MOCs
-  region: Region,
+  /// Method used to select MOCs.
+  method: Method,
+}
+
+#[derive(Debug, Clone)]
+pub struct IdList(HashSet<u64>);
+
+impl FromStr for IdList {
+  type Err = ParseIntError;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    s.split(',')
+      .map(|id| id.parse::<u64>())
+      .collect::<Result<HashSet<u64>, _>>()
+      .map(IdList)
+  }
 }
 
 #[derive(Debug, Parser)]
-pub enum Region {
+pub enum Method {
+  #[clap(name = "ids", allow_negative_numbers = true)]
+  /// Provided list of MOC IDs.
+  IDs {
+    #[clap(value_parser = clap::value_parser!(IdList))]
+    /// Coma separated list of MOC IDs.
+    ids: IdList,
+    #[clap(subcommand)]
+    /// Export format
+    output: OutputFormat,
+  },
   #[clap(name = "pos", allow_negative_numbers = true)]
   /// Single position.
   Pos {
@@ -62,6 +87,9 @@ pub enum Region {
     lon_deg: f64,
     /// Latitude of the cone center (in degrees)
     lat_deg: f64,
+    #[clap(subcommand)]
+    /// Export format
+    output: OutputFormat,
   },
   #[clap(name = "cone", allow_negative_numbers = true)]
   /// A cone, i.e. a position with a small area around (approximated by a MOC).
@@ -76,8 +104,11 @@ pub enum Region {
     /// MOC precision; 0: depth 'd' at which the cone is overlapped by 1 to max 9 cells; 1: depth 'd' + 1; n: depth 'd' + n.
     prec: u8,
     #[clap(short = 'i', long = "included")]
-    /// Returns MOCs containing the whole cone MOC (instead of overlapping only)
+    /// Selects MOCs containing the whole cone MOC (instead of overlapping only)
     full: bool,
+    #[clap(subcommand)]
+    /// Export format
+    output: OutputFormat,
   },
   #[clap(name = "moc")]
   /// The given MOC (you create a moc using moc-cli and pipe it into moc-set)
@@ -89,8 +120,11 @@ pub enum Region {
     /// Format of the input MOC ('ascii', 'json' or 'fits') [default: guess from the file extension]
     input_fmt: Option<InputFormat>,
     #[clap(short = 'i', long = "included")]
-    /// Returns MOCs containing the whole given MOC (instead of overlapping)
+    /// Select MOCs containing the whole given MOC (instead of overlapping)
     full: bool,
+    #[clap(subcommand)]
+    /// Export format
+    output: OutputFormat,
   },
 }
 
@@ -128,36 +162,35 @@ pub fn fmt_from_extension(path: &Path) -> Result<InputFormat, String> {
   }
 }
 
-impl Query {
+impl Union {
   pub fn exec(self) -> Result<(), Box<dyn Error>> {
-    match self.region {
-      Region::Pos { lon_deg, lat_deg } => {
+    match self.method {
+      Method::IDs { ids, output } => exec_ids(self.file, self.depth, ids.0, output),
+      Method::Pos {
+        lon_deg,
+        lat_deg,
+        output,
+      } => {
         let lon = lon_deg2rad(lon_deg)?;
         let lat = lat_deg2rad(lat_deg)?;
         let idx64 = nested::hash(Hpx::<u64>::MAX_DEPTH, lon, lat);
         let idx32 = u32::from_u64_idx(idx64);
-        if self.print_coverage {
-          exec_gen_with_coverage(
-            self.file,
-            self.include_deprecated,
-            move |ranges| ranges.contains_val(&idx32),
-            move |ranges| ranges.contains_val(&idx64),
-          )
-        } else {
-          exec_gen(
-            self.file,
-            self.include_deprecated,
-            move |ranges| ranges.contains_val(&idx32),
-            move |ranges| ranges.contains_val(&idx64),
-          )
-        }
+        exec_gen(
+          self.file,
+          self.include_deprecated,
+          self.depth,
+          output,
+          move |ranges| ranges.contains_val(&idx32),
+          move |ranges| ranges.contains_val(&idx64),
+        )
       }
-      Region::Cone {
+      Method::Cone {
         lon_deg,
         lat_deg,
         r_arcsec,
         prec,
         full,
+        output,
       } => {
         let r_rad = (r_arcsec / 3600.0).to_radians();
         let depth = if !has_best_starting_depth(r_rad) {
@@ -179,42 +212,31 @@ impl Query {
           let moc32_ref = (&moc32).into();
           let moc64_ref = (&moc64).into();
           if full {
-            if self.print_coverage {
-              exec_gen_with_coverage(
-                self.file,
-                self.include_deprecated,
-                move |ranges| ranges.contains(&moc32_ref),
-                move |ranges| ranges.contains(&moc64_ref),
-              )
-            } else {
-              exec_gen(
-                self.file,
-                self.include_deprecated,
-                move |ranges| ranges.contains(&moc32_ref),
-                move |ranges| ranges.contains(&moc64_ref),
-              )
-            }
-          } else if self.print_coverage {
-            exec_gen_with_coverage(
+            exec_gen(
               self.file,
               self.include_deprecated,
-              move |ranges| ranges.intersects(&moc32_ref),
-              move |ranges| ranges.intersects(&moc64_ref),
+              self.depth,
+              output,
+              move |ranges| ranges.contains(&moc32_ref),
+              move |ranges| ranges.contains(&moc64_ref),
             )
           } else {
             exec_gen(
               self.file,
               self.include_deprecated,
+              self.depth,
+              output,
               move |ranges| ranges.intersects(&moc32_ref),
               move |ranges| ranges.intersects(&moc64_ref),
             )
           }
         }
       }
-      Region::Moc {
+      Method::Moc {
         input,
         input_fmt,
         full,
+        output,
       } => {
         let path = input;
         let (moc32, moc64) = if path == PathBuf::from("-") {
@@ -242,32 +264,20 @@ impl Query {
         let moc32_ref = (&moc32).into();
         let moc64_ref = (&moc64).into();
         if full {
-          if self.print_coverage {
-            exec_gen_with_coverage(
-              self.file,
-              self.include_deprecated,
-              move |ranges| ranges.contains(&moc32_ref),
-              move |ranges| ranges.contains(&moc64_ref),
-            )
-          } else {
-            exec_gen(
-              self.file,
-              self.include_deprecated,
-              move |ranges| ranges.contains(&moc32_ref),
-              move |ranges| ranges.contains(&moc64_ref),
-            )
-          }
-        } else if self.print_coverage {
-          exec_gen_with_coverage(
+          exec_gen(
             self.file,
             self.include_deprecated,
-            move |ranges| ranges.intersects(&moc32_ref),
-            move |ranges| ranges.intersects(&moc64_ref),
+            self.depth,
+            output,
+            move |ranges| ranges.contains(&moc32_ref),
+            move |ranges| ranges.contains(&moc64_ref),
           )
         } else {
           exec_gen(
             self.file,
             self.include_deprecated,
+            self.depth,
+            output,
             move |ranges| ranges.intersects(&moc32_ref),
             move |ranges| ranges.intersects(&moc64_ref),
           )
@@ -364,39 +374,45 @@ pub fn load_moc<R: BufRead>(
   }
 }
 
-fn exec_gen<F, D>(file: PathBuf, include_deprecated: bool, f: F, d: D) -> Result<(), Box<dyn Error>>
-where
-  F: Fn(&BorrowedRanges<'_, u32>) -> bool,
-  D: Fn(&BorrowedRanges<'_, u64>) -> bool,
-{
+fn exec_ids(
+  file: PathBuf,
+  depth: u8,
+  ids: HashSet<u64>,
+  output: OutputFormat,
+) -> Result<(), Box<dyn Error>> {
   let moc_set_reader = MocSetFileReader::new(file)?;
   let meta_it = moc_set_reader.meta().into_iter();
   let bytes_it = moc_set_reader.index().into_iter();
-  println!("id");
+
+  let mut builder = RangeMocBuilder::<u64, Hpx<u64>>::new(depth, None);
+
   for (flg_depth_id, byte_range) in meta_it.zip(bytes_it) {
     let id = flg_depth_id.identifier();
     let status = flg_depth_id.status();
-    let depth = flg_depth_id.depth();
-    if status == StatusFlag::Valid || (include_deprecated && status == StatusFlag::Deprecated) {
+    if ids.contains(&id) && (status == StatusFlag::Valid || status == StatusFlag::Deprecated) {
+      let depth = flg_depth_id.depth();
       if depth <= Hpx::<u32>::MAX_DEPTH {
         let ranges = moc_set_reader.ranges::<u32>(byte_range);
-        if f(&ranges) {
-          println!("{}", id);
+        for Range { start, end } in ranges.0.iter() {
+          builder.push((*start).to_u64_idx()..(*end).to_u64_idx())
         }
       } else {
         let ranges = moc_set_reader.ranges::<u64>(byte_range);
-        if d(&ranges) {
-          println!("{}", id);
+        for Range { start, end } in ranges.0 {
+          builder.push(*start..*end);
         }
       }
     }
   }
-  Ok(())
+  let moc = builder.into_moc();
+  output.write_moc(moc.into_range_moc_iter())
 }
 
-fn exec_gen_with_coverage<F, D>(
+fn exec_gen<F, D>(
   file: PathBuf,
   include_deprecated: bool,
+  depth: u8,
+  output: OutputFormat,
   f: F,
   d: D,
 ) -> Result<(), Box<dyn Error>>
@@ -407,28 +423,32 @@ where
   let moc_set_reader = MocSetFileReader::new(file)?;
   let meta_it = moc_set_reader.meta().into_iter();
   let bytes_it = moc_set_reader.index().into_iter();
-  println!("id,moc_coverage");
+
+  let mut builder = RangeMocBuilder::<u64, Hpx<u64>>::new(depth, None);
+
   for (flg_depth_id, byte_range) in meta_it.zip(bytes_it) {
-    let id = flg_depth_id.identifier();
     let status = flg_depth_id.status();
     let depth = flg_depth_id.depth();
     if status == StatusFlag::Valid || (include_deprecated && status == StatusFlag::Deprecated) {
       if depth <= Hpx::<u32>::MAX_DEPTH {
         let ranges = moc_set_reader.ranges::<u32>(byte_range);
         if f(&ranges) {
-          let borrowed_moc_ranges = BorrowedMocRanges::<'_, u32, Hpx<u32>>::from(ranges);
-          println!("{},{:.6e}", id, borrowed_moc_ranges.coverage_percentage());
+          for Range { start, end } in ranges.0.iter() {
+            builder.push((*start).to_u64_idx()..(*end).to_u64_idx())
+          }
         }
       } else {
         let ranges = moc_set_reader.ranges::<u64>(byte_range);
         if d(&ranges) {
-          let borrowed_moc_ranges = BorrowedMocRanges::<'_, u64, Hpx<u64>>::from(ranges);
-          println!("{},{:.6e}", id, borrowed_moc_ranges.coverage_percentage());
+          for Range { start, end } in ranges.0 {
+            builder.push(*start..*end);
+          }
         }
       }
     }
   }
-  Ok(())
+  let moc = builder.into_moc();
+  output.write_moc(moc.into_range_moc_iter())
 }
 
 fn lon_deg2rad(lon_deg: f64) -> Result<f64, Box<dyn Error>> {

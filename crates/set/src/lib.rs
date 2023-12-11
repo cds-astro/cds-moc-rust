@@ -1,38 +1,36 @@
-
 use std::{
-  slice,
-  ops::Range,
-  str::FromStr,
-  error::Error,
-  path::PathBuf,
   collections::HashMap,
+  error::Error,
+  fs::{self, File, OpenOptions},
+  io::{self, BufReader, BufWriter, Cursor, Seek, SeekFrom, Write},
   mem::{align_of, size_of},
-  fs::{self, OpenOptions, File},
-  io::{self, Seek, Cursor, BufReader, Write, BufWriter, SeekFrom},
-  ptr::slice_from_raw_parts
+  ops::Range,
+  path::PathBuf,
+  ptr::slice_from_raw_parts,
+  slice,
+  str::FromStr,
 };
 
-use memmap::{MmapOptions, Mmap, MmapMut};
+use memmap::{Mmap, MmapMut, MmapOptions};
 
-use byteorder::{ReadBytesExt, WriteBytesExt, LittleEndian};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use moclib::{
-  qty::{MocQty, Hpx},
+  deser::fits::{from_fits_ivoa, MocIdxType},
   idx::Idx,
-  ranges::BorrowedRanges,
   moc::range::RangeMOC,
-  deser::fits::{
-    from_fits_ivoa, MocIdxType
-  }
+  qty::{Hpx, MocQty},
+  ranges::BorrowedRanges,
 };
 
-pub mod mk;
 pub mod append;
 pub mod chgstatus;
-pub mod purge;
-pub mod list;
-pub mod query;
 pub mod extract;
+pub mod list;
+pub mod mk;
+pub mod purge;
+pub mod query;
+pub mod union;
 
 /// Size of one element of the meta array.
 /// Each element is made of:
@@ -41,7 +39,7 @@ pub mod extract;
 /// * 6 bytes storing the identifer
 /// /// ```rust
 /// use moc_set::{META_ELEM_BYTE_SIZE,};
-/// assert_eq!(8, META_ELEM_BYTE_SIZE_SHIFT); 
+/// assert_eq!(8, META_ELEM_BYTE_SIZE_SHIFT);
 /// ```
 pub const META_ELEM_BYTE_SIZE: usize = size_of::<u64>();
 
@@ -52,7 +50,6 @@ pub const META_ELEM_BYTE_SIZE: usize = size_of::<u64>();
 /// assert_eq!(9_usize << META_ELEM_BYTE_SIZE_SHIFT, 9_usize * META_ELEM_BYTE_SIZE);
 /// ```
 pub const META_ELEM_BYTE_SIZE_SHIFT: usize = 3;
-
 
 /// * u64 => 8 bytes
 pub const INDEX_ELEM_BYTE_SIZE: usize = size_of::<u64>();
@@ -70,12 +67,14 @@ pub const ID_MASK: u64 = 0x0000FFFFFFFFFFFF;
 
 pub fn check_id(id: u64) -> Result<u64, String> {
   if id > ID_MASK {
-    Err(format!("ID is too large. Max expected: {}; Actual: {}", ID_MASK, id))
+    Err(format!(
+      "ID is too large. Max expected: {}; Actual: {}",
+      ID_MASK, id
+    ))
   } else {
     Ok(id)
   }
 }
-
 
 const VOID: &str = "void";
 const REMOVED: &str = "removed";
@@ -86,10 +85,10 @@ const VALID: &str = "valid";
 #[repr(u8)]
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
 pub enum StatusFlag {
-  Void       = 0b00, // 0
-  Removed    = 0b01, // 1
+  Void = 0b00,       // 0
+  Removed = 0b01,    // 1
   Deprecated = 0b10, // 2
-  Valid      = 0b11  // 3
+  Valid = 0b11,      // 3
 }
 
 impl FromStr for StatusFlag {
@@ -102,7 +101,10 @@ impl FromStr for StatusFlag {
       DEPRECATED => Ok(StatusFlag::Deprecated),
       VALID => Ok(StatusFlag::Valid),
       // Hide 'void'.
-      _ => Err(format!("Status string not valid: Actual: {}. Expected: {}, {} or {}", s, REMOVED, DEPRECATED, VALID))
+      _ => Err(format!(
+        "Status string not valid: Actual: {}. Expected: {}, {} or {}",
+        s, REMOVED, DEPRECATED, VALID
+      )),
     }
   }
 }
@@ -119,31 +121,28 @@ impl StatusFlag {
 }
 
 /// Utility struct to have methods to compose from/decompose to the flag, depth and id elements.
-/// 
+///
 /// ```rust
 /// use moc_set::{META_ELEM_BYTE_SIZE, FlagDepthId};
-/// 
+///
 /// assert_eq!(std::mem::size_of::<FlagDepthId>(), META_ELEM_BYTE_SIZE);
 /// ```
 #[derive(Copy, Clone)]
 pub struct FlagDepthId(u64);
 
 impl FlagDepthId {
-  
   fn new(flag: StatusFlag, depth: u8, identifier: u64) -> Self {
-    FlagDepthId(
-      ((flag as u64) << 56) | ((depth as u64) << 48) | (identifier & ID_MASK)
-    )
+    FlagDepthId(((flag as u64) << 56) | ((depth as u64) << 48) | (identifier & ID_MASK))
   }
 
   fn from_raw(raw_val: u64) -> Self {
     Self(raw_val)
   }
-  
+
   fn raw_value(&self) -> u64 {
     self.0
   }
-  
+
   fn status(&self) -> StatusFlag {
     let val = (self.0 >> 56) as u8 & 0b11;
     match val {
@@ -173,7 +172,7 @@ impl<'a> IntoIterator for &Metadata<'a> {
 
   fn into_iter(self) -> Self::IntoIter {
     MetadataIter(self.0.iter())
-  } 
+  }
 }
 
 pub struct MetadataIter<'a>(slice::Iter<'a, FlagDepthId>);
@@ -190,7 +189,6 @@ impl<'a> Iterator for MetadataIter<'a> {
   }
 }
 
-
 ///
 /// `[(n_mocs + 1) / 1024, moc_0, moc_1, ..., moc_n]`
 /// `[0, n_bytes_0, n_bytes_0 + n_bytes_1, ..., sum]`
@@ -203,16 +201,13 @@ impl<'a> IntoIterator for &CumulByteSize<'a> {
   fn into_iter(self) -> Self::IntoIter {
     let mut it = self.0.iter();
     let start = it.next().map(|v| *v as usize).unwrap_or(0);
-    MOCByteRangeIter {
-      start,
-      it
-    }
+    MOCByteRangeIter { start, it }
   }
 }
 
 pub struct MOCByteRangeIter<'a> {
   start: usize,
-  it: slice::Iter<'a, u64>
+  it: slice::Iter<'a, u64>,
 }
 
 /// End the iteration at first Void encountered.
@@ -222,16 +217,15 @@ impl<'a> Iterator for MOCByteRangeIter<'a> {
   fn next(&mut self) -> Option<Self::Item> {
     match self.it.next() {
       Some(end) => {
-        let end  = *end as usize;
+        let end = *end as usize;
         let range = self.start..end;
         self.start = end;
         Some(range)
-      },
+      }
       None => None,
     }
   }
 }
-
 
 // impl Iterator<Item=Range<u64> for CumulByteSize
 // To be use with zip on MetadataIter to stop :)
@@ -247,7 +241,6 @@ pub struct MocSetFileReader {
 }
 
 impl MocSetFileReader {
-  
   pub fn new(path: PathBuf) -> Result<Self, io::Error> {
     let file = File::open(path)?;
     let helper = MocSetFileIOHelper::from_file(&file)?;
@@ -258,7 +251,7 @@ impl MocSetFileReader {
   pub fn n128(&self) -> u64 {
     self.helper.n128()
   }
-  
+
   pub fn meta(&self) -> Metadata {
     let blob = &self.mmap[self.helper.meta_bytes()];
     let len = self.helper.n_mocs_max();
@@ -270,9 +263,7 @@ impl MocSetFileReader {
       panic!("Wrong metadata alignment!");
     }
     // ######################################
-    Metadata( unsafe {
-      &* slice_from_raw_parts(blob.as_ptr() as *const FlagDepthId, len)
-    })
+    Metadata(unsafe { &*slice_from_raw_parts(blob.as_ptr() as *const FlagDepthId, len) })
   }
 
   pub fn index(&self) -> CumulByteSize {
@@ -286,18 +277,15 @@ impl MocSetFileReader {
       panic!("Wrong metadata alignment!");
     }
     // ######################################
-    CumulByteSize( unsafe {
-      &* slice_from_raw_parts(blob.as_ptr() as *const u64, len)
-    })
+    CumulByteSize(unsafe { &*slice_from_raw_parts(blob.as_ptr() as *const u64, len) })
   }
-  
+
   /// WARNING: calling this method is unsafe.
   /// You have to be sure of the type `T` (either `u32` or `u64`)
   /// according to the MOC depth!
   pub fn ranges<T: Idx>(&self, bytes: Range<usize>) -> BorrowedRanges<'_, T> {
     BorrowedRanges::from(&self.mmap[bytes])
   }
-  
 }
 
 pub struct MocSetFileWriter {
@@ -308,28 +296,31 @@ pub struct MocSetFileWriter {
 }
 
 impl MocSetFileWriter {
-
   pub fn new(path: PathBuf) -> Result<Self, io::Error> {
     let mut lock_path = path.clone();
-    assert!(
-      lock_path.set_extension(
-        lock_path.extension().map(|e| format!("{:?}.lock", e)).unwrap_or_else(|| String::from(".lock"))
-      )
-    );
+    assert!(lock_path.set_extension(
+      lock_path
+        .extension()
+        .map(|e| format!("{:?}.lock", e))
+        .unwrap_or_else(|| String::from(".lock"))
+    ));
     // Atomic operation: fails if the file is already created!
     // Create the lock file
-    OpenOptions::new().write(true)
+    OpenOptions::new()
+      .write(true)
       .create_new(true)
       .open(&lock_path)?;
-    let file = OpenOptions::new()
-      .read(true)
-      .write(true)
-      .open(&path)?;
+    let file = OpenOptions::new().read(true).write(true).open(&path)?;
     let helper = MocSetFileIOHelper::from_file(&file)?;
     let mmap = unsafe { MmapOptions::new().map_mut(&file)? };
-    Ok(MocSetFileWriter { helper, file, lock_path, mmap })
+    Ok(MocSetFileWriter {
+      helper,
+      file,
+      lock_path,
+      mmap,
+    })
   }
-  
+
   pub fn remap(&mut self) -> Result<(), io::Error> {
     self.mmap = unsafe { MmapOptions::new().map_mut(&self.file)? };
     Ok(())
@@ -338,9 +329,12 @@ impl MocSetFileWriter {
   pub fn n128(&self) -> u64 {
     self.helper.n128()
   }
-  
+
   pub fn chg_status(&mut self, target_id: u64, new_status: StatusFlag) -> io::Result<()> {
-    assert!(new_status > StatusFlag::Void, "Status 'void' can't be set manually.");
+    assert!(
+      new_status > StatusFlag::Void,
+      "Status 'void' can't be set manually."
+    );
     let mut cursor = Cursor::new(&mut self.mmap[self.helper.meta_bytes()]);
     loop {
       let flg_depth_id = FlagDepthId::from_raw(cursor.read_u64::<LittleEndian>()?);
@@ -389,7 +383,10 @@ impl MocSetFileWriter {
         assert!(status == StatusFlag::Deprecated || status == StatusFlag::Valid);
         let id = flg_depth_id.identifier();
         if let Some(new_status) = target.get(&id) {
-          assert!(*new_status > StatusFlag::Void, "Status 'void' can't be set manually.");
+          assert!(
+            *new_status > StatusFlag::Void,
+            "Status 'void' can't be set manually."
+          );
           if status != *new_status {
             let depth = flg_depth_id.depth();
             let new_meta_elem = FlagDepthId::new(*new_status, depth, id);
@@ -407,12 +404,12 @@ impl MocSetFileWriter {
     self.flush_meta()?;
     Ok(())
   }
-  
+
   pub fn append_moc<T: Idx>(
     &mut self,
     flag: StatusFlag,
     id: u64,
-    moc: RangeMOC<T, Hpx::<T>>
+    moc: RangeMOC<T, Hpx<T>>,
   ) -> Result<(), Box<dyn Error>> {
     let file_len = self.mmap.len();
     let (header, _) = self.mmap.split_at_mut(self.helper.header_byte_size());
@@ -439,7 +436,15 @@ impl MocSetFileWriter {
         let mut file_data = self.file.try_clone()?;
         file_data.seek(SeekFrom::Start(curr_index_from))?;
         let mut data_writer = BufWriter::new(file_data);
-        let _new_size = append_moc(flag, id, moc, curr_index_from, &mut meta, &mut index, &mut data_writer)?;
+        let _new_size = append_moc(
+          flag,
+          id,
+          moc,
+          curr_index_from,
+          &mut meta,
+          &mut index,
+          &mut data_writer,
+        )?;
         // flush order is important to ensure data is written before index and meta at the end
         data_writer.flush()?; // flush new data
         self.flush_index()?;
@@ -450,7 +455,7 @@ impl MocSetFileWriter {
     }
     Err(String::from("No more space available in the mocset file!").into())
   }
-  
+
   pub fn flush_meta(&self) -> io::Result<()> {
     let Range { start, end } = self.helper.meta_bytes();
     self.mmap.flush_range(start, end - start)
@@ -459,7 +464,7 @@ impl MocSetFileWriter {
     let Range { start, end } = self.helper.index_bytes();
     self.mmap.flush_range(start, end - start)
   }
-  
+
   pub fn release(self) -> io::Result<()> {
     fs::remove_file(self.lock_path)
   }
@@ -468,11 +473,11 @@ impl MocSetFileWriter {
 pub(crate) fn append_moc<T: Idx>(
   flag: StatusFlag,
   id: u64,
-  moc: RangeMOC<T, Hpx::<T>>,
+  moc: RangeMOC<T, Hpx<T>>,
   from_byte: u64,
   meta: &mut Cursor<&mut [u8]>,
   index: &mut Cursor<&mut [u8]>,
-  data: &mut BufWriter<File>
+  data: &mut BufWriter<File>,
 ) -> Result<u64, io::Error> {
   let depth = moc.depth_max();
   assert!(depth <= Hpx::<T>::MAX_DEPTH);
@@ -489,7 +494,7 @@ pub(crate) fn append_moc_bytes(
   mut from_byte: u64,
   meta: &mut Cursor<&mut [u8]>,
   index: &mut Cursor<&mut [u8]>,
-  data: &mut BufWriter<File>
+  data: &mut BufWriter<File>,
 ) -> Result<u64, io::Error> {
   let flag_depth_id = FlagDepthId::new(flag, depth, id);
   from_byte += moc_bytes.len() as u64;
@@ -499,13 +504,11 @@ pub(crate) fn append_moc_bytes(
   Ok(from_byte)
 }
 
-
 pub struct MocSetFileIOHelper {
   n128: u64,
 }
 
 impl MocSetFileIOHelper {
-
   pub fn from_file(file: &File) -> Result<Self, io::Error> {
     let mmap = unsafe {
       MmapOptions::new()
@@ -514,8 +517,8 @@ impl MocSetFileIOHelper {
     };
     let n128 = MocSetFileIOHelper::read_n128(&mmap)?;
     Ok(MocSetFileIOHelper::new(n128))
-  } 
-  
+  }
+
   pub fn new(n128: u64) -> MocSetFileIOHelper {
     MocSetFileIOHelper { n128 }
   }
@@ -523,7 +526,7 @@ impl MocSetFileIOHelper {
   pub fn n128(&self) -> u64 {
     self.n128
   }
-  
+
   pub fn n_mocs_max_plus_one(&self) -> usize {
     debug_assert_eq!((self.n128 as usize) << 7, (self.n128 as usize) * 128);
     (self.n128 as usize) << 7
@@ -536,7 +539,7 @@ impl MocSetFileIOHelper {
   pub fn n_index_elements(&self) -> usize {
     self.n_mocs_max_plus_one()
   }
-  
+
   /// Size in bytes of the number of 128 mocs
   /// # Remark
   ///   Same size as a meta elements so that `(n128 + meta)` is an integer value of kilobytes
@@ -558,10 +561,13 @@ impl MocSetFileIOHelper {
     res
   }
 
-  /// Size in bytes of the header, i.e. the meta part plus the index part. 
+  /// Size in bytes of the header, i.e. the meta part plus the index part.
   pub fn header_byte_size(&self) -> usize {
     let res = (self.n128 as usize) << 11;
-    debug_assert_eq!(res, MocSetFileIOHelper::n128_byte_size() + self.meta_byte_size() + self.index_byte_size());
+    debug_assert_eq!(
+      res,
+      MocSetFileIOHelper::n128_byte_size() + self.meta_byte_size() + self.index_byte_size()
+    );
     res
   }
 
@@ -573,20 +579,23 @@ impl MocSetFileIOHelper {
     let byte_range = 0..MocSetFileIOHelper::meta_first_byte_inclusive();
     (&mmap[byte_range]).read_u64::<LittleEndian>()
   }
-  
+
   pub fn write_meta(&self, mmap: &mut MmapMut, meta: Vec<u8>) -> io::Result<()> {
-    let byte_range = MocSetFileIOHelper::meta_first_byte_inclusive()..self.meta_last_byte_exclusive();
+    let byte_range =
+      MocSetFileIOHelper::meta_first_byte_inclusive()..self.meta_last_byte_exclusive();
     (&mut mmap[byte_range]).write_all(&meta)
   }
-  
-  
+
   pub fn meta_first_byte_inclusive() -> usize {
     MocSetFileIOHelper::n128_byte_size()
   }
 
   pub fn meta_last_byte_exclusive(&self) -> usize {
     let res = (self.n128 as usize) << 10;
-    debug_assert_eq!(res, MocSetFileIOHelper::n128_byte_size() + self.meta_byte_size());
+    debug_assert_eq!(
+      res,
+      MocSetFileIOHelper::n128_byte_size() + self.meta_byte_size()
+    );
     res
   }
 
@@ -597,7 +606,7 @@ impl MocSetFileIOHelper {
   pub fn index_last_byte_exclusive(&self) -> usize {
     self.header_byte_size()
   }
-  
+
   pub fn meta_bytes(&self) -> Range<usize> {
     MocSetFileIOHelper::meta_first_byte_inclusive()..self.meta_last_byte_exclusive()
   }
