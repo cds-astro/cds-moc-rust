@@ -139,6 +139,7 @@ fn from_fits_skymap_internal<R: BufRead>(
   } else if tform1 =="1024E" {
     Ok((false, 1024_u64))
   } else {
+    // TODO: ALSO SUPPORT B or 1B and TTYPE = M (for MASK)!!
     Err(
       FitsError::UnexpectedValue(
         String::from("TFORM1"),
