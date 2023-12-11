@@ -31,7 +31,7 @@
     "language": "eng",
     "license": "MIT",
     "notes": "Release Notes: https://github.com/cds-astro/cds-moc-rust/blob/main/CHANGELOG.md",
-    "publication_date": "2021-10-18",
+    "publication_date": "2023-12-11",
     "related_identifiers": [
         {
             "identifier": "https://github.com/cds-astro/cds-moc-rust",
@@ -48,5 +48,5 @@
     ],
     "title": "MOC Lib Rust, MOCCLi, MOCWasm and MOCSet",
     "upload_type": "software",
-    "version": "0.5.3"
+    "version": "0.11.3"
 }
