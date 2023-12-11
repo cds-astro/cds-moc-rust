@@ -121,20 +121,20 @@ list1
 query_cone_valid
 query_cone_valid_with_coverage
 list1
-cargo run --release chgstatus mocset.bin 50 deprecated
+cargo run --release chgstatus mocset.bin deprecated 50
 list2
-cargo run --release chgstatus mocset.bin 50 valid
+cargo run --release chgstatus mocset.bin valid 50
 list1
-cargo run --release chgstatus mocset.bin 50 removed 
+cargo run --release chgstatus mocset.bin removed 50
 list3
-cargo run --release chgstatus mocset.bin 161 deprecated
+cargo run --release chgstatus mocset.bin deprecated 161
 query_cone_deprecated_nodeprect
 query_cone_deprecated_withdeprect
-cargo run --release chgstatus mocset.bin 161 removed
+cargo run --release chgstatus mocset.bin removed 161
 query_cone_removed_nodeprec
 query_cone_removed_withdeprec
 cargo run --release append mocset.bin -161 data/CDS_J_ApJ_811_30_table3.fits
-cargo run --release chgstatus mocset.bin 161 valid
+cargo run --release chgstatus mocset.bin valid 161
 cargo run --release purge mocset.bin
 query_cone_valid
 query_cone_valid_with_coverage

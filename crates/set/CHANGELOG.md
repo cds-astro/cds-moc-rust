@@ -7,6 +7,17 @@ Released 2023-12-11
 * Add 'union' command in moc-set
 * Add possible list of IDs to 'union' and 'chagstatus' commands
 
+### ⚠️ BREAKING Changes 
+
+* In the command `chgstatus`, the identifier can now be a list,
+  and it is now the last arguments so that 
+```bash
+mocset chgstatus mocset.bin 50 deprecated
+``
+is now
+```bash
+mocset chgstatus mocset.bin deprecated 50
+```
 
 ## 0.7.0
 
