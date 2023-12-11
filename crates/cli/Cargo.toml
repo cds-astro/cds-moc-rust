@@ -1,6 +1,6 @@
 [package]
 name = "moc-cli"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = "Command-line to create and manipulate HEALPix Multi-Order Coverages maps (MOCs)"
 license = "MIT OR Apache-2.0"

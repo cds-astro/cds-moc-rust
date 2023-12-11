@@ -1,5 +1,12 @@
 # `moc-cli` Change Log
 
+## 0.8.0
+
+Released 2023-12-11
+
+* Minor option bound checks updated
+
+
 ## 0.7.0
 
 Released 2023-04-21

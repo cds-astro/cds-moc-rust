@@ -1,5 +1,12 @@
 # `moc-wasm` Change Log
 
+## 0.8.0
+
+Released 2023-12-11
+
+* No modification, relaesed because of changes in MOCSet
+
+
 ## 0.7.0
 
 Released 2023-04-21

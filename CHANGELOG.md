@@ -1,5 +1,14 @@
 # `moc` Change Log
 
+## 0.11.4
+
+Released 2023-12-11
+
+### Added
+
+* test index validity in ASCII MOCs
+
+
 ## 0.11.3 (no bug fix, but minor add)
 
 Released 2023-03-31
