@@ -1062,7 +1062,10 @@ impl From {
 }
 
 fn lon_deg2rad(lon_deg: f64) -> Result<f64, Box<dyn Error>> {
-  let lon = lon_deg.to_radians();
+  let mut lon = lon_deg.to_radians();
+  if lon == TWICE_PI {
+    lon = 0.0;
+  }
   if !(0.0..TWICE_PI).contains(&lon) {
     Err(String::from("Longitude must be in [0, 2pi[").into())
   } else {
@@ -1072,7 +1075,7 @@ fn lon_deg2rad(lon_deg: f64) -> Result<f64, Box<dyn Error>> {
 
 fn lat_deg2rad(lat_deg: f64) -> Result<f64, Box<dyn Error>> {
   let lat  = lat_deg.to_radians();
-  if !(-HALF_PI..HALF_PI).contains(&lat) {
+  if !(-HALF_PI..=HALF_PI).contains(&lat) {
     Err(String::from("Latitude must be in [-pi/2, pi/2]").into())
   } else {
     Ok(lat)

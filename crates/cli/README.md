@@ -319,6 +319,23 @@ POLYGON lon1_deg lat1_deg lon2_deg lat2_deg ... lonn_deg latn_deg
 POLYGON complement lon1_deg lat1_deg lon2_deg lat2_deg ... lonn_deg latn_deg
 ```
 
+## Example of Stream MOC
+
+The input list must be sorted according to the HEALPix NESTED Z-order curve.
+```bash
+echo "qty=HPX
+depth=6
+29/210191438858682368-210261807602860032
+29/1207809125065424896-1207879493809602560
+29/1386193891555803136-1386264260299980800
+29/1436648281131188224-1436718649875365888
+29/1437703812293853184-1437774181038030848
+29/1440025980851716096-1440096349595893760
+29/1440237087084249088-1440307455828426752
+29/2488801744075620352-2488872112819798016
+" | moc convert - -f stream -t smoc fits mutlicone.moc.fits
+```
+
 
 ## View a MOC
 
@@ -373,6 +390,7 @@ time moc filter position SMOC_GLIMPSE_u32.fits kids_dr2.csv --has-header --lon R
 
 * [ ] Remove `structop` and replace by `clap v3`
 * [ ] MOC from cells (simpler than MOC from pos)
+* [ ] SMOC from ranges (simpler than MOC from pos)
 * [ ] MOC from vcells with a simple constraint? 
 * [ ] Contact [gnuastro](https://www.gnu.org/software/gnuastro) ?
 * [ ] Add filter on ST-MOCs
