@@ -8,7 +8,6 @@ use nom::{
 };
 
 use stc_s::{
-  Stc,
   space::{
     common::{
       region::{BoxParams, CircleParams, ConvexParams, EllipseParams, PolygonParams},
@@ -17,7 +16,8 @@ use stc_s::{
     position::Position,
     positioninterval::PositionInterval,
   },
-  visitor::{StcVisitResult, CompoundVisitor, SpaceVisitor, impls::donothing::VoidVisitor},
+  visitor::{impls::donothing::VoidVisitor, CompoundVisitor, SpaceVisitor, StcVisitResult},
+  Stc,
 };
 
 use healpix::nested::{
@@ -72,7 +72,10 @@ struct Stc2Moc {
 }
 impl Stc2Moc {
   fn new(depth: u8, delta_depth: Option<u8>) -> Self {
-    Self { depth, delta_depth: delta_depth.unwrap_or(2) }
+    Self {
+      depth,
+      delta_depth: delta_depth.unwrap_or(2),
+    }
   }
 }
 impl CompoundVisitor for Stc2Moc {
@@ -391,15 +394,15 @@ fn new_allsky(depth: u8) -> BMOC {
 }
 
 /// Create new S-MOC from the given STC-S string.
-/// 
+///
 /// # WARNING
-/// * `DIFFERENCE` is interpreted as a symmetrical difference (it is a `MINUS` in the STC standard) 
+/// * `DIFFERENCE` is interpreted as a symmetrical difference (it is a `MINUS` in the STC standard)
 /// * `Polygon` do not follow the STC-S standard: here self-intersecting polygons are supported
 /// * No implicit conversion: the STC-S will be rejected if
 ///     + the frame is different from `ICRS`
 ///     + the flavor is different from `Spher2`
 ///     + the units are different from `degrees`
-/// * Time, Spectral and Redshift sub-phrases are ignored 
+/// * Time, Spectral and Redshift sub-phrases are ignored
 ///
 /// # Params
 /// * `depth`: MOC maximum depth in `[0, 29]`
@@ -409,25 +412,56 @@ fn new_allsky(depth: u8) -> BMOC {
 ///
 /// # Output
 /// - The new S-MOC (or an error)
-pub fn stcs2moc(depth: u8, delta_depth: Option<u8>, stcs_ascii: &str) -> Result<RangeMOC<u64, Hpx<u64>>, Stc2MocError> {
+pub fn stcs2moc(
+  depth: u8,
+  delta_depth: Option<u8>,
+  stcs_ascii: &str,
+) -> Result<RangeMOC<u64, Hpx<u64>>, Stc2MocError> {
   match Stc::parse::<VerboseError<&str>>(stcs_ascii.trim()) {
     Ok((rem, stcs)) => {
       if !rem.is_empty() {
-        return Err(Stc2MocError::ParseHasRemaining { rem: rem.to_string() })
+        return Err(Stc2MocError::ParseHasRemaining {
+          rem: rem.to_string(),
+        });
       }
       let stc2moc_visitor = Stc2Moc::new(depth, delta_depth);
-      let StcVisitResult { space, .. } = stcs.accept(VoidVisitor, stc2moc_visitor, VoidVisitor, VoidVisitor);
+      let StcVisitResult { space, .. } =
+        stcs.accept(VoidVisitor, stc2moc_visitor, VoidVisitor, VoidVisitor);
       match space {
         None => Err(Stc2MocError::NoSpaceFound),
         Some(space_res) => space_res,
       }
     }
-    Err(err) => {
-      Err(match err {
-        Err::Incomplete(_) => Stc2MocError::ParseIncomplete { msg: String::from("Incomplete parsing.") },
-        Err::Error(e) => Stc2MocError::ParseIncomplete { msg: convert_error(stcs_ascii, e) },
-        Err::Failure(e) => Stc2MocError::ParseIncomplete { msg: convert_error(stcs_ascii, e) },
-      })
-    }
+    Err(err) => Err(match err {
+      Err::Incomplete(_) => Stc2MocError::ParseIncomplete {
+        msg: String::from("Incomplete parsing."),
+      },
+      Err::Error(e) => Stc2MocError::ParseIncomplete {
+        msg: convert_error(stcs_ascii, e),
+      },
+      Err::Failure(e) => Stc2MocError::ParseIncomplete {
+        msg: convert_error(stcs_ascii, e),
+      },
+    }),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::{moc::range::RangeMOC, qty::Hpx};
+
+  use super::stcs2moc;
+
+  #[test]
+  fn test_from_stcs() {
+    let moc1 = stcs2moc(10, Some(2), "Circle ICRS 147.6 69.9 0.4").unwrap();
+    let moc2 = RangeMOC::<u64, Hpx<u64>>::from_cone(
+      147.6_f64.to_radians(),
+      69.9_f64.to_radians(),
+      0.4_f64.to_radians(),
+      10,
+      2,
+    );
+    assert_eq!(moc1, moc2)
   }
 }
