@@ -134,8 +134,8 @@ jobs:
          rustup target add aarch64-apple-darwin
          pip install maturin
          cd crates/set
-         maturin publish --interpreter python${{matrix.python_version}} --no-sdist --universal2 --skip-existing --username "$MATURIN_USERNAME"
+         maturin publish --interpreter python${{matrix.python_version}} --no-sdist --target universal2-apple-darwin --skip-existing --username "$MATURIN_USERNAME"
          cd ../cli
-         maturin publish --interpreter python${{matrix.python_version}} --no-sdist --universal2 --skip-existing --username "$MATURIN_USERNAME"
+         maturin publish --interpreter python${{matrix.python_version}} --no-sdist --target universal2-apple-darwin --skip-existing --username "$MATURIN_USERNAME"
 
 
