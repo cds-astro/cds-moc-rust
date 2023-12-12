@@ -114,6 +114,40 @@ pub fn or<T, Q, U, R, I1, J1, K1, I2, J2, K2>(
       whether the index is a single index, a range lower bound or a range upper bound
 * [ ] Make a PostgresQL wrapper using e.g. [pgx](https://github.com/zombodb/pgx/)?
 
+
+## WARNING about the STC-S to MOC function
+
+STC-S parsing is ensured by the [STC crate](https://github.com/cds-astro/cds-stc-rust).
+
+Current discrepancies between the STC standard and this implementation:
+
+* The `DIFFERENCE` operation has been implemented as being a `symmetric difference`
+    + why? probably because:
+        1. I am biased towards Boolean algebra, it as `XOR`
+           (exclusive `OR` or symmetric difference) but no `Difference`
+        2. I read parts of the STC standard after the STC-S implementation
+        3. `XOR` is already implemented in [cdshleapix](https://github.com/cds-astro/cds-healpix-rust), but `DIFFERENCE` is not.
+    + has stated in the STC standard: `R1 – R2 = R1 AND (NOT R2))`;
+      but also: `R1 - R2 = R1 AND (R1 XOR R2)`, and
+      `XOR = (R1 OR R2) AND (NOT (R1 AND R2))` is more complex that `DIFFERENCE`
+      (so is worth having implented?).
+* For `Polygon`: we do not use the STC convention
+    + we support self-intersecting polygons
+    + we generally return the smallest area polygon (use `NOT` to get its complement!)
+    + one convention could be to use an additional (last) provided points as a control point
+        - note that for convex polygons, the control point could be the vertices gravity center
+        - in a GUI, a user could define the inner part of the polygon by a final click
+    + why?
+        1. efficient algorithms dealing with polygons supports self-intersecting polygons
+        2. to support arbitrary defined polygons by a user clicking in a viewer such as Aladin or Aladin Lite
+        3. [cdshleapix](https://github.com/cds-astro/cds-healpix-rust) is based on self-intersecting polygons
+* For `Box`: a position angle can be added as a last parameter, right after `bsize`.
+
+So far, we reject STC-S having:
+* a frame different from `ICRS`
+* a flavor different from `Spher2`
+* units different from `degrees`
+
 ## License
 
 Like most projects in Rust, this project is licensed under either of

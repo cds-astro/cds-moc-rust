@@ -1,0 +1,415 @@
+//! MOC creation from an STC-S string.
+
+use thiserror::Error;
+
+use nom::{
+  error::{convert_error, VerboseError},
+  Err,
+};
+
+use stc::{
+  Stc,
+  space::{
+    common::{
+      region::{BoxParams, CircleParams, ConvexParams, EllipseParams, PolygonParams},
+      FillFrameRefposFlavor, Flavor, Frame, FromPosToVelocity, SpaceUnit,
+    },
+    position::Position,
+    positioninterval::PositionInterval,
+  },
+  visitor::{StcVisitResult, CompoundVisitor, SpaceVisitor, impls::donothing::VoidVisitor},
+};
+
+use healpix::nested::{
+  bmoc::{BMOCBuilderUnsafe, BMOC},
+  box_coverage, cone_coverage_approx_custom, elliptical_cone_coverage_custom, polygon_coverage,
+};
+
+use crate::{moc::range::RangeMOC, qty::Hpx};
+
+const HALF_PI: f64 = 0.5 * std::f64::consts::PI;
+const PI: f64 = std::f64::consts::PI;
+const TWICE_PI: f64 = 2.0 * std::f64::consts::PI;
+
+#[derive(Error, Debug)]
+pub enum Stc2MocError {
+  #[error("Frame other than ICRS not supported (yet). Found: {found:?}")]
+  FrameIsNotICRS { found: Frame },
+  #[error("Flavor other than Spher2 not supported (yet). Found: {found:?}")]
+  FlavorIsNotSpher2 { found: Flavor },
+  #[error("Units ther than 'deg' not (yet?!) supported. Found: {found:?}")]
+  UnitsNotSupported { found: Vec<SpaceUnit> },
+  #[error("Convex shape not (yet?!) supported.")]
+  ConvexNotSupported,
+  #[error("Simple position not supported.")]
+  SimplePositionNotSupported,
+  #[error("Position interval not supported.")]
+  PositionIntervalNotSupported,
+  #[error("invalid header (expected {expected:?}, found {found:?})")]
+  WrongNumberOfParams { expected: u8, found: u8 },
+  #[error("Longitude value out of bounds. Expected: [0, 360[. Actual: {value:?}")]
+  WrongLongitude { value: f64 },
+  #[error("Latitude value out of bounds. Expected: [-90, 90[. Actual: {value:?}")]
+  WrongLatitude { value: f64 },
+  #[error("STC-S string parsing not complete. Remaining: {rem:?}")]
+  ParseHasRemaining { rem: String },
+  #[error("STC-S string parsing incomplete: {msg:?}")]
+  ParseIncomplete { msg: String },
+  #[error("STC-S string parsing error: {msg:?}")]
+  ParseFailure { msg: String },
+  #[error("STC-S string parsing failure: {msg:?}")]
+  ParseError { msg: String },
+  #[error("No space sub-phrase found in STC-S string")]
+  NoSpaceFound,
+  #[error("Custom error: {msg:?}")]
+  Custom { msg: String },
+}
+
+#[derive(Debug, Clone)]
+struct Stc2Moc {
+  depth: u8,
+  delta_depth: u8,
+}
+impl Stc2Moc {
+  fn new(depth: u8, delta_depth: Option<u8>) -> Self {
+    Self { depth, delta_depth: delta_depth.unwrap_or(2) }
+  }
+}
+impl CompoundVisitor for Stc2Moc {
+  type Value = BMOC;
+  type Error = Stc2MocError;
+
+  fn visit_allsky(&mut self) -> Result<Self::Value, Self::Error> {
+    // Ok(BMOC::new_allsky(self.depth))
+    Ok(new_allsky(self.depth))
+  }
+
+  fn visit_circle(&mut self, circle: &CircleParams) -> Result<Self::Value, Self::Error> {
+    // Get params
+    let lon_deg = circle.center().get(0).ok_or_else(|| Stc2MocError::Custom {
+      msg: String::from("Empty circle longitude"),
+    })?;
+    let lat_deg = circle.center().get(1).ok_or_else(|| Stc2MocError::Custom {
+      msg: String::from("Empty circle latitude"),
+    })?;
+    let radius_deg = circle.radius();
+    // Convert params
+    let lon = lon_deg2rad(*lon_deg)?;
+    let lat = lat_deg2rad(*lat_deg)?;
+    let r = radius_deg.to_radians();
+    if r <= 0.0 || PI <= r {
+      Err(Stc2MocError::Custom {
+        msg: format!("Radius out of bounds. Expected: ]0, 180[. Actual: {}.", r),
+      })
+    } else {
+      Ok(cone_coverage_approx_custom(
+        self.depth,
+        self.delta_depth,
+        lon,
+        lat,
+        r,
+      ))
+    }
+  }
+
+  fn visit_ellipse(&mut self, ellipse: &EllipseParams) -> Result<Self::Value, Self::Error> {
+    // Get params
+    let lon_deg = ellipse
+      .center()
+      .get(0)
+      .ok_or_else(|| Stc2MocError::Custom {
+        msg: String::from("Empty ellipse longitude"),
+      })?;
+    let lat_deg = ellipse
+      .center()
+      .get(1)
+      .ok_or_else(|| Stc2MocError::Custom {
+        msg: String::from("Empty ellipse latitude"),
+      })?;
+    let a_deg = ellipse.radius_a();
+    let b_deg = ellipse.radius_b();
+    let pa_deg = ellipse.pos_angle();
+    // Convert params
+    let lon = lon_deg2rad(*lon_deg)?;
+    let lat = lat_deg2rad(*lat_deg)?;
+    let a = a_deg.to_radians();
+    let b = b_deg.to_radians();
+    let pa = pa_deg.to_radians();
+    if a <= 0.0 || HALF_PI <= a {
+      Err(Stc2MocError::Custom {
+        msg: format!(
+          "Semi-major axis out of bounds. Expected: ]0, 90[. Actual: {}.",
+          a_deg
+        ),
+      })
+    } else if b <= 0.0 || a <= b {
+      Err(Stc2MocError::Custom {
+        msg: format!(
+          "Semi-minor axis out of bounds. Expected: ]0, {}[. Actual: {}.",
+          a_deg, b_deg
+        ),
+      })
+    } else if pa <= 0.0 || PI <= pa {
+      Err(Stc2MocError::Custom {
+        msg: format!(
+          "Position angle out of bounds. Expected: [0, 180[. Actual: {}.",
+          pa_deg
+        ),
+      })
+    } else {
+      Ok(elliptical_cone_coverage_custom(
+        self.depth,
+        self.delta_depth,
+        lon,
+        lat,
+        a,
+        b,
+        pa,
+      ))
+    }
+  }
+
+  fn visit_box(&mut self, skybox: &BoxParams) -> Result<Self::Value, Self::Error> {
+    // Get params
+    let lon_deg = skybox.center().get(0).ok_or_else(|| Stc2MocError::Custom {
+      msg: String::from("Empty ellipse longitude"),
+    })?;
+    let lat_deg = skybox.center().get(1).ok_or_else(|| Stc2MocError::Custom {
+      msg: String::from("Empty ellipse latitude"),
+    })?;
+    let mut a_deg = skybox.bsize().get(0).ok_or_else(|| Stc2MocError::Custom {
+      msg: String::from("Empty bsize on latitude"),
+    })?;
+    let mut b_deg = skybox.bsize().get(0).ok_or_else(|| Stc2MocError::Custom {
+      msg: String::from("Empty bsize on longitude"),
+    })?;
+    let mut pa_deg = skybox.bsize().get(0).copied().unwrap_or(90.0);
+    if a_deg < b_deg {
+      std::mem::swap(&mut b_deg, &mut a_deg);
+      pa_deg = 90.0 - pa_deg;
+    }
+    // Convert params
+    let lon = lon_deg2rad(*lon_deg)?;
+    let lat = lat_deg2rad(*lat_deg)?;
+    let a = a_deg.to_radians();
+    let b = b_deg.to_radians();
+    let pa = pa_deg.to_radians();
+    if a <= 0.0 || HALF_PI <= a {
+      Err(Stc2MocError::Custom {
+        msg: format!(
+          "Box semi-major axis out of bounds. Expected: ]0, 90[. Actual: {}.",
+          a_deg
+        ),
+      })
+    } else if b <= 0.0 || a <= b {
+      Err(Stc2MocError::Custom {
+        msg: format!(
+          "Box semi-minor axis out of bounds. Expected: ]0, {}[. Actual: {}.",
+          a_deg, b_deg
+        ),
+      })
+    } else if !(0.0..PI).contains(&pa) {
+      Err(Stc2MocError::Custom {
+        msg: format!(
+          "Position angle out of bounds. Expected: [0, 180[. Actual: {}.",
+          pa_deg
+        ),
+      })
+    } else {
+      Ok(box_coverage(self.depth, lon, lat, a, b, pa))
+    }
+  }
+
+  fn visit_polygon(&mut self, polygon: &PolygonParams) -> Result<Self::Value, Self::Error> {
+    let vertices_deg = polygon.vertices();
+    let vertices = vertices_deg
+      .iter()
+      .step_by(2)
+      .zip(vertices_deg.iter().skip(1).step_by(2))
+      .map(|(lon_deg, lat_deg)| {
+        let lon = lon_deg2rad(*lon_deg)?;
+        let lat = lat_deg2rad(*lat_deg)?;
+        Ok((lon, lat))
+      })
+      .collect::<Result<Vec<(f64, f64)>, Stc2MocError>>()?;
+    Ok(polygon_coverage(self.depth, vertices.as_slice(), true))
+  }
+
+  fn visit_convex(&mut self, _convex: &ConvexParams) -> Result<Self::Value, Self::Error> {
+    Err(Stc2MocError::ConvexNotSupported)
+  }
+
+  fn visit_not(&mut self, bmoc: Self::Value) -> Result<Self::Value, Self::Error> {
+    Ok(bmoc.not())
+  }
+
+  fn visit_union(&mut self, bmocs: Vec<Self::Value>) -> Result<Self::Value, Self::Error> {
+    let n = bmocs.len();
+    bmocs
+      .into_iter()
+      .reduce(|acc, curr| acc.or(&curr))
+      .ok_or_else(|| Stc2MocError::Custom {
+        msg: format!(
+          "Wrong number of elements in union. Expected: >=2. Actual: {} ",
+          n
+        ),
+      })
+  }
+
+  fn visit_intersection(&mut self, bmocs: Vec<Self::Value>) -> Result<Self::Value, Self::Error> {
+    let n = bmocs.len();
+    bmocs
+      .into_iter()
+      .reduce(|acc, curr| acc.and(&curr))
+      .ok_or_else(|| Stc2MocError::Custom {
+        msg: format!(
+          "Wrong number of elements in intersection. Expected: >=2. Actual: {} ",
+          n
+        ),
+      })
+  }
+
+  fn visit_difference(
+    &mut self,
+    left_bmoc: Self::Value,
+    right_bmoc: Self::Value,
+  ) -> Result<Self::Value, Self::Error> {
+    // Warning: we interpret 'difference' as being a 'symmetrical difference', i.e. xor (not minus)
+    Ok(left_bmoc.xor(&right_bmoc))
+  }
+}
+
+impl SpaceVisitor for Stc2Moc {
+  type Value = RangeMOC<u64, Hpx<u64>>;
+  type Error = Stc2MocError;
+  type C = Self;
+
+  fn new_compound_visitor(
+    &self,
+    fill_frame_refpos_flavor: &FillFrameRefposFlavor,
+    from_pos_to_velocity: &FromPosToVelocity,
+  ) -> Result<Self, Self::Error> {
+    // Check ICRS frame
+    let frame = fill_frame_refpos_flavor.frame();
+    if frame != Frame::ICRS {
+      return Err(Stc2MocError::FrameIsNotICRS { found: frame });
+    }
+    // Check SPHER2 flavor
+    let flavor = fill_frame_refpos_flavor.flavor();
+    if let Some(flavor) = flavor {
+      if flavor != Flavor::Spher2 {
+        return Err(Stc2MocError::FlavorIsNotSpher2 { found: flavor });
+      }
+    }
+    // Check units
+    let opt_units = from_pos_to_velocity.unit().cloned();
+    if let Some(units) = opt_units {
+      for unit in units.iter().cloned() {
+        if unit != SpaceUnit::Deg {
+          return Err(Stc2MocError::UnitsNotSupported { found: units });
+        }
+      }
+    }
+    Ok(self.clone())
+  }
+
+  fn visit_position_simple(self, _: &Position) -> Result<Self::Value, Self::Error> {
+    Err(Stc2MocError::SimplePositionNotSupported)
+  }
+
+  fn visit_position_interval(self, _: &PositionInterval) -> Result<Self::Value, Self::Error> {
+    Err(Stc2MocError::PositionIntervalNotSupported)
+  }
+
+  fn visit_allsky(self, bmoc: BMOC) -> Result<Self::Value, Self::Error> {
+    Ok(Self::Value::from(bmoc))
+  }
+
+  fn visit_circle(self, bmoc: BMOC) -> Result<Self::Value, Self::Error> {
+    Ok(bmoc.into())
+  }
+
+  fn visit_ellipse(self, bmoc: BMOC) -> Result<Self::Value, Self::Error> {
+    Ok(bmoc.into())
+  }
+
+  fn visit_box(self, bmoc: BMOC) -> Result<Self::Value, Self::Error> {
+    Ok(bmoc.into())
+  }
+
+  fn visit_polygon(self, bmoc: BMOC) -> Result<Self::Value, Self::Error> {
+    Ok(bmoc.into())
+  }
+
+  fn visit_convex(self, _: BMOC) -> Result<Self::Value, Self::Error> {
+    unreachable!() // because an error is raised before calling this
+  }
+
+  fn visit_not(self, bmoc: BMOC) -> Result<Self::Value, Self::Error> {
+    Ok(bmoc.into())
+  }
+
+  fn visit_union(self, bmoc: BMOC) -> Result<Self::Value, Self::Error> {
+    Ok(bmoc.into())
+  }
+
+  fn visit_intersection(self, bmoc: BMOC) -> Result<Self::Value, Self::Error> {
+    Ok(bmoc.into())
+  }
+
+  fn visit_difference(self, bmoc: BMOC) -> Result<Self::Value, Self::Error> {
+    Ok(bmoc.into())
+  }
+}
+
+fn lon_deg2rad(lon_deg: f64) -> Result<f64, Stc2MocError> {
+  let mut lon = lon_deg.to_radians();
+  if lon == TWICE_PI {
+    lon = 0.0;
+  }
+  if !(0.0..TWICE_PI).contains(&lon) {
+    Err(Stc2MocError::WrongLongitude { value: lon_deg })
+  } else {
+    Ok(lon)
+  }
+}
+
+fn lat_deg2rad(lat_deg: f64) -> Result<f64, Stc2MocError> {
+  let lat = lat_deg.to_radians();
+  if !(-HALF_PI..=HALF_PI).contains(&lat) {
+    Err(Stc2MocError::WrongLatitude { value: lat_deg })
+  } else {
+    Ok(lat)
+  }
+}
+
+// TODO: remove when newt version of cdshealpix will be published
+fn new_allsky(depth: u8) -> BMOC {
+  let mut builder = BMOCBuilderUnsafe::new(depth, 12);
+  builder.push_all(0, 0, 11, true);
+  builder.to_bmoc()
+}
+
+
+pub fn stcs2moc(depth: u8, delta_depth: Option<u8>, stcs_ascii: &str) -> Result<RangeMOC<u64, Hpx<u64>>, Stc2MocError> {
+  match Stc::parse::<VerboseError<&str>>(stcs_ascii.trim()) {
+    Ok((rem, stcs)) => {
+      if !rem.is_empty() {
+        return Err(Stc2MocError::ParseHasRemaining { rem: rem.to_string() })
+      }
+      let stc2moc_visitor = Stc2Moc::new(depth, delta_depth);
+      let StcVisitResult { space, .. } = stcs.accept(VoidVisitor, stc2moc_visitor, VoidVisitor, VoidVisitor);
+      match space {
+        None => Err(Stc2MocError::NoSpaceFound),
+        Some(space_res) => space_res,
+      }
+    }
+    Err(err) => {
+      Err(match err {
+        Err::Incomplete(_) => Stc2MocError::ParseIncomplete { msg: String::from("Incomplete parsing.") },
+        Err::Error(e) => Stc2MocError::ParseIncomplete { msg: convert_error(stcs_ascii, e) },
+        Err::Failure(e) => Stc2MocError::ParseIncomplete { msg: convert_error(stcs_ascii, e) },
+      })
+    }
+  }
+}

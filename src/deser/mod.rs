@@ -13,3 +13,4 @@ pub mod json;
 pub mod fits;
 pub mod gz;
 pub mod img;
+pub mod stcs;
