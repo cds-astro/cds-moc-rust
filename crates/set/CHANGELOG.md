@@ -2,10 +2,10 @@
 
 ## 0.8.0
 
-Released 2023-12-11
+Released 2023-12-12
 
 * Add 'union' command in moc-set
-* Add possible list of IDs to 'union' and 'chagstatus' commands
+* Add possible list of IDs to 'union' and 'chgstatus' commands
 
 ### ⚠️ BREAKING Changes 
 

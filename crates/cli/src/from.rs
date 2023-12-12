@@ -26,9 +26,11 @@ use moclib::{
     RangeMOC2IntoIterator,
     range::RangeMOC2
   },
-  deser::fits::{
+  deser::{fits::{
     multiordermap::from_fits_multiordermap,
-    skymap::from_fits_skymap
+    skymap::from_fits_skymap,
+    
+  }, stcs::stcs2moc
   }
 };
 
@@ -236,11 +238,22 @@ pub enum From {
     /// Depth of the created MOC, in `[0, 29]`.
     depth: u8,
     #[structopt(parse(from_os_str))]
-    /// The input file containing one cone per line, use '-' for stdin
+    /// The input file containing one cone per line, use '-' to read from stdin
     input: PathBuf,
     #[structopt(short = "s", long = "separator", default_value = " ")]
     /// File separator (default = ' ')
     separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat,
+  },
+  #[structopt(name = "stcs")]
+  /// Create a Spatial MOC from a STC-S input.
+  StcS {
+    /// Depth of the created MOC, in `[0, 29]`.
+    depth: u8,
+    #[structopt(parse(from_os_str))]
+    /// The input file containing the STC-S string, use '-' to read from stdin
+    input: PathBuf,
     #[structopt(subcommand)]
     out: OutputFormat,
   },
@@ -618,6 +631,19 @@ impl From {
         };
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       },
+      From::StcS {
+        depth,
+        input,
+        out,
+      } => {
+        let ascii_stc = if input == PathBuf::from(r"-") {
+          std::io::read_to_string(std::io::stdin())
+        } else {
+          std::fs::read_to_string(input)
+        }?;
+        let moc = stcs2moc(depth, None, ascii_stc.as_ref())?;
+        out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
+      }
       From::Positions {
         depth,
         input,

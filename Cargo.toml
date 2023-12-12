@@ -59,7 +59,7 @@ rayon = "1.5.1"
 flate2 = "1.0.22" # Compression/decompression
 png = "0.17" # For png
 slab = { version = "0.4", optional = true }
-stc = { git = "https://github.com/cds-astro/cds-stc-rust" }
+stc-s = "0.1"
 thiserror = "1.0" # For STC-S (quick-error should be replaced by thiserror everywhere)
 
 

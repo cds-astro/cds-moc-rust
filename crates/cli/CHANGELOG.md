@@ -2,8 +2,9 @@
 
 ## 0.8.0
 
-Released 2023-12-11
+Released 2023-12-12
 
+* Build a S-MOC from a STC-S string
 * Minor option bound checks updated
 
 

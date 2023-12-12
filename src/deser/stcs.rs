@@ -7,7 +7,7 @@ use nom::{
   Err,
 };
 
-use stc::{
+use stc_s::{
   Stc,
   space::{
     common::{
@@ -390,7 +390,25 @@ fn new_allsky(depth: u8) -> BMOC {
   builder.to_bmoc()
 }
 
-
+/// Create new S-MOC from the given STC-S string.
+/// 
+/// # WARNING
+/// * `DIFFERENCE` is interpreted as a symmetrical difference (it is a `MINUS` in the STC standard) 
+/// * `Polygon` do not follow the STC-S standard: here self-intersecting polygons are supported
+/// * No implicit conversion: the STC-S will be rejected if
+///     + the frame is different from `ICRS`
+///     + the flavor is different from `Spher2`
+///     + the units are different from `degrees`
+/// * Time, Spectral and Redshift sub-phrases are ignored 
+///
+/// # Params
+/// * `depth`: MOC maximum depth in `[0, 29]`
+/// * `delta_depth` the difference between the MOC depth and the depth at which the computations
+///   are made (should remain quite small).  
+/// * `ascii_stcs`: lthe STC-S string
+///
+/// # Output
+/// - The new S-MOC (or an error)
 pub fn stcs2moc(depth: u8, delta_depth: Option<u8>, stcs_ascii: &str) -> Result<RangeMOC<u64, Hpx<u64>>, Stc2MocError> {
   match Stc::parse::<VerboseError<&str>>(stcs_ascii.trim()) {
     Ok((rem, stcs)) => {

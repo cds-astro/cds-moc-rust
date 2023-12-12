@@ -406,6 +406,22 @@ impl MOC {
       .map_err(|e| e.into())
   }
 
+  #[wasm_bindgen(js_name = "fromSTCS", catch)]
+  /// Create a MOC from the given STC-S string.
+  ///
+  /// # Arguments
+  /// * `depth` - the MOC depth
+  /// * `ascii_stcs` - the STC-S string (see the MOC Lib Rust README file for WARNINGs about discrepancies from the standard).
+  /// * `delta_depth` - the difference between the MOC depth and the depth at which the computations
+  ///   are made (should remain quite small, default = 2).
+  ///
+  pub fn from_stcs(depth: u8, ascii_stcs: &str, delta_depth: Option<u8>) ->  Result<MOC, JsValue> {
+    U64MocStore::get_global_store()
+      .from_stcs(depth, delta_depth.unwrap_or(2), ascii_stcs)
+      .map(Self::from_store_index)
+      .map_err(|e| e.into())
+  }
+
   #[wasm_bindgen(js_name = "fromRing", catch)]
   /// Create a MOC from the given ring.
   ///

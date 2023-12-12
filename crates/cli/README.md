@@ -137,6 +137,7 @@ SUBCOMMANDS:
     pos             Create a Spatial MOC from a list of positions in decimal degrees (one pair per line, longitude
                     first, then latitude)
     ring            Create a Spatial MOC from the given ring
+    stcs            Create a Spatial MOC from a STC-S input
     timerange       Create a Time MOC from a list of time range (one range per line, lower bound first, then upper
                     bound)
     timerangepos    Create a Space-Time MOC from a list of time range and positions in decimal degrees (tmin first,
@@ -269,6 +270,14 @@ sys	0m0,005s
 
 ![XMM MOC allsky](img/xmmmoc.png)
 ![XMM MOC zoomed](img/xmmmoc_zoom.png)
+
+
+### Build a S-MOC from a STC-S string
+
+```bash
+echo "Circle ICRS 147.6 69.9 0.4" | moc from stcs 14 - fits stcs.moc.fits --force-u64
+moc view stcs.moc.fits moc.png auto 200
+```
 
 ### Build a MOC from a multi-region file
 

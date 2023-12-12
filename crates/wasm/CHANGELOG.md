@@ -2,9 +2,9 @@
 
 ## 0.8.0
 
-Released 2023-12-11
+Released 2023-12-12
 
-* No modification, relaesed because of changes in MOCSet
+* Add `fromSTCS` function
 
 
 ## 0.7.0

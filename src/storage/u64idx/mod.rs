@@ -44,6 +44,7 @@ use crate::{
       multiordermap::from_fits_multiordermap,
       skymap::from_fits_skymap,
     },
+    stcs::stcs2moc,
   },
 };
 
@@ -1225,7 +1226,38 @@ impl U64MocStore {
     store::add(moc)
   }
 
-
+  /// Create and store a new S-MOC from the given STC-S string.
+  /// # WARNING
+  /// * `DIFFERENCE` is interpreted as a symmetrical difference (it is a `MINUS` in the STC standard) 
+  /// * `Polygon` do not follow the STC-S standard: here self-intersecting polygons are supported
+  /// * No implicit conversion: the STC-S will be rejected if
+  ///     + the frame is different from `ICRS`
+  ///     + the flavor is different from `Spher2`
+  ///     + the units are different from `degrees`
+  /// * Time, Spectral and Redshift sub-phrases are ignored 
+  /// 
+  /// # Params
+  /// * `depth`: MOC maximum depth in `[0, 29]`
+  /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
+  ///   are made (should remain quite small).  
+  /// * `ascii_stcs`: lthe STC-S string
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn from_stcs(
+    &self,
+    depth: u8,
+    delta_depth: u8,
+    ascii_stcs: &str,
+  ) -> Result<usize, String> {
+    check_depth::<Hpx<u64>>(depth)?;
+    let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
+    let moc: RangeMOC<u64, Hpx<u64>> = stcs2moc(depth, Some(dd), ascii_stcs)
+      .map_err(|e| e.to_string())?;
+    store::add(moc)
+  }
+  
+  
   // - SMOC MutliOrder
 
 
