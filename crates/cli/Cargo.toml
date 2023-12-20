@@ -1,6 +1,6 @@
 [package]
 name = "moc-cli"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = "Command-line to create and manipulate HEALPix Multi-Order Coverages maps (MOCs)"
 license = "MIT OR Apache-2.0"
@@ -24,7 +24,7 @@ test = false
 moclib = { package = "moc", path = "../.." }
 num = "0.4"
 structopt = "0.3"
-healpix = { package = "cdshealpix", version = "0.6.3" }
+healpix = { package = "cdshealpix", version = "0.6.7" }
 mapproj = "0.3.0"
 rayon = "1.5.1"
 time = { version = "0.3.3", features = ["parsing"] }

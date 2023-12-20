@@ -1,5 +1,13 @@
 # `moc-set` Change Log
 
+## 0.8.1
+
+Released 2023-12-20
+
+* No modification, release due to new moc-cli and moc-wasm release
+* Only update cdshealpix
+
+
 ## 0.8.0
 
 Released 2023-12-12

@@ -1,8 +1,26 @@
 # `moc` Change Log
 
-## 0.11.4
+## 0.12.1
+
+Released 2023-12-20
+
+### Fixed
+
+* Bugs in the stcs2moc: allky not complete + intesection error comming from cdshealpix BMOC
+* Update CDSHealpix
+
+## 0.12.0
 
 Released 2023-12-11
+
+### Added
+
+* stcs2moc functionnality
+
+
+## 0.11.4
+
+Never Released
 
 ### Added
 

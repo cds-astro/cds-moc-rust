@@ -1,5 +1,13 @@
 # `moc-wasm` Change Log
 
+## 0.8.1
+
+Released 2023-12-20
+
+* Fix issues S-MOC from STC-S
+* Update cdshealpix
+
+
 ## 0.8.0
 
 Released 2023-12-12

@@ -1,6 +1,6 @@
 [package]
 name = "moc-set"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = "command-line tool to build, update and query a persistent set of HEALPix Multi-Order Coverages maps (MOCs)"
 license = "MIT OR Apache-2.0"
@@ -22,7 +22,7 @@ test = false
 
 [dependencies]
 moclib = { package = "moc", path = "../.." }
-cdshealpix = "0.6.3"
+cdshealpix = "0.6.7"
 memmap = { package = "memmap2", version = "0.5" }
 clap = { version = "4.4", features = ["derive"] }
 byteorder = "1"
