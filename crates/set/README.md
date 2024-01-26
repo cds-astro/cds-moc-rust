@@ -519,6 +519,8 @@ The structure of the file is made of two main blocks:
     + a fixed length cumulative byte index
 * a extensible data part
 
+![](resources/doc/img/MOCSet_simple.png)
+
 #### Metadata part
 
 A fixed size (chosen at creation) buffer of `n` `u64` elements.
@@ -551,6 +553,9 @@ To get the size (in bytes) of the MOC at index `i`, we can simply perform the op
 
 A simple concatenation of the MOCs ranges.  
 According to the depth of each MOC, the ranges are either ranges of `u32` or ranges of `u64`.
+
+![](resources/doc/img/MOCSet_full.png)
+
 
 ### Updates and Reading while writing
 
@@ -586,6 +591,32 @@ It works well because we only append new MOCs (we never delete information),
 we only update metadata to flag a MOC as removed of deprecated, and we
 respect the read/write order as described above.
 
+#### Mocset file before adding a new MOC
+
+![](resources/doc/img/MOCSet_write1.png)
+
+
+#### Add a new moc step 1/3
+
+![](resources/doc/img/MOCSet_write2.png)
+
+
+#### add a new moc step 2/3
+
+![](resources/doc/img/MOCSet_write3.png)
+
+
+#### add a new moc step 3/3
+
+![](resources/doc/img/MOCSet_write4.png)
+
+
+#### Mocset file after having added a new MOC
+
+![](resources/doc/img/MOCSet_write5.png)
+
+
+
 #### Purge
 
 The purge operation is the only one removing physically stored MOCs.  
@@ -593,6 +624,7 @@ It actually consists in building a new `moc-set`, removing the MOCs flagged as r
 in a temporary file, and then making a move replacing the previous `moc-set`
 by the new one.  
 The `purge` operation uses a write lock.
+
 
 ## ToDo list
 
