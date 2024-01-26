@@ -421,13 +421,23 @@ where
         let ranges = moc_set_reader.ranges::<u32>(byte_range);
         if f(&ranges) {
           let borrowed_moc_ranges = BorrowedMocRanges::<'_, u32, Hpx<u32>>::from(ranges);
-          let _ = writeln!(&mut out, "{},{:.6e}", id, borrowed_moc_ranges.coverage_percentage());
+          let _ = writeln!(
+            &mut out,
+            "{},{:.6e}",
+            id,
+            borrowed_moc_ranges.coverage_percentage()
+          );
         }
       } else {
         let ranges = moc_set_reader.ranges::<u64>(byte_range);
         if d(&ranges) {
           let borrowed_moc_ranges = BorrowedMocRanges::<'_, u64, Hpx<u64>>::from(ranges);
-          let _ = writeln!(&mut out, "{},{:.6e}", id, borrowed_moc_ranges.coverage_percentage());
+          let _ = writeln!(
+            &mut out,
+            "{},{:.6e}",
+            id,
+            borrowed_moc_ranges.coverage_percentage()
+          );
         }
       }
     }

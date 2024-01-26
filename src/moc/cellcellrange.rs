@@ -1,16 +1,15 @@
-
-use std::slice;
-use std::vec::{IntoIter};
 use std::marker::PhantomData;
+use std::slice;
+use std::vec::IntoIter;
 
-use crate::idx::Idx;
-use crate::qty::MocQty;
 use crate::elem::cellcellrange::CellOrCellRange;
 use crate::elemset::cellcellrange::{CellOrCellRanges, MocCellOrCellRanges};
+use crate::idx::Idx;
 use crate::moc::{
-  HasMaxDepth, ZSorted, NonOverlapping, MOCProperties,
-  CellOrCellRangeMOCIterator, CellOrCellRangeMOCIntoIterator
+  CellOrCellRangeMOCIntoIterator, CellOrCellRangeMOCIterator, HasMaxDepth, MOCProperties,
+  NonOverlapping, ZSorted,
 };
+use crate::qty::MocQty;
 
 /// A MOC made of a mix of (ordered and non-overlaping) cells and cells range
 /// (a cell range is a range at the cell depth, while regular ranges are at the
@@ -19,7 +18,7 @@ use crate::moc::{
 #[derive(Debug)]
 pub struct CellOrCellRangeMOC<T: Idx, Q: MocQty<T>> {
   depth_max: u8,
-  ranges: MocCellOrCellRanges<T, Q>
+  ranges: MocCellOrCellRanges<T, Q>,
 }
 impl<T: Idx, Q: MocQty<T>> CellOrCellRangeMOC<T, Q> {
   pub fn new(depth_max: u8, ranges: MocCellOrCellRanges<T, Q>) -> Self {
@@ -38,9 +37,8 @@ impl<T: Idx, Q: MocQty<T>> HasMaxDepth for CellOrCellRangeMOC<T, Q> {
     self.depth_max
   }
 }
-impl<T: Idx, Q: MocQty<T>> ZSorted for CellOrCellRangeMOC<T, Q> { }
-impl<T: Idx, Q: MocQty<T>> NonOverlapping for CellOrCellRangeMOC<T, Q> { }
-
+impl<T: Idx, Q: MocQty<T>> ZSorted for CellOrCellRangeMOC<T, Q> {}
+impl<T: Idx, Q: MocQty<T>> NonOverlapping for CellOrCellRangeMOC<T, Q> {}
 
 /// Iterator taking the ownership of the `CellOrCellRangeMOC` it iterates over.
 pub struct CellOrCellRangeMocIter<T: Idx, Q: MocQty<T>> {
@@ -54,9 +52,9 @@ impl<T: Idx, Q: MocQty<T>> HasMaxDepth for CellOrCellRangeMocIter<T, Q> {
     self.depth_max
   }
 }
-impl<T: Idx, Q: MocQty<T>> ZSorted for CellOrCellRangeMocIter<T, Q> { }
-impl<T: Idx, Q: MocQty<T>> NonOverlapping for CellOrCellRangeMocIter<T, Q> { }
-impl<T: Idx, Q: MocQty<T>> MOCProperties for CellOrCellRangeMocIter<T, Q> { }
+impl<T: Idx, Q: MocQty<T>> ZSorted for CellOrCellRangeMocIter<T, Q> {}
+impl<T: Idx, Q: MocQty<T>> NonOverlapping for CellOrCellRangeMocIter<T, Q> {}
+impl<T: Idx, Q: MocQty<T>> MOCProperties for CellOrCellRangeMocIter<T, Q> {}
 impl<T: Idx, Q: MocQty<T>> Iterator for CellOrCellRangeMocIter<T, Q> {
   type Item = CellOrCellRange<T>;
   fn next(&mut self) -> Option<Self::Item> {
@@ -75,17 +73,17 @@ impl<T: Idx, Q: MocQty<T>> CellOrCellRangeMOCIntoIterator<T> for CellOrCellRange
   type IntoCellOrCellRangeMOCIter = CellOrCellRangeMocIter<T, Self::Qty>;
 
   fn into_cellcellrange_moc_iter(self) -> Self::IntoCellOrCellRangeMOCIter {
-    let l = self.ranges.0.0.len();
+    let l = self.ranges.0 .0.len();
     let last: Option<CellOrCellRange<T>> = if l > 0 {
-      Some(self.ranges.0.0[l - 1].clone())
+      Some(self.ranges.0 .0[l - 1].clone())
     } else {
       None
     };
     CellOrCellRangeMocIter {
       depth_max: self.depth_max,
       last,
-      iter: self.ranges.0.0.into_vec().into_iter(),
-      _qty: PhantomData
+      iter: self.ranges.0 .0.into_vec().into_iter(),
+      _qty: PhantomData,
     }
   }
 }
@@ -102,9 +100,9 @@ impl<'a, T: Idx, Q: MocQty<T>> HasMaxDepth for CellOrCellRangeRefMocIter<'a, T, 
     self.depth_max
   }
 }
-impl<'a, T: Idx, Q: MocQty<T>> ZSorted for CellOrCellRangeRefMocIter<'a, T, Q> { }
-impl<'a, T: Idx, Q: MocQty<T>> NonOverlapping for CellOrCellRangeRefMocIter<'a, T, Q> { }
-impl<'a, T: Idx, Q: MocQty<T>> MOCProperties for CellOrCellRangeRefMocIter<'a, T, Q> { }
+impl<'a, T: Idx, Q: MocQty<T>> ZSorted for CellOrCellRangeRefMocIter<'a, T, Q> {}
+impl<'a, T: Idx, Q: MocQty<T>> NonOverlapping for CellOrCellRangeRefMocIter<'a, T, Q> {}
+impl<'a, T: Idx, Q: MocQty<T>> MOCProperties for CellOrCellRangeRefMocIter<'a, T, Q> {}
 impl<'a, T: Idx, Q: MocQty<T>> Iterator for CellOrCellRangeRefMocIter<'a, T, Q> {
   type Item = CellOrCellRange<T>;
   fn next(&mut self) -> Option<Self::Item> {
@@ -115,7 +113,9 @@ impl<'a, T: Idx, Q: MocQty<T>> Iterator for CellOrCellRangeRefMocIter<'a, T, Q> 
     self.iter.size_hint()
   }
 }
-impl<'a, T: Idx, Q: MocQty<T>> CellOrCellRangeMOCIterator<T> for CellOrCellRangeRefMocIter<'a, T, Q> {
+impl<'a, T: Idx, Q: MocQty<T>> CellOrCellRangeMOCIterator<T>
+  for CellOrCellRangeRefMocIter<'a, T, Q>
+{
   type Qty = Q;
 
   fn peek_last(&self) -> Option<&CellOrCellRange<T>> {
@@ -127,17 +127,17 @@ impl<'a, T: Idx, Q: MocQty<T>> CellOrCellRangeMOCIntoIterator<T> for &'a CellOrC
   type IntoCellOrCellRangeMOCIter = CellOrCellRangeRefMocIter<'a, T, Self::Qty>;
 
   fn into_cellcellrange_moc_iter(self) -> Self::IntoCellOrCellRangeMOCIter {
-    let l = self.ranges.0.0.len();
-    let last: Option< CellOrCellRange<T>> = if l > 0 {
-      Some(self.ranges.0.0[l - 1].clone())
+    let l = self.ranges.0 .0.len();
+    let last: Option<CellOrCellRange<T>> = if l > 0 {
+      Some(self.ranges.0 .0[l - 1].clone())
     } else {
       None
     };
     CellOrCellRangeRefMocIter {
       depth_max: self.depth_max,
       last,
-      iter: self.ranges.0.0.iter(),
-      _qty: PhantomData
+      iter: self.ranges.0 .0.iter(),
+      _qty: PhantomData,
     }
   }
 }

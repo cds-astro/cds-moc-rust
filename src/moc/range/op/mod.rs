@@ -4,12 +4,12 @@ pub mod check;
 pub mod convert;
 pub mod merge;
 
-pub mod not;   // <=> complement
 pub mod degrade;
+pub mod not; // <=> complement
 
-pub mod and;   // <=> intersection
-pub mod or;    // <=> union
+pub mod and; // <=> intersection
 pub mod minus; // <=> mocpy difference = Aladin Soustracction
-pub mod xor;   // <=> Aladin Difference
+pub mod or; // <=> union
+pub mod xor; // <=> Aladin Difference
 
 pub mod multi_op;

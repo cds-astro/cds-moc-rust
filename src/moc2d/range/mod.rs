@@ -1,29 +1,21 @@
-
-use std::{
-  slice,
-  ops::Range,
-  cmp::Ordering,
-  vec::IntoIter,
-};
+use std::{cmp::Ordering, ops::Range, slice, vec::IntoIter};
 
 use crate::{
   idx::Idx,
-  qty::{MocQty, Time, Hpx},
   moc::{
-    ZSorted, NonOverlapping,
-    RangeMOCIterator, RangeMOCIntoIterator,
-    range::{RangeMOC, RangeMocIter, RangeRefMocIter},
     adapters::CellMOCIteratorFromRanges,
+    range::{RangeMOC, RangeMocIter, RangeRefMocIter},
+    NonOverlapping, RangeMOCIntoIterator, RangeMOCIterator, ZSorted,
   },
   moc2d::{
-    HasTwoMaxDepth, MOC2Properties,
-    RangeMOC2ElemIt, RangeMOC2Iterator, RangeMOC2IntoIterator,
-    CellMOC2ElemIt, CellMOC2Iterator, CellMOC2IntoIterator,
     builder::{
       maxdepths_cell::FixedDepthSTMocBuilder,
-      maxdepths_ranges_cells::RangesAndFixedDepthCellsSTMocBuilder
-    }
-  }
+      maxdepths_ranges_cells::RangesAndFixedDepthCellsSTMocBuilder,
+    },
+    CellMOC2ElemIt, CellMOC2IntoIterator, CellMOC2Iterator, HasTwoMaxDepth, MOC2Properties,
+    RangeMOC2ElemIt, RangeMOC2IntoIterator, RangeMOC2Iterator,
+  },
+  qty::{Hpx, MocQty, Time},
 };
 
 pub mod op;
@@ -42,9 +34,9 @@ pub struct RangeMOC2Elem<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
 }
 impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2Elem<T, Q, U, R> {
   pub fn new(moc_l: RangeMOC<T, Q>, moc_r: RangeMOC<U, R>) -> Self {
-    Self { moc_l , moc_r }
+    Self { moc_l, moc_r }
   }
-  
+
   /// Returns the number of ranges in the first dimension
   pub fn n_ranges_1(&self) -> usize {
     self.moc_l.len()
@@ -57,11 +49,11 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2Elem<T, Q, U, R> {
   pub fn n_ranges(&self) -> u64 {
     self.n_ranges_1() as u64 + self.n_ranges_2() as u64
   }
-  
+
   pub fn mocs(self) -> (RangeMOC<T, Q>, RangeMOC<U, R>) {
     (self.moc_l, self.moc_r)
   }
-  
+
   pub fn eq_without_depth(&self, rhs: &Self) -> bool {
     self.moc_l.eq_without_depth(&rhs.moc_l) && self.moc_r.eq_without_depth(&rhs.moc_r)
   }
@@ -78,7 +70,6 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2Elem<T, Q, U, R> {
   pub fn contains_val(&self, val_left: &T, val_right: &U) -> bool {
     self.moc_l.contains_val(val_left) && self.moc_r.contains_val(val_right)
   }
-
 }
 /*impl<T, Q, U, R> PartialEq for RangeMOC2Elem<T, Q, U, R> {
   where
@@ -86,7 +77,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2Elem<T, Q, U, R> {
   Q: MocQty<T>,
   U: Idx,
   R: MocQty<U>
-  
+
   fn eq(&self, other: &Self) -> bool {
     self.depth_max == other.depth_max
       && self.ranges.eq(&other.ranges)
@@ -94,60 +85,70 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2Elem<T, Q, U, R> {
 }*/
 
 impl<T, Q, U, R> RangeMOC2ElemIt<T, Q, U, R> for RangeMOC2Elem<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
   type It1 = RangeMocIter<T, Q>;
   type It2 = RangeMocIter<U, R>;
-  fn range_mocs_it(self) -> (Self::It1,  Self::It2)  {
-    (self.moc_l.into_range_moc_iter(), self.moc_r.into_range_moc_iter())
+  fn range_mocs_it(self) -> (Self::It1, Self::It2) {
+    (
+      self.moc_l.into_range_moc_iter(),
+      self.moc_r.into_range_moc_iter(),
+    )
   }
 }
 impl<'a, T, Q, U, R> RangeMOC2ElemIt<T, Q, U, R> for &'a RangeMOC2Elem<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
   type It1 = RangeRefMocIter<'a, T, Q>;
   type It2 = RangeRefMocIter<'a, U, R>;
-  fn range_mocs_it(self) -> (Self::It1,  Self::It2)  {
-    ((&self.moc_l).into_range_moc_iter(), (&self.moc_r).into_range_moc_iter())
+  fn range_mocs_it(self) -> (Self::It1, Self::It2) {
+    (
+      (&self.moc_l).into_range_moc_iter(),
+      (&self.moc_r).into_range_moc_iter(),
+    )
   }
 }
 
-
 impl<T, Q, U, R> CellMOC2ElemIt<T, Q, U, R> for RangeMOC2Elem<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
-  type It1 = CellMOCIteratorFromRanges<T, Q, RangeMocIter<T, Q>> ;
+  type It1 = CellMOCIteratorFromRanges<T, Q, RangeMocIter<T, Q>>;
   type It2 = CellMOCIteratorFromRanges<U, R, RangeMocIter<U, R>>;
-  fn cell_mocs_it(self) -> (Self::It1,  Self::It2)  {
-    (self.moc_l.into_range_moc_iter().cells(), self.moc_r.into_range_moc_iter().cells())
+  fn cell_mocs_it(self) -> (Self::It1, Self::It2) {
+    (
+      self.moc_l.into_range_moc_iter().cells(),
+      self.moc_r.into_range_moc_iter().cells(),
+    )
   }
 }
 impl<'a, T, Q, U, R> CellMOC2ElemIt<T, Q, U, R> for &'a RangeMOC2Elem<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
-  type It1 = CellMOCIteratorFromRanges<T, Q, RangeRefMocIter<'a, T, Q>> ;
+  type It1 = CellMOCIteratorFromRanges<T, Q, RangeRefMocIter<'a, T, Q>>;
   type It2 = CellMOCIteratorFromRanges<U, R, RangeRefMocIter<'a, U, R>>;
-  fn cell_mocs_it(self) -> (Self::It1,  Self::It2)  {
-    ((&self.moc_l).into_range_moc_iter().cells(), (&self.moc_r).into_range_moc_iter().cells())
+  fn cell_mocs_it(self) -> (Self::It1, Self::It2) {
+    (
+      (&self.moc_l).into_range_moc_iter().cells(),
+      (&self.moc_r).into_range_moc_iter().cells(),
+    )
   }
 }
-
 
 /// A MOC2 made of Range elements
 #[derive(Debug, Clone, PartialEq)]
@@ -156,30 +157,31 @@ pub struct RangeMOC2<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
   depth_max_r: u8, // not in vmoc. Really useful?
   elems: Vec<RangeMOC2Elem<T, Q, U, R>>,
 }
-impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
-  
+impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2<T, Q, U, R> {
   pub fn new(depth_max_l: u8, depth_max_r: u8, elems: Vec<RangeMOC2Elem<T, Q, U, R>>) -> Self {
-    Self { depth_max_l, depth_max_r, elems }
+    Self {
+      depth_max_l,
+      depth_max_r,
+      elems,
+    }
   }
 
   pub fn is_empty(&self) -> bool {
     self.elems.is_empty()
   }
-  
+
   pub fn min_index_left(&self) -> Option<T> {
-    self.elems.first()
-      .and_then(|elem| elem.first_index_left())
+    self.elems.first().and_then(|elem| elem.first_index_left())
   }
 
   pub fn max_index_left(&self) -> Option<T> {
-    self.elems.last()
-      .and_then(|elem| elem.last_index_left())
+    self.elems.last().and_then(|elem| elem.last_index_left())
   }
 
   pub fn global_range_left(&self) -> Option<Range<T>> {
     match (self.min_index_left(), self.max_index_left()) {
       (Some(min), Some(max)) => Some(min..max),
-      _ => None
+      _ => None,
     }
   }
 
@@ -196,13 +198,12 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
     true
   }
 
-  
   /// From a list of cells in both dim 1 and dim 2.
-  pub fn from_fixed_depth_cells<I: Iterator<Item=(T, U)>>(
+  pub fn from_fixed_depth_cells<I: Iterator<Item = (T, U)>>(
     depth_1: u8,
     depth_2: u8,
     cells_it: I,
-    buf_capacity: Option<usize>
+    buf_capacity: Option<usize>,
   ) -> Self {
     let mut builder = FixedDepthSTMocBuilder::new(depth_1, depth_2, buf_capacity);
     for (cell_1, cell_2) in cells_it {
@@ -212,11 +213,11 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
   }
 
   /// From al list of tuple containing both a range in dim 1 and a cell in dim 2.
-  pub fn from_ranges_and_fixed_depth_cells<I: Iterator<Item=(Range<T>, U)>>(
+  pub fn from_ranges_and_fixed_depth_cells<I: Iterator<Item = (Range<T>, U)>>(
     depth_1: u8,
     depth_2: u8,
     cells_it: I,
-    buf_capacity: Option<usize>
+    buf_capacity: Option<usize>,
   ) -> Self {
     let mut builder = RangesAndFixedDepthCellsSTMocBuilder::new(depth_1, depth_2, buf_capacity);
     for (range_1, cell_2) in cells_it {
@@ -224,7 +225,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
     }
     builder.into_moc()
   }
-  
+
   /// The total number of ranges in both dimensions
   pub fn compute_n_ranges(&self) -> u64 {
     self.elems.iter().map(|e| e.n_ranges()).sum()
@@ -232,24 +233,26 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
 
   /// The values are the values at Q::MAX_DEPTH and R::MAX_DEPTH respectively
   pub fn contains_val(&self, val_left: &T, val_right: &U) -> bool {
-    let comp_res = self.elems.binary_search_by(
-      |elem| match (elem.moc_l.first_index(), elem.moc_l.last_index()) {
-        (Some(start), Some(end)) => if *val_left < start {
-          Ordering::Less
-        } else if *val_left >= end{
-          Ordering::Greater
-        } else {
-          Ordering::Equal
-        },
+    let comp_res = self.elems.binary_search_by(|elem| {
+      match (elem.moc_l.first_index(), elem.moc_l.last_index()) {
+        (Some(start), Some(end)) => {
+          if *val_left < start {
+            Ordering::Less
+          } else if *val_left >= end {
+            Ordering::Greater
+          } else {
+            Ordering::Equal
+          }
+        }
         _ => Ordering::Less,
       }
-    );
+    });
     match comp_res {
-      Ok(i) => self.elems[i].contains_val(val_left, val_right), 
-      _ => false
+      Ok(i) => self.elems[i].contains_val(val_left, val_right),
+      _ => false,
     }
   }
-  
+
   /// So far the internal code resort to the code to perform operation on iterator.
   /// TODO: make a more performan code based on the particular RangeMOC2 type?
   pub fn into_or(self, rhs: RangeMOC2<T, Q, U, R>) -> RangeMOC2<T, Q, U, R> {
@@ -263,30 +266,29 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>  RangeMOC2<T, Q, U, R> {
 }
 
 impl RangeMOC2<u64, Time<u64>, u64, Hpx<u64>> {
-
-  pub fn from_time_and_coos<I: Iterator<Item=(u64, f64, f64)>>(
-    depth_time: u8, 
-    depth_hpx: u8, 
-    val_it: I, 
-    buf_capacity: Option<usize>
+  pub fn from_time_and_coos<I: Iterator<Item = (u64, f64, f64)>>(
+    depth_time: u8,
+    depth_hpx: u8,
+    val_it: I,
+    buf_capacity: Option<usize>,
   ) -> Self {
     let layer = healpix::nested::get(depth_hpx);
     Self::from_fixed_depth_cells(
-      depth_time, depth_hpx,
-      val_it.map(move |(us_since_jd0, lon_rad, lat_rad)| (us_since_jd0, layer.hash(lon_rad, lat_rad))),
-      buf_capacity
+      depth_time,
+      depth_hpx,
+      val_it
+        .map(move |(us_since_jd0, lon_rad, lat_rad)| (us_since_jd0, layer.hash(lon_rad, lat_rad))),
+      buf_capacity,
     )
   }
-
 }
 
-
 impl<T, Q, U, R> HasTwoMaxDepth for RangeMOC2<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
   fn depth_max_1(&self) -> u8 {
     self.depth_max_l
@@ -296,42 +298,48 @@ impl<T, Q, U, R> HasTwoMaxDepth for RangeMOC2<T, Q, U, R>
   }
 }
 impl<T, Q, U, R> ZSorted for RangeMOC2<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 impl<T, Q, U, R> NonOverlapping for RangeMOC2<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 impl<T, Q, U, R> MOC2Properties for RangeMOC2<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 
 /// Iterator taking the ownership of a MOC2 made of Range elements
 pub struct RangeMoc2Iter<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
   depth_max_l: u8,
   depth_max_r: u8,
-  iter: IntoIter<RangeMOC2Elem<T, Q, U, R>>
+  iter: IntoIter<RangeMOC2Elem<T, Q, U, R>>,
 }
 impl<T, Q, U, R> HasTwoMaxDepth for RangeMoc2Iter<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
   fn depth_max_1(&self) -> u8 {
     self.depth_max_l
@@ -341,29 +349,35 @@ impl<T, Q, U, R> HasTwoMaxDepth for RangeMoc2Iter<T, Q, U, R>
   }
 }
 impl<T, Q, U, R> ZSorted for RangeMoc2Iter<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 impl<T, Q, U, R> NonOverlapping for RangeMoc2Iter<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 impl<T, Q, U, R> MOC2Properties for RangeMoc2Iter<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 impl<T, Q, U, R> Iterator for RangeMoc2Iter<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
   type Item = RangeMOC2Elem<T, Q, U, R>;
   fn next(&mut self) -> Option<Self::Item> {
@@ -371,66 +385,78 @@ impl<T, Q, U, R> Iterator for RangeMoc2Iter<T, Q, U, R>
   }
 }
 
-
-impl<T, Q, U, R> RangeMOC2Iterator<
-  T, Q, RangeMocIter<T, Q>,
-  U, R, RangeMocIter<U, R>,
-  RangeMOC2Elem<T, Q, U, R>
-> for RangeMoc2Iter<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> { }
+impl<T, Q, U, R>
+  RangeMOC2Iterator<T, Q, RangeMocIter<T, Q>, U, R, RangeMocIter<U, R>, RangeMOC2Elem<T, Q, U, R>>
+  for RangeMoc2Iter<T, Q, U, R>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 
 impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>
-RangeMOC2IntoIterator<
-  T, Q, RangeMocIter<T, Q>,
-  U, R, RangeMocIter<U, R>,
-  RangeMOC2Elem<T, Q, U, R>
-> for RangeMOC2<T, Q, U, R> {
-  
+  RangeMOC2IntoIterator<
+    T,
+    Q,
+    RangeMocIter<T, Q>,
+    U,
+    R,
+    RangeMocIter<U, R>,
+    RangeMOC2Elem<T, Q, U, R>,
+  > for RangeMOC2<T, Q, U, R>
+{
   type IntoRangeMOC2Iter = RangeMoc2Iter<T, Q, U, R>;
-  
+
   fn into_range_moc2_iter(self) -> Self::IntoRangeMOC2Iter {
     RangeMoc2Iter {
       depth_max_l: self.depth_max_l,
       depth_max_r: self.depth_max_r,
-      iter: self.elems.into_iter()
+      iter: self.elems.into_iter(),
     }
   }
 }
 
-
-impl<T, Q, U, R> CellMOC2Iterator<
-  T, Q, CellMOCIteratorFromRanges<T, Q, RangeMocIter<T, Q>>,
-  U, R, CellMOCIteratorFromRanges<U, R, RangeMocIter<U, R>>,
-  RangeMOC2Elem<T, Q, U, R>
-> for RangeMoc2Iter<T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> { }
+impl<T, Q, U, R>
+  CellMOC2Iterator<
+    T,
+    Q,
+    CellMOCIteratorFromRanges<T, Q, RangeMocIter<T, Q>>,
+    U,
+    R,
+    CellMOCIteratorFromRanges<U, R, RangeMocIter<U, R>>,
+    RangeMOC2Elem<T, Q, U, R>,
+  > for RangeMoc2Iter<T, Q, U, R>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 
 impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>
-CellMOC2IntoIterator<
-  T, Q, CellMOCIteratorFromRanges<T, Q, RangeMocIter<T, Q>>,
-  U, R, CellMOCIteratorFromRanges<U, R, RangeMocIter<U, R>>,
-  RangeMOC2Elem<T, Q, U, R>
-> for RangeMOC2<T, Q, U, R> {
-
+  CellMOC2IntoIterator<
+    T,
+    Q,
+    CellMOCIteratorFromRanges<T, Q, RangeMocIter<T, Q>>,
+    U,
+    R,
+    CellMOCIteratorFromRanges<U, R, RangeMocIter<U, R>>,
+    RangeMOC2Elem<T, Q, U, R>,
+  > for RangeMOC2<T, Q, U, R>
+{
   type IntoCellMOC2Iter = RangeMoc2Iter<T, Q, U, R>;
 
   fn into_cell_moc2_iter(self) -> Self::IntoCellMOC2Iter {
     RangeMoc2Iter {
       depth_max_l: self.depth_max_l,
       depth_max_r: self.depth_max_r,
-      iter: self.elems.into_iter()
+      iter: self.elems.into_iter(),
     }
   }
 }
-
 
 /*impl<T, Q, U, R> CellMOC2Iterator<
   T, Q, CellMOCIteratorFromRanges<T, Q, RangeMocIter<T, Q>>,
@@ -443,12 +469,12 @@ CellMOC2IntoIterator<
     U: Idx,
     R: MocQty<U> {}
 
-impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> 
+impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>
 CellMOC2IntoIterator<
   T, Q, CellMOCIteratorFromRanges<T, Q, RangeMocIter<T, Q>>,
   U, U, CellMOCIteratorFromRanges<U, R, RangeMocIter<U, R>>,
   RangeMOC2ElemIt<
-    T, Q, U, R, 
+    T, Q, U, R,
     It1=CellMOCIteratorFromRanges<T, Q, RangeMocIter<T, Q>>,
     It2=CellMOCIteratorFromRanges<U, R, RangeMocIter<U, R>>
   >
@@ -466,22 +492,22 @@ CellMOC2IntoIterator<
 
 /// Iterator borrowing a MOC2 made of Range elements
 pub struct RangeRefMoc2Iter<'a, T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
   depth_max_l: u8,
   depth_max_r: u8,
-  iter: slice::Iter<'a, RangeMOC2Elem<T, Q, U, R>>
+  iter: slice::Iter<'a, RangeMOC2Elem<T, Q, U, R>>,
 }
 impl<'a, T, Q, U, R> HasTwoMaxDepth for RangeRefMoc2Iter<'a, T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
   fn depth_max_1(&self) -> u8 {
     self.depth_max_l
@@ -491,29 +517,35 @@ impl<'a, T, Q, U, R> HasTwoMaxDepth for RangeRefMoc2Iter<'a, T, Q, U, R>
   }
 }
 impl<'a, T, Q, U, R> ZSorted for RangeRefMoc2Iter<'a, T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 impl<'a, T, Q, U, R> NonOverlapping for RangeRefMoc2Iter<'a, T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 impl<'a, T, Q, U, R> MOC2Properties for RangeRefMoc2Iter<'a, T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 impl<'a, T, Q, U, R> Iterator for RangeRefMoc2Iter<'a, T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
 {
   type Item = &'a RangeMOC2Elem<T, Q, U, R>;
   fn next(&mut self) -> Option<Self::Item> {
@@ -521,29 +553,41 @@ impl<'a, T, Q, U, R> Iterator for RangeRefMoc2Iter<'a, T, Q, U, R>
   }
 }
 
-impl<'a, T, Q, U, R> RangeMOC2Iterator<
-  T, Q, RangeRefMocIter<'a, T, Q>,
-  U, R, RangeRefMocIter<'a, U, R>,
-  &'a RangeMOC2Elem<T, Q, U, R>
-> for RangeRefMoc2Iter<'a, T, Q, U, R>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    U: Idx,
-    R: MocQty<U> {}
+impl<'a, T, Q, U, R>
+  RangeMOC2Iterator<
+    T,
+    Q,
+    RangeRefMocIter<'a, T, Q>,
+    U,
+    R,
+    RangeRefMocIter<'a, U, R>,
+    &'a RangeMOC2Elem<T, Q, U, R>,
+  > for RangeRefMoc2Iter<'a, T, Q, U, R>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  U: Idx,
+  R: MocQty<U>,
+{
+}
 
 impl<'a, T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>
-RangeMOC2IntoIterator<
-  T, Q, RangeRefMocIter<'a, T, Q>,
-  U, R, RangeRefMocIter<'a, U, R>,
-  &'a RangeMOC2Elem<T, Q, U, R>
-> for &'a RangeMOC2<T, Q, U, R> {
+  RangeMOC2IntoIterator<
+    T,
+    Q,
+    RangeRefMocIter<'a, T, Q>,
+    U,
+    R,
+    RangeRefMocIter<'a, U, R>,
+    &'a RangeMOC2Elem<T, Q, U, R>,
+  > for &'a RangeMOC2<T, Q, U, R>
+{
   type IntoRangeMOC2Iter = RangeRefMoc2Iter<'a, T, Q, U, R>;
   fn into_range_moc2_iter(self) -> Self::IntoRangeMOC2Iter {
     RangeRefMoc2Iter {
       depth_max_l: self.depth_max_l,
       depth_max_r: self.depth_max_r,
-      iter: self.elems.iter()
+      iter: self.elems.iter(),
     }
   }
 }

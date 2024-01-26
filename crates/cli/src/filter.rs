@@ -1,20 +1,20 @@
+use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
-use std::error::Error;
 use std::marker::Send;
+use std::path::PathBuf;
 
 use num::PrimInt;
 use rayon::prelude::*;
 use structopt::StructOpt;
 
-use moclib::idx::Idx;
-use moclib::qty::{MocQty, Hpx, Time};
-use moclib::moc::range::RangeMOC;
 use moclib::deser::fits::{MocIdxType, MocQtyType};
+use moclib::idx::Idx;
+use moclib::moc::range::RangeMOC;
+use moclib::qty::{Hpx, MocQty, Time};
 
-use super::InputTime;
 use super::input::from_fits_file;
+use super::InputTime;
 
 #[derive(StructOpt, Debug)]
 pub struct CsvArgs {
@@ -29,14 +29,13 @@ pub struct CsvArgs {
   delimiter: char,
 }
 impl CsvArgs {
-  
   fn posfilter_input_dispatch<T: Idx>(
     &self,
     pos_filter: &PositionFilter,
-    moc: RangeMOC<T, Hpx<T>>
+    moc: RangeMOC<T, Hpx<T>>,
   ) -> Result<(), Box<dyn Error>> {
     let path = self.input_csv.clone().unwrap_or_else(|| PathBuf::from("-"));
-    if path ==  PathBuf::from("-") {
+    if path == PathBuf::from("-") {
       let stdin = std::io::stdin();
       pos_filter.filter_from(BufReader::new(stdin), moc)
     } else {
@@ -48,10 +47,10 @@ impl CsvArgs {
   fn timefilter_input_dispatch<T: Idx>(
     &self,
     time_filter: &TimeFilter,
-    moc: RangeMOC<T, Time<T>>
+    moc: RangeMOC<T, Time<T>>,
   ) -> Result<(), Box<dyn Error>> {
     let path = self.input_csv.clone().unwrap_or_else(|| PathBuf::from("-"));
-    if path ==  PathBuf::from("-") {
+    if path == PathBuf::from("-") {
       let stdin = std::io::stdin();
       time_filter.filter_from(BufReader::new(stdin), moc)
     } else {
@@ -102,28 +101,29 @@ pub struct PositionFilter {
 impl PositionFilter {
   pub fn exec(&self) -> Result<(), Box<dyn Error>> {
     match from_fits_file(self.input_moc.clone())? {
-      MocIdxType::U16(moc) =>
-        match moc {
-          MocQtyType::Hpx(moc) => self.filter(moc.collect()),
-          _ => Err(String::from("Input MOC must be a Spatial MOC.").into()),
-        },
-      MocIdxType::U32(moc) =>
-        match moc {
-          MocQtyType::Hpx(moc) => self.filter(moc.collect()),
-          _ => Err(String::from("Input MOC must be a Spatial MOC.").into()),
-        },
-      MocIdxType::U64(moc) =>
-        match moc {
-          MocQtyType::Hpx(moc) => self.filter(moc.collect()),
-          _ => Err(String::from("Input MOC must be a Spatial MOC.").into()),
-        },
+      MocIdxType::U16(moc) => match moc {
+        MocQtyType::Hpx(moc) => self.filter(moc.collect()),
+        _ => Err(String::from("Input MOC must be a Spatial MOC.").into()),
+      },
+      MocIdxType::U32(moc) => match moc {
+        MocQtyType::Hpx(moc) => self.filter(moc.collect()),
+        _ => Err(String::from("Input MOC must be a Spatial MOC.").into()),
+      },
+      MocIdxType::U64(moc) => match moc {
+        MocQtyType::Hpx(moc) => self.filter(moc.collect()),
+        _ => Err(String::from("Input MOC must be a Spatial MOC.").into()),
+      },
     }
   }
 
   fn filter<T: Idx>(&self, moc: RangeMOC<T, Hpx<T>>) -> Result<(), Box<dyn Error>> {
     self.csv_args.posfilter_input_dispatch(self, moc)
   }
-  fn filter_from<T: Idx, R: BufRead + Send>(&self, reader: R, moc: RangeMOC<T, Hpx<T>>) -> Result<(), Box<dyn Error>> {
+  fn filter_from<T: Idx, R: BufRead + Send>(
+    &self,
+    reader: R,
+    moc: RangeMOC<T, Hpx<T>>,
+  ) -> Result<(), Box<dyn Error>> {
     let sep = self.csv_args.delimiter;
     let mut it = reader.lines().peekable();
     // Consume and echo starting comments
@@ -157,7 +157,7 @@ impl PositionFilter {
     };
     // We can start the job
     let layer = healpix::nested::get(moc.depth_max());
-    // WARNING: THIS WILL NOT WORK IF MOC CONTAINS DEPTH > 29!! 
+    // WARNING: THIS WILL NOT WORK IF MOC CONTAINS DEPTH > 29!!
     let shift = Hpx::<u64>::shift_from_depth_max(moc.depth_max()) as u32;
     match self.n_threads {
       None | Some(1) => {
@@ -169,7 +169,11 @@ impl PositionFilter {
             let lon = split_it.nth(ilon).map(|s| s.parse::<f64>());
             let lat = split_it.nth(olat).map(|s| s.parse::<f64>());
             if let (Some(Ok(lon)), Some(Ok(lat))) = (lon, lat) {
-              let icell = T::from_u64_idx(layer.hash(lon.to_radians(), lat.to_radians()).unsigned_shl(shift));
+              let icell = T::from_u64_idx(
+                layer
+                  .hash(lon.to_radians(), lat.to_radians())
+                  .unsigned_shl(shift),
+              );
               if moc.contains_val(&icell) {
                 println!("{}", line);
               }
@@ -184,78 +188,104 @@ impl PositionFilter {
             let lat = split_it.nth(ilat).map(|s| s.parse::<f64>());
             let lon = split_it.nth(olon).map(|s| s.parse::<f64>());
             if let (Some(Ok(lon)), Some(Ok(lat))) = (lon, lat) {
-              let icell = T::from_u64_idx(layer.hash(lon.to_radians(), lat.to_radians()).unsigned_shl(shift));
+              let icell = T::from_u64_idx(
+                layer
+                  .hash(lon.to_radians(), lat.to_radians())
+                  .unsigned_shl(shift),
+              );
               if moc.contains_val(&icell) {
                 println!("{}", line);
               }
             }
           }
         }
-      },
+      }
       Some(nthread) => {
-        rayon::ThreadPoolBuilder::new().num_threads(nthread as usize).build_global().unwrap();
+        rayon::ThreadPoolBuilder::new()
+          .num_threads(nthread as usize)
+          .build_global()
+          .unwrap();
         let chunk_size = self.chunk_size as usize;
         let mut input: Vec<Result<String, _>> = (&mut it).take(chunk_size).collect();
         let mut output: Vec<String> = Default::default();
         while !input.is_empty() {
           let (next_output, ((), next_input)) = rayon::join(
-            || if ilon < ilat {
-              let olat = ilat - ilon - 1;
-              input.par_iter()
-                .filter_map(|res| res.as_ref().ok())
-                .filter_map(|line| {
-                  let mut split_it = line.split(sep);
-                  let lon = split_it.nth(ilon).map(|s| s.parse::<f64>());
-                  let lat = split_it.nth(olat).map(|s| s.parse::<f64>());
-                  if let (Some(Ok(lon)), Some(Ok(lat))) = (lon, lat) {
-                    let icell = T::from_u64_idx(layer.hash(lon.to_radians(), lat.to_radians()).unsigned_shl(shift));
-                    if moc.contains_val(&icell) {
-                      Some(line.clone())
+            || {
+              if ilon < ilat {
+                let olat = ilat - ilon - 1;
+                input
+                  .par_iter()
+                  .filter_map(|res| res.as_ref().ok())
+                  .filter_map(|line| {
+                    let mut split_it = line.split(sep);
+                    let lon = split_it.nth(ilon).map(|s| s.parse::<f64>());
+                    let lat = split_it.nth(olat).map(|s| s.parse::<f64>());
+                    if let (Some(Ok(lon)), Some(Ok(lat))) = (lon, lat) {
+                      let icell = T::from_u64_idx(
+                        layer
+                          .hash(lon.to_radians(), lat.to_radians())
+                          .unsigned_shl(shift),
+                      );
+                      if moc.contains_val(&icell) {
+                        Some(line.clone())
+                      } else {
+                        None
+                      }
                     } else {
                       None
                     }
-                  } else {
-                    None
-                  }
-                })
-                .collect()
-            } else {
-              // Yeah, code repetition to put a if out of a for loop...
-              let olon = ilon - ilat - 1;
-              input.par_iter()
-                .filter_map(|res| res.as_ref().ok())
-                .filter_map(|line| {
-                  let mut split_it = line.split(sep);
-                  let lat = split_it.nth(ilat).map(|s| s.parse::<f64>());
-                  let lon = split_it.nth(olon).map(|s| s.parse::<f64>());
-                  if let (Some(Ok(lon)), Some(Ok(lat))) = (lon, lat) {
-                    let icell = T::from_u64_idx(layer.hash(lon.to_radians(), lat.to_radians()).unsigned_shl(shift));
-                    if moc.contains_val(&icell) {
-                      Some(line.clone())
+                  })
+                  .collect()
+              } else {
+                // Yeah, code repetition to put a if out of a for loop...
+                let olon = ilon - ilat - 1;
+                input
+                  .par_iter()
+                  .filter_map(|res| res.as_ref().ok())
+                  .filter_map(|line| {
+                    let mut split_it = line.split(sep);
+                    let lat = split_it.nth(ilat).map(|s| s.parse::<f64>());
+                    let lon = split_it.nth(olon).map(|s| s.parse::<f64>());
+                    if let (Some(Ok(lon)), Some(Ok(lat))) = (lon, lat) {
+                      let icell = T::from_u64_idx(
+                        layer
+                          .hash(lon.to_radians(), lat.to_radians())
+                          .unsigned_shl(shift),
+                      );
+                      if moc.contains_val(&icell) {
+                        Some(line.clone())
+                      } else {
+                        None
+                      }
                     } else {
                       None
                     }
-                  } else {
-                    None
-                  }
-                })
-                .collect()
+                  })
+                  .collect()
+              }
             },
-            || rayon::join(
-              || for line in output { println!("{}", line); }, // write output
-              || (&mut it).take(chunk_size).collect(),        // read new chunk
-            ),
+            || {
+              rayon::join(
+                || {
+                  for line in output {
+                    println!("{}", line);
+                  }
+                }, // write output
+                || (&mut it).take(chunk_size).collect(), // read new chunk
+              )
+            },
           );
           input = next_input;
           output = next_output;
         }
-        for line in output { println!("{}", line); } // write output
-      },
+        for line in output {
+          println!("{}", line);
+        } // write output
+      }
     };
     Ok(())
   }
 }
-
 
 #[derive(StructOpt, Debug)]
 pub struct TimeFilter {
@@ -274,28 +304,29 @@ pub struct TimeFilter {
 impl TimeFilter {
   pub fn exec(&self) -> Result<(), Box<dyn Error>> {
     match from_fits_file(self.input_moc.clone())? {
-      MocIdxType::U16(moc) =>
-        match moc {
-          MocQtyType::Time(moc) => self.filter(moc.collect()),
-          _ => Err(String::from("Input MOC must be a Time MOC.").into()),
-        },
-      MocIdxType::U32(moc) =>
-        match moc {
-          MocQtyType::Time(moc) => self.filter(moc.collect()),
-          _ => Err(String::from("Input MOC must be a Time MOC.").into()),
-        },
-      MocIdxType::U64(moc) =>
-        match moc {
-          MocQtyType::Time(moc) => self.filter(moc.collect()),
-          _ => Err(String::from("Input MOC must be a Time MOC.").into()),
-        },
+      MocIdxType::U16(moc) => match moc {
+        MocQtyType::Time(moc) => self.filter(moc.collect()),
+        _ => Err(String::from("Input MOC must be a Time MOC.").into()),
+      },
+      MocIdxType::U32(moc) => match moc {
+        MocQtyType::Time(moc) => self.filter(moc.collect()),
+        _ => Err(String::from("Input MOC must be a Time MOC.").into()),
+      },
+      MocIdxType::U64(moc) => match moc {
+        MocQtyType::Time(moc) => self.filter(moc.collect()),
+        _ => Err(String::from("Input MOC must be a Time MOC.").into()),
+      },
     }
   }
 
   fn filter<T: Idx>(&self, moc: RangeMOC<T, Time<T>>) -> Result<(), Box<dyn Error>> {
     self.csv_args.timefilter_input_dispatch(self, moc)
   }
-  fn filter_from<T: Idx, R: BufRead + Send>(&self, reader: R, moc: RangeMOC<T, Time<T>>) -> Result<(), Box<dyn Error>> {
+  fn filter_from<T: Idx, R: BufRead + Send>(
+    &self,
+    reader: R,
+    moc: RangeMOC<T, Time<T>>,
+  ) -> Result<(), Box<dyn Error>> {
     let sep = self.csv_args.delimiter;
     let mut it = reader.lines().peekable();
     // Consume and echo starting comments
@@ -327,12 +358,13 @@ impl TimeFilter {
       self.time.parse::<usize>()?
     };
     // We can start the job
-    // WARNING: THIS WILL NOT WORK IF MOC CONTAINS DEPTH > 29!! 
+    // WARNING: THIS WILL NOT WORK IF MOC CONTAINS DEPTH > 29!!
     let shift = Time::<u64>::shift_from_depth_max(moc.depth_max()) as u32;
     for line in it {
       let line = line?;
       let mut split_it = line.split(sep);
-      let icell = split_it.nth(itime)
+      let icell = split_it
+        .nth(itime)
         .and_then(|s| self.time_type.parse(s).ok())
         .map(|tcell| T::from_u64_idx(tcell).unsigned_shl(shift));
       if let Some(icell) = icell {
@@ -344,4 +376,3 @@ impl TimeFilter {
     Ok(())
   }
 }
-

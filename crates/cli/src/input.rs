@@ -1,14 +1,10 @@
-
+use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
-use std::str::{self, FromStr};
 use std::path::{Path, PathBuf};
-use std::error::Error;
+use std::str::{self, FromStr};
 
-use moclib::deser::fits::{MocIdxType, from_fits_ivoa};
-
-
-
+use moclib::deser::fits::{from_fits_ivoa, MocIdxType};
 
 #[derive(Debug)]
 pub enum ReducedInputFormat {
@@ -22,7 +18,10 @@ impl FromStr for ReducedInputFormat {
     match s {
       "fits" => Ok(ReducedInputFormat::Fits),
       "stream" => Ok(ReducedInputFormat::Stream),
-      _ => Err(format!("Unrecognized format '{}'. Expected: 'fits' or 'stream'", s)),
+      _ => Err(format!(
+        "Unrecognized format '{}'. Expected: 'fits' or 'stream'",
+        s
+      )),
     }
   }
 }
@@ -43,7 +42,10 @@ impl FromStr for InputFormat {
       "json" => Ok(InputFormat::Json),
       "fits" => Ok(InputFormat::Fits),
       "stream" => Ok(InputFormat::Stream),
-      _ => Err(format!("Unrecognized format '{}'. Expected: 'ascii, 'json', 'fits' or 'stream'", s)),
+      _ => Err(format!(
+        "Unrecognized format '{}'. Expected: 'ascii, 'json', 'fits' or 'stream'",
+        s
+      )),
     }
   }
 }
@@ -55,7 +57,9 @@ pub fn fmt_from_extension(path: &Path) -> Result<InputFormat, String> {
     Some("json") => Ok(InputFormat::Json),
     Some("ascii") | Some("txt") => Ok(InputFormat::Ascii),
     Some("stream") => Ok(InputFormat::Stream),
-    _ => Err(String::from("Unable to guess the MOC format from the file extension, see options.")),
+    _ => Err(String::from(
+      "Unable to guess the MOC format from the file extension, see options.",
+    )),
   }
 }
 

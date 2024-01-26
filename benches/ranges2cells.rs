@@ -1,19 +1,12 @@
-
 use std::cmp::Ordering;
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, Criterion};
 
-use moc::idx::Idx;
-use moc::qty::{Hpx, MocQty};
 use moc::elem::cell::Cell;
-use moc::elemset::range::{
-  MocRanges,
-  hpx::HpxUniq2DepthIdxIter
-};
-use moc::moc::{
-  RangeMOCIterator, RangeMOCIntoIterator,
-  range::RangeMOC
-};
+use moc::elemset::range::{hpx::HpxUniq2DepthIdxIter, MocRanges};
+use moc::idx::Idx;
+use moc::moc::{range::RangeMOC, RangeMOCIntoIterator, RangeMOCIterator};
+use moc::qty::{Hpx, MocQty};
 
 fn create_ranges() -> RangeMOC<u64, Hpx<u64>> {
   RangeMOC::new(
@@ -23,8 +16,8 @@ fn create_ranges() -> RangeMOC<u64, Hpx<u64>> {
       6..59,
       78..6953,
       12458..55587,
-      55787..65587
-    ])
+      55787..65587,
+    ]),
   )
 }
 
@@ -38,17 +31,20 @@ fn test_new_version<T: Idx, Q: MocQty<T>>(ranges_moc: RangeMOC<T, Q>) -> Vec<Cel
 
 fn test_new_version_ref<T: Idx, Q: MocQty<T>>(ranges_moc: &RangeMOC<T, Q>) -> Vec<Cell<T>> {
   let mut v: Vec<Cell<T>> = ranges_moc.into_range_moc_iter().cells().collect();
-  v.sort_by(
-    |a, b| match a.depth.cmp(&b.depth) {
-      Ordering::Less => Ordering::Less,
-      Ordering::Greater => Ordering::Greater,
-      Ordering::Equal => a.idx.cmp(&b.idx)
-    });
+  v.sort_by(|a, b| match a.depth.cmp(&b.depth) {
+    Ordering::Less => Ordering::Less,
+    Ordering::Greater => Ordering::Greater,
+    Ordering::Equal => a.idx.cmp(&b.idx),
+  });
   v
 }
 
 fn test_new_version_ref_2<T: Idx, Q: MocQty<T>>(ranges_moc: &RangeMOC<T, Q>) -> Vec<T> {
-  let mut v: Vec<T> = ranges_moc.into_range_moc_iter().cells().map(|cell| cell.uniq_hpx()).collect();
+  let mut v: Vec<T> = ranges_moc
+    .into_range_moc_iter()
+    .cells()
+    .map(|cell| cell.uniq_hpx())
+    .collect();
   v.sort_unstable();
   v
 }
@@ -58,15 +54,17 @@ fn bench_ranges2cells(c: &mut Criterion) {
   let mut group = c.benchmark_group("Ranges2Cells");
   let range_moc = create_ranges();
   /*group.bench_with_input(BenchmarkId::new("CDS HEALPix", '1'), &range_moc,
-    |b, moc| b.iter(|| test_new_version(moc)));*/
-  group.bench_function("CDS HEALPix",
-    |b| b.iter(|| test_new_version(create_ranges())));
-  group.bench_function("MOCPy",
-    |b| b.iter(|| test_old_version(create_ranges())));
-  group.bench_function("CDS HEALPix ref and sort",
-    |b| b.iter(|| test_new_version_ref(&range_moc)));
-  group.bench_function("CDS HEALPix ref and sort V2",
-                       |b| b.iter(|| test_new_version_ref_2(&range_moc)));
+  |b, moc| b.iter(|| test_new_version(moc)));*/
+  group.bench_function("CDS HEALPix", |b| {
+    b.iter(|| test_new_version(create_ranges()))
+  });
+  group.bench_function("MOCPy", |b| b.iter(|| test_old_version(create_ranges())));
+  group.bench_function("CDS HEALPix ref and sort", |b| {
+    b.iter(|| test_new_version_ref(&range_moc))
+  });
+  group.bench_function("CDS HEALPix ref and sort V2", |b| {
+    b.iter(|| test_new_version_ref_2(&range_moc))
+  });
 }
 
 criterion_group!(benches, bench_ranges2cells);

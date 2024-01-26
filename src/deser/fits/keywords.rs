@@ -1,14 +1,13 @@
 //! This module contains the MOC specific FITS keywords
 
-use std::str::{self, FromStr};
 use std::fmt;
 use std::slice::ChunksMut;
+use std::str::{self, FromStr};
 
 use crate::deser::fits::{
+  common::{get_keyword, get_str_val_no_quote, parse_uint_val, write_keyword_record},
   error::FitsError,
-  common::{get_str_val_no_quote, get_keyword, parse_uint_val, write_keyword_record},
 };
-
 
 pub trait FitsCard: Sized {
   const KEYWORD: &'static [u8; 8];
@@ -39,17 +38,17 @@ pub trait FitsCard: Sized {
   /// To be called in `specific_parse_value`.
   /// Essentially, it converts &str in String (because once the error is raised, the str in the
   /// read buffer are out-of-scope.
-  fn predefine_val_err(
-    parsed_value: &[u8],
-    expected_values: &[&[u8]],
-  ) -> FitsError {
+  fn predefine_val_err(parsed_value: &[u8], expected_values: &[&[u8]]) -> FitsError {
     FitsError::UnexpectedValue(
       Self::keyword_string(),
-      format!("{:?}", expected_values.iter()
-        .map(|v| unsafe { String::from_utf8_unchecked(v.to_vec()) })
-        .collect::<Vec<String>>()
+      format!(
+        "{:?}",
+        expected_values
+          .iter()
+          .map(|v| unsafe { String::from_utf8_unchecked(v.to_vec()) })
+          .collect::<Vec<String>>()
       ),
-      String::from_utf8_lossy(parsed_value).to_string()
+      String::from_utf8_lossy(parsed_value).to_string(),
     )
   }
 }
@@ -68,12 +67,10 @@ impl FitsCard for MocVers {
       b"1.1" => Ok(MocVers::V1_1),
       b"2.0" => Ok(MocVers::V2_0),
       // b"2.0-freq" => Ok(MocVers::V2_0_Freq),
-      parsed_val => Err(
-        Self::predefine_val_err(
-          parsed_val, 
-          &[b"1.1", b"2.0", /* b"2.0-freq" */]
-        )
-      ),
+      parsed_val => Err(Self::predefine_val_err(
+        parsed_val,
+        &[b"1.1", b"2.0" /* b"2.0-freq" */],
+      )),
     }
   }
 
@@ -104,12 +101,16 @@ impl FitsCard for MocDim {
       b"TIME.SPACE" => Ok(MocDim::TimeSpace),
       b"FREQUENCY" => Ok(MocDim::Frequency),
       b"FREQUENCY.SPACE" => Ok(MocDim::FrequencySpace),
-      parsed_val => Err(
-        Self::predefine_val_err(
-          parsed_val, 
-          &[b"TIME", b"SPACE", b"TIME.SPACE", b"FREQUENCY", b"FREQUENCY.SPACE"]
-        )
-      ),
+      parsed_val => Err(Self::predefine_val_err(
+        parsed_val,
+        &[
+          b"TIME",
+          b"SPACE",
+          b"TIME.SPACE",
+          b"FREQUENCY",
+          b"FREQUENCY.SPACE",
+        ],
+      )),
     }
   }
 
@@ -130,7 +131,7 @@ pub enum Ordering {
   Range,   //      v2.0
   Range29, //  pre v2.0
   Nested,  // skymaps
-  Ring     // skymaps
+  Ring,    // skymaps
 }
 impl FitsCard for Ordering {
   const KEYWORD: &'static [u8; 8] = b"ORDERING";
@@ -142,7 +143,10 @@ impl FitsCard for Ordering {
       b"RANGE29" => Ok(Ordering::Range29),
       b"NESTED" => Ok(Ordering::Nested),
       b"RING" => Ok(Ordering::Ring),
-      parsed_val => Err(Self::predefine_val_err(parsed_val, &[b"NUNIQ", b"RANGE", b"RANGE29", b"NESTED", b"RING"])),
+      parsed_val => Err(Self::predefine_val_err(
+        parsed_val,
+        &[b"NUNIQ", b"RANGE", b"RANGE29", b"NESTED", b"RING"],
+      )),
     }
   }
 
@@ -179,7 +183,7 @@ impl FitsCard for CoordSys {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TimeSys {
   TCB, // TCB
-  JD, // pre V2.0
+  JD,  // pre V2.0
 }
 impl FitsCard for TimeSys {
   const KEYWORD: &'static [u8; 8] = b"TIMESYS ";
@@ -199,7 +203,6 @@ impl FitsCard for TimeSys {
     }
   }
 }
-
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum MocType {
@@ -231,7 +234,10 @@ impl FromStr for MocType {
     match s {
       "IMAGE" => Ok(MocType::Image),
       "CATALOG" => Ok(MocType::Catalog),
-      parsed_val => Err(Self::predefine_val_err(parsed_val.as_bytes(), &[b"IMAGE", b"CATALOG"])),
+      parsed_val => Err(Self::predefine_val_err(
+        parsed_val.as_bytes(),
+        &[b"IMAGE", b"CATALOG"],
+      )),
     }
   }
 }
@@ -263,8 +269,9 @@ impl FitsCard for MocId {
   const KEYWORD: &'static [u8; 8] = b"MOCID   ";
 
   fn specific_parse_value(keyword_record: &[u8]) -> Result<Self, FitsError> {
-    get_str_val_no_quote(keyword_record)
-      .map(|s| MocId { id: String::from_utf8_lossy(s).to_string() })
+    get_str_val_no_quote(keyword_record).map(|s| MocId {
+      id: String::from_utf8_lossy(s).to_string(),
+    })
   }
 
   fn to_fits_value(&self) -> String {
@@ -280,8 +287,9 @@ impl FitsCard for MocTool {
   const KEYWORD: &'static [u8; 8] = b"MOCTOOL ";
 
   fn specific_parse_value(keyword_record: &[u8]) -> Result<Self, FitsError> {
-    get_str_val_no_quote(keyword_record)
-      .map(|s| MocTool { tool: String::from_utf8_lossy(s).to_string() })
+    get_str_val_no_quote(keyword_record).map(|s| MocTool {
+      tool: String::from_utf8_lossy(s).to_string(),
+    })
   }
 
   fn to_fits_value(&self) -> String {
@@ -381,15 +389,13 @@ impl FitsCard for TForm1 {
   }
 
   fn to_fits_value(&self) -> String {
-    String::from(
-      match self {
-        TForm1::OneB => "'1B'",
-        TForm1::OneI => "'1I'",
-        TForm1::OneJ => "'1J'",
-        TForm1::OneK => "'1K'",
-        TForm1::TwoK => "'2K'",
-      }
-    )
+    String::from(match self {
+      TForm1::OneB => "'1B'",
+      TForm1::OneI => "'1I'",
+      TForm1::OneJ => "'1J'",
+      TForm1::OneK => "'1K'",
+      TForm1::TwoK => "'2K'",
+    })
   }
 }
 
@@ -401,8 +407,9 @@ impl FitsCard for TType1 {
   const KEYWORD: &'static [u8; 8] = b"TTYPE1  ";
 
   fn specific_parse_value(keyword_record: &[u8]) -> Result<Self, FitsError> {
-    get_str_val_no_quote(keyword_record)
-      .map(|s| TType1 { ttype: String::from_utf8_lossy(s).to_string() })
+    get_str_val_no_quote(keyword_record).map(|s| TType1 {
+      ttype: String::from_utf8_lossy(s).to_string(),
+    })
   }
 
   fn to_fits_value(&self) -> String {
@@ -410,8 +417,7 @@ impl FitsCard for TType1 {
   }
 }
 
-
-// Healpix skymap specific 
+// Healpix skymap specific
 #[derive(Debug)]
 pub struct Nside {
   pub nside: u32,
@@ -428,53 +434,89 @@ impl FitsCard for Nside {
   }
 }
 
-// Healpix skymap specific 
+// Healpix skymap specific
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum IndexSchema {
   Implicit,
   Explicit,
 }
 impl FitsCard for IndexSchema {
-const KEYWORD: &'static [u8; 8] = b"INDXSCHM";
+  const KEYWORD: &'static [u8; 8] = b"INDXSCHM";
 
-fn specific_parse_value(keyword_record: &[u8]) -> Result<Self, FitsError> {
-  match get_str_val_no_quote(keyword_record)? {
-    b"IMPLICIT" => Ok(IndexSchema::Implicit),
-    b"EXPLICIT" => Ok(IndexSchema::Explicit),
-    parsed_val => Err(Self::predefine_val_err(parsed_val, &[b"IMPLICIT", b"EXPLICIT"])),
+  fn specific_parse_value(keyword_record: &[u8]) -> Result<Self, FitsError> {
+    match get_str_val_no_quote(keyword_record)? {
+      b"IMPLICIT" => Ok(IndexSchema::Implicit),
+      b"EXPLICIT" => Ok(IndexSchema::Explicit),
+      parsed_val => Err(Self::predefine_val_err(
+        parsed_val,
+        &[b"IMPLICIT", b"EXPLICIT"],
+      )),
+    }
+  }
+
+  fn to_fits_value(&self) -> String {
+    String::from(match self {
+      IndexSchema::Implicit => "'IMPLICIT'",
+      IndexSchema::Explicit => "'EXPLICIT'",
+    })
   }
 }
 
-fn to_fits_value(&self) -> String {
-  String::from(
-    match self {
-      IndexSchema::Implicit => "'IMPLICIT'",
-      IndexSchema::Explicit => "'EXPLICIT'",
-    }
-  )
-}
-}
-
-
 // Usse the index in an array of Option(MocKeywords) for fast retrieving of the Card :)
-pub trait MocCard: FitsCard { const INDEX: u8; }
-impl MocCard for MocVers     { const INDEX: u8 = 0; }
-impl MocCard for MocDim      { const INDEX: u8 = 1; }
-impl MocCard for Ordering    { const INDEX: u8 = 2; }
-impl MocCard for CoordSys    { const INDEX: u8 = 3; }
-impl MocCard for TimeSys     { const INDEX: u8 = 4; }
-impl MocCard for MocId       { const INDEX: u8 = 5; }
-impl MocCard for MocTool     { const INDEX: u8 = 6; }
-impl MocCard for MocType     { const INDEX: u8 = 7; }
-impl MocCard for MocOrdS     { const INDEX: u8 = 8; }
-impl MocCard for MocOrdT     { const INDEX: u8 = 9; }
-impl MocCard for MocOrder    { const INDEX: u8 = 10; }
-impl MocCard for PixType     { const INDEX: u8 = 11; }
-impl MocCard for TForm1      { const INDEX: u8 = 12; }
-impl MocCard for TType1      { const INDEX: u8 = 13; }
-impl MocCard for Nside       { const INDEX: u8 = 14; }
-impl MocCard for IndexSchema { const INDEX: u8 = 15; }
-impl MocCard for MocOrdF     { const INDEX: u8 = 16; }
+pub trait MocCard: FitsCard {
+  const INDEX: u8;
+}
+impl MocCard for MocVers {
+  const INDEX: u8 = 0;
+}
+impl MocCard for MocDim {
+  const INDEX: u8 = 1;
+}
+impl MocCard for Ordering {
+  const INDEX: u8 = 2;
+}
+impl MocCard for CoordSys {
+  const INDEX: u8 = 3;
+}
+impl MocCard for TimeSys {
+  const INDEX: u8 = 4;
+}
+impl MocCard for MocId {
+  const INDEX: u8 = 5;
+}
+impl MocCard for MocTool {
+  const INDEX: u8 = 6;
+}
+impl MocCard for MocType {
+  const INDEX: u8 = 7;
+}
+impl MocCard for MocOrdS {
+  const INDEX: u8 = 8;
+}
+impl MocCard for MocOrdT {
+  const INDEX: u8 = 9;
+}
+impl MocCard for MocOrder {
+  const INDEX: u8 = 10;
+}
+impl MocCard for PixType {
+  const INDEX: u8 = 11;
+}
+impl MocCard for TForm1 {
+  const INDEX: u8 = 12;
+}
+impl MocCard for TType1 {
+  const INDEX: u8 = 13;
+}
+impl MocCard for Nside {
+  const INDEX: u8 = 14;
+}
+impl MocCard for IndexSchema {
+  const INDEX: u8 = 15;
+}
+impl MocCard for MocOrdF {
+  const INDEX: u8 = 16;
+}
 
 #[derive(Debug)]
 pub(super) struct MocKeywordsMap {
@@ -484,8 +526,9 @@ impl MocKeywordsMap {
   pub(super) fn new() -> MocKeywordsMap {
     Self {
       entries: [
-        None, None, None, None, None, None, None, None, None, None, 
-        None, None, None, None, None, None, None]
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None,
+      ],
     }
   }
 
@@ -493,7 +536,7 @@ impl MocKeywordsMap {
     self.entries[entry.index()].replace(entry)
   }
 
-  pub(super) fn get<T: MocCard>(&self/*, _phantom: PhantomData<T>*/) -> Option<&MocKeywords> {
+  pub(super) fn get<T: MocCard>(&self /*, _phantom: PhantomData<T>*/) -> Option<&MocKeywords> {
     self.entries[T::INDEX as usize].as_ref()
   }
 
@@ -508,7 +551,7 @@ impl MocKeywordsMap {
     match self.get::<PixType>() {
       Some(MocKeywords::PixType(PixType::Healpix)) => Ok(()),
       None => Err(FitsError::MissingKeyword(PixType::keyword_string())),
-      _ => unreachable!() // since there is only one elem in PixType enum
+      _ => unreachable!(), // since there is only one elem in PixType enum
     }
   }
 
@@ -516,36 +559,40 @@ impl MocKeywordsMap {
     match self.get::<CoordSys>() {
       Some(MocKeywords::CoordSys(CoordSys::ICRS)) => Ok(()),
       None => Err(FitsError::MissingKeyword(CoordSys::keyword_string())),
-      _ => unreachable!() // since there is only one elem in CoorSys enum
+      _ => unreachable!(), // since there is only one elem in CoorSys enum
     }
   }
-  
+
   pub(super) fn check_ordering(&self, expected: Ordering) -> Result<(), FitsError> {
     match self.get::<Ordering>() {
-      Some(MocKeywords::Ordering(actual)) => if *actual == expected {
-        Ok(())
-      } else {
-        Err(FitsError::UnexpectedValue(
-          Ordering::keyword_string(), // keyword
-          expected.to_fits_value(),   // expected
-          actual.to_fits_value()      // actual
-        ))
-      },
+      Some(MocKeywords::Ordering(actual)) => {
+        if *actual == expected {
+          Ok(())
+        } else {
+          Err(FitsError::UnexpectedValue(
+            Ordering::keyword_string(), // keyword
+            expected.to_fits_value(),   // expected
+            actual.to_fits_value(),     // actual
+          ))
+        }
+      }
       _ => Err(FitsError::MissingKeyword(Ordering::keyword_string())),
     }
   }
 
   pub(super) fn check_index_schema(&self, expected: IndexSchema) -> Result<(), FitsError> {
     match self.get::<IndexSchema>() {
-      Some(MocKeywords::IndexSchema(actual)) => if *actual == expected {
-        Ok(())
-      } else {
-        Err(FitsError::UnexpectedValue(
-          IndexSchema::keyword_string(), // keyword
-          expected.to_fits_value(),      // expected
-          actual.to_fits_value()         // actual
-        ))
-      },
+      Some(MocKeywords::IndexSchema(actual)) => {
+        if *actual == expected {
+          Ok(())
+        } else {
+          Err(FitsError::UnexpectedValue(
+            IndexSchema::keyword_string(), // keyword
+            expected.to_fits_value(),      // expected
+            actual.to_fits_value(),        // actual
+          ))
+        }
+      }
       _ => Err(FitsError::MissingKeyword(Ordering::keyword_string())),
     }
   }
@@ -567,17 +614,14 @@ pub enum MocKeywords {
   MOCOrder(MocOrder), // v1.1
   PixType(PixType),   // v1.1
   // BINTABLE specific
-  TForm1(TForm1),     // bintable
-  TType1(TType1),     // bintable
+  TForm1(TForm1), // bintable
+  TType1(TType1), // bintable
   // Skymap speicific
-  Nside(Nside),            // Skymap
-  IndexSchema(IndexSchema) // Skymap
+  Nside(Nside),             // Skymap
+  IndexSchema(IndexSchema), // Skymap
 }
-impl MocKeywords  {
-
-  pub(super) fn is_moc_kw(keyword_record: &[u8])
-    -> Option<Result<Self, FitsError>>
-  {
+impl MocKeywords {
+  pub(super) fn is_moc_kw(keyword_record: &[u8]) -> Option<Result<Self, FitsError>> {
     // I have not yet found how to match on the FitsCard::KEYWORD associated constant :o/
     match get_keyword(keyword_record) {
       b"MOCVERS " => Some(MocVers::parse_value(keyword_record).map(MocKeywords::MOCVers)),
@@ -654,7 +698,7 @@ impl MocKeywords  {
   }
 
   pub(super) fn keyword_str(&self) -> &str {
-    unsafe{ str::from_utf8_unchecked(self.keyword()) }.trim_end()
+    unsafe { str::from_utf8_unchecked(self.keyword()) }.trim_end()
   }
 
   fn write_keyword_record(&self, keyword_record: &mut [u8]) -> Result<(), FitsError> {

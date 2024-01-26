@@ -1,5 +1,5 @@
 //! MOC storage, protected from concurrent access.
-//! The purpose is to be used this common storage in MOCWasm, MOCSet and MOCGui 
+//! The purpose is to be used this common storage in MOCWasm, MOCSet and MOCGui
 //! to store MOC in memory on the Rust side.
 //!
 //! # Note
@@ -9,73 +9,67 @@
 //! (v0.11.4) is still experimental according to the README, and the development does not seem to be
 //! very active.
 
-
-use std::{fs::{self, File}, ops::Range, path::Path, io::{Cursor, BufRead, BufReader}, convert};
+use std::{
+  convert,
+  fs::{self, File},
+  io::{BufRead, BufReader, Cursor},
+  ops::Range,
+  path::Path,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::iter::{
-  ParallelIterator, IndexedParallelIterator,
-  IntoParallelIterator, IntoParallelRefMutIterator,
+  IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 
 use crate::{
-  idx::Idx,
-  qty::{MocQty, Hpx, Time, Frequency},
-  elem::valuedcell::valued_cells_to_moc_with_opt,
-  elemset::range::HpxRanges,
-  moc::{
-    CellMOCIterator, CellMOCIntoIterator,
-    RangeMOCIterator,
-    CellOrCellRangeMOCIterator, CellOrCellRangeMOCIntoIterator,
-    range::RangeMOC,
-  },
-  moc2d::{
-    RangeMOC2Iterator, RangeMOC2IntoIterator,
-    CellMOC2IntoIterator,
-    CellOrCellRangeMOC2IntoIterator,
-  },
-  hpxranges2d::TimeSpaceMoc,
   deser::{
     ascii::{from_ascii_ivoa, moc2d_from_ascii_ivoa},
-    json::{from_json_aladin, cellmoc2d_from_json_aladin},
-    img::to_img_default,
     fits::{
-      from_fits_ivoa, MocIdxType,
-      multiordermap::from_fits_multiordermap,
-      skymap::from_fits_skymap,
+      from_fits_ivoa, multiordermap::from_fits_multiordermap, skymap::from_fits_skymap, MocIdxType,
     },
+    img::to_img_default,
+    json::{cellmoc2d_from_json_aladin, from_json_aladin},
     stcs::stcs2moc,
   },
+  elem::valuedcell::valued_cells_to_moc_with_opt,
+  elemset::range::HpxRanges,
+  hpxranges2d::TimeSpaceMoc,
+  idx::Idx,
+  moc::{
+    range::RangeMOC, CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIntoIterator,
+    CellOrCellRangeMOCIterator, RangeMOCIterator,
+  },
+  moc2d::{
+    CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator, RangeMOC2IntoIterator, RangeMOC2Iterator,
+  },
+  qty::{Frequency, Hpx, MocQty, Time},
 };
 
 pub mod common;
 mod load;
-mod store;
 mod op1;
 mod op2;
 mod opn;
+mod store;
 
 use self::{
   common::{
-    PI, HALF_PI, MocQType,
-    InternalMoc, SMOC, TMOC, FMOC, STMOC,
-    check_depth, lon_deg2rad, lat_deg2rad,
+    check_depth, lat_deg2rad, lon_deg2rad, InternalMoc, MocQType, FMOC, HALF_PI, PI, SMOC, STMOC,
+    TMOC,
   },
   load::{
-    from_fits_gen, from_fits_u64,
-    smoc_from_fits_gen, tmoc_from_fits_gen, fmoc_from_fits_gen,
-    stmoc_from_fits_u64
+    fmoc_from_fits_gen, from_fits_gen, from_fits_u64, smoc_from_fits_gen, stmoc_from_fits_u64,
+    tmoc_from_fits_gen,
   },
   op1::{
-    Op1, Op1MultiRes,
-    op1_count_split, op1_1st_axis_min, op1_1st_axis_max,
-    op1_flatten_to_moc_depth, op1_flatten_to_depth,
-    op1_moc_barycenter, op1_moc_largest_distance_from_coo_to_moc_vertices
+    op1_1st_axis_max, op1_1st_axis_min, op1_count_split, op1_flatten_to_depth,
+    op1_flatten_to_moc_depth, op1_moc_barycenter,
+    op1_moc_largest_distance_from_coo_to_moc_vertices, Op1, Op1MultiRes,
   },
   op2::Op2,
   opn::OpN,
 };
-
 
 /// Number of microseconds in a 24h day.
 const JD_TO_USEC: f64 = (24_u64 * 60 * 60 * 1_000_000) as f64;
@@ -93,8 +87,9 @@ pub struct U64MocStore;
 // * fill holes
 
 impl U64MocStore {
-
-  pub fn get_global_store() -> &'static Self { &GLOBAL_STORE }
+  pub fn get_global_store() -> &'static Self {
+    &GLOBAL_STORE
+  }
 
   pub fn insert_smoc(&self, moc: SMOC) -> Result<usize, String> {
     store::add(moc)
@@ -113,17 +108,17 @@ impl U64MocStore {
   }
 
   pub fn new_empty_smoc(&self, depth: u8) -> Result<usize, String> {
-    let moc = RangeMOC::<u64, Hpx::<u64>>::new_empty(depth);
+    let moc = RangeMOC::<u64, Hpx<u64>>::new_empty(depth);
     store::add(moc)
   }
 
   pub fn new_empty_tmoc(&self, depth: u8) -> Result<usize, String> {
-    let moc = RangeMOC::<u64, Time::<u64>>::new_empty(depth);
+    let moc = RangeMOC::<u64, Time<u64>>::new_empty(depth);
     store::add(moc)
   }
 
   pub fn new_empty_fmoc(&self, depth: u8) -> Result<usize, String> {
-    let moc = RangeMOC::<u64, Frequency::<u64>>::new_empty(depth);
+    let moc = RangeMOC::<u64, Frequency<u64>>::new_empty(depth);
     store::add(moc)
   }
 
@@ -135,58 +130,54 @@ impl U64MocStore {
   pub fn copy(&self, index: usize) -> Result<(), String> {
     store::copy_moc(index).and_then(convert::identity)
   }
-  
+
   /// Remove from the store the MOC at the given index.
   pub fn drop(&self, index: usize) -> Result<(), String> {
     store::drop(index).and_then(convert::identity).map(|_| ())
   }
 
   pub fn drop_smoc(&self, index: usize) -> Result<Option<SMOC>, String> {
-    store::drop(index)?
-      .and_then(|opt_moc|
-        opt_moc.map(|moc|
-          match moc {
-            InternalMoc::Space(moc) => Ok(moc),
-            _ => Err(String::from("MOC at the given index is not a S-MOC"))
-          }
-        ).transpose()
-      )
+    store::drop(index)?.and_then(|opt_moc| {
+      opt_moc
+        .map(|moc| match moc {
+          InternalMoc::Space(moc) => Ok(moc),
+          _ => Err(String::from("MOC at the given index is not a S-MOC")),
+        })
+        .transpose()
+    })
   }
 
   pub fn drop_tmoc(&self, index: usize) -> Result<Option<TMOC>, String> {
-    store::drop(index)?
-      .and_then(|opt_moc|
-        opt_moc.map(|moc|
-          match moc {
-            InternalMoc::Time(moc) => Ok(moc),
-            _ => Err(String::from("MOC at the given index is not a T-MOC"))
-          }
-        ).transpose()
-      )
+    store::drop(index)?.and_then(|opt_moc| {
+      opt_moc
+        .map(|moc| match moc {
+          InternalMoc::Time(moc) => Ok(moc),
+          _ => Err(String::from("MOC at the given index is not a T-MOC")),
+        })
+        .transpose()
+    })
   }
 
   pub fn drop_fmoc(&self, index: usize) -> Result<Option<FMOC>, String> {
-    store::drop(index)?
-      .and_then(|opt_moc|
-        opt_moc.map(|moc|
-          match moc {
-            InternalMoc::Frequency(moc) => Ok(moc),
-            _ => Err(String::from("MOC at the given index is not a F-MOC"))
-          }
-        ).transpose()
-      )
+    store::drop(index)?.and_then(|opt_moc| {
+      opt_moc
+        .map(|moc| match moc {
+          InternalMoc::Frequency(moc) => Ok(moc),
+          _ => Err(String::from("MOC at the given index is not a F-MOC")),
+        })
+        .transpose()
+    })
   }
 
   pub fn drop_stmoc(&self, index: usize) -> Result<Option<STMOC>, String> {
-    store::drop(index)?
-      .and_then(|opt_moc|
-        opt_moc.map(|moc|
-          match moc {
-            InternalMoc::TimeSpace(moc) => Ok(moc),
-            _ => Err(String::from("MOC at the given index is not a ST-MOC"))
-          }
-        ).transpose()
-      )
+    store::drop(index)?.and_then(|opt_moc| {
+      opt_moc
+        .map(|moc| match moc {
+          InternalMoc::TimeSpace(moc) => Ok(moc),
+          _ => Err(String::from("MOC at the given index is not a ST-MOC")),
+        })
+        .transpose()
+    })
   }
 
   pub fn get_1st_axis_min(&self, index: usize) -> Result<Option<u64>, String> {
@@ -237,18 +228,15 @@ impl U64MocStore {
   }
 
   pub fn get_coverage_percentage(&self, index: usize) -> Result<f64, String> {
-    store::exec_on_one_readonly_moc(
-      index,
-      |internal_moc| internal_moc.get_coverage_percentage().ok_or_else(|| String::from("No coverage available for this type of MOC"))
-    )
+    store::exec_on_one_readonly_moc(index, |internal_moc| {
+      internal_moc
+        .get_coverage_percentage()
+        .ok_or_else(|| String::from("No coverage available for this type of MOC"))
+    })
   }
 
   pub fn eq(&self, left_index: usize, right_index: usize) -> Result<bool, String> {
-    store::exec_on_two_readonly_mocs(
-      left_index,
-      right_index,
-      |l, r| Ok(l == r)
-    )
+    store::exec_on_two_readonly_mocs(left_index, right_index, |l, r| Ok(l == r))
   }
 
   pub fn to_uniq_hpx(&self, index: usize) -> Result<Vec<u64>, String> {
@@ -266,7 +254,7 @@ impl U64MocStore {
   pub fn to_ranges(&self, index: usize) -> Result<Vec<Range<u64>>, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_ranges)
   }
-  
+
   pub fn to_hz_ranges(&self, index: usize) -> Result<Vec<Range<f64>>, String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_hz_ranges)
   }
@@ -276,7 +264,7 @@ impl U64MocStore {
 
   // - from fits //
 
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -286,7 +274,7 @@ impl U64MocStore {
     self.load_from_fits(reader)
   }
 
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -297,18 +285,18 @@ impl U64MocStore {
   pub fn load_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
     from_fits_ivoa(reader)
       .map_err(|e| e.to_string())
-      .and_then(
-        |moc| match moc {
+      .and_then(|moc| {
+        match moc {
           MocIdxType::U16(moc) => from_fits_gen(moc),
           MocIdxType::U32(moc) => from_fits_gen(moc),
           MocIdxType::U64(moc) => from_fits_u64(moc),
-        }.map_err(|e| e.to_string())
-      )
+        }
+        .map_err(|e| e.to_string())
+      })
       .and_then(store::add)
   }
 
-
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -318,7 +306,7 @@ impl U64MocStore {
     self.load_smoc_from_fits(reader)
   }
 
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -329,17 +317,18 @@ impl U64MocStore {
   pub fn load_smoc_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
     from_fits_ivoa(reader)
       .map_err(|e| e.to_string())
-      .and_then(
-        |moc| match moc {
+      .and_then(|moc| {
+        match moc {
           MocIdxType::U16(moc) => smoc_from_fits_gen(moc),
           MocIdxType::U32(moc) => smoc_from_fits_gen(moc),
           MocIdxType::U64(moc) => smoc_from_fits_gen(moc),
-        }.map_err(|e| e.to_string())
-      )
+        }
+        .map_err(|e| e.to_string())
+      })
       .and_then(store::add)
   }
 
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -349,7 +338,7 @@ impl U64MocStore {
     self.load_tmoc_from_fits(reader)
   }
 
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -360,18 +349,18 @@ impl U64MocStore {
   pub fn load_tmoc_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
     from_fits_ivoa(reader)
       .map_err(|e| e.to_string())
-      .and_then(
-        |moc| match moc {
+      .and_then(|moc| {
+        match moc {
           MocIdxType::U16(moc) => tmoc_from_fits_gen(moc),
           MocIdxType::U32(moc) => tmoc_from_fits_gen(moc),
           MocIdxType::U64(moc) => tmoc_from_fits_gen(moc),
-        }.map_err(|e| e.to_string())
-      )
+        }
+        .map_err(|e| e.to_string())
+      })
       .and_then(store::add)
   }
 
-
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -381,7 +370,7 @@ impl U64MocStore {
     self.load_fmoc_from_fits(reader)
   }
 
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -392,17 +381,18 @@ impl U64MocStore {
   pub fn load_fmoc_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
     from_fits_ivoa(reader)
       .map_err(|e| e.to_string())
-      .and_then(
-        |moc| match moc {
+      .and_then(|moc| {
+        match moc {
           MocIdxType::U16(moc) => fmoc_from_fits_gen(moc),
           MocIdxType::U32(moc) => fmoc_from_fits_gen(moc),
           MocIdxType::U64(moc) => fmoc_from_fits_gen(moc),
-        }.map_err(|e| e.to_string())
-      )
+        }
+        .map_err(|e| e.to_string())
+      })
       .and_then(store::add)
   }
 
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -412,7 +402,7 @@ impl U64MocStore {
     self.load_stmoc_from_fits(reader)
   }
 
-  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store 
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
   ///
   /// # Output
   /// - The index in the storage
@@ -423,16 +413,16 @@ impl U64MocStore {
   pub fn load_stmoc_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
     from_fits_ivoa(reader)
       .map_err(|e| e.to_string())
-      .and_then(
-        |moc| match moc {
+      .and_then(|moc| {
+        match moc {
           MocIdxType::U16(_) => Err(String::from("Only u64 ST-MOCs are supported").into()),
           MocIdxType::U32(_) => Err(String::from("Only u64 ST-MOCs are supported").into()),
           MocIdxType::U64(moc) => stmoc_from_fits_u64(moc),
-        }.map_err(|e| e.to_string())
-      )
+        }
+        .map_err(|e| e.to_string())
+      })
       .and_then(store::add)
   }
-
 
   /// Create o S-MOC from a FITS multi-order map plus other parameters.
   /// # Args
@@ -463,8 +453,9 @@ impl U64MocStore {
       !not_strict,
       split,
       revese_recursive_descent,
-    ).map_err(|e| e.to_string())
-      .and_then(store::add)
+    )
+    .map_err(|e| e.to_string())
+    .and_then(store::add)
   }
 
   /// Create o S-MOC from a FITS multi-order map plus other parameters.
@@ -494,14 +485,15 @@ impl U64MocStore {
       !not_strict,
       split,
       revese_recursive_descent,
-    ).map_err(|e| e.to_string())
-      .and_then(store::add)
+    )
+    .map_err(|e| e.to_string())
+    .and_then(store::add)
   }
 
   /// Create o S-MOC from a FITS skymap plus other parameters.
   /// # Args
   /// * `path`: path of the fits file
-  /// * `skip_values_le`: skip cells associated to values lower or equal to the given value 
+  /// * `skip_values_le`: skip cells associated to values lower or equal to the given value
   /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
   /// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
   /// * `asc`: Compute cumulative value from ascending density values instead of descending (often = false).
@@ -530,14 +522,15 @@ impl U64MocStore {
       !not_strict,
       split,
       revese_recursive_descent,
-    ).map_err(|e| e.to_string())
-      .and_then(store::add)
+    )
+    .map_err(|e| e.to_string())
+    .and_then(store::add)
   }
 
   /// Create o S-MOC from a FITS skymap plus other parameters.
   /// # Args
   /// * `data`: binary content of the fits file
-  /// * `skip_values_le`: skip cells associated to values lower or equal to the given value 
+  /// * `skip_values_le`: skip cells associated to values lower or equal to the given value
   /// * `from_threshold`: Cumulative value at which we start putting cells in he MOC (often = 0).
   /// * `to_threshold`: Cumulative value at which we stop putting cells in the MOC.
   /// * `asc`: Compute cumulative value from ascending density values instead of descending (often = false).
@@ -564,8 +557,9 @@ impl U64MocStore {
       !not_strict,
       split,
       revese_recursive_descent,
-    ).map_err(|e| e.to_string())
-      .and_then(store::add)
+    )
+    .map_err(|e| e.to_string())
+    .and_then(store::add)
   }
 
   // - from ascii  //
@@ -594,39 +588,50 @@ impl U64MocStore {
       .and_then(|s| self.load_stmoc_from_ascii(&s))
   }
 
-
   pub fn load_smoc_from_ascii(&self, content: &str) -> Result<usize, String> {
-    from_ascii_ivoa::<u64, Hpx::<u64>>(content)
+    from_ascii_ivoa::<u64, Hpx<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cellcellranges| {
-        let moc = cellcellranges.into_cellcellrange_moc_iter().ranges().into_range_moc();
+        let moc = cellcellranges
+          .into_cellcellrange_moc_iter()
+          .ranges()
+          .into_range_moc();
         store::add(moc)
       })
   }
 
   pub fn load_tmoc_from_ascii(&self, content: &str) -> Result<usize, String> {
-    from_ascii_ivoa::<u64, Time::<u64>>(content)
+    from_ascii_ivoa::<u64, Time<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cellcellranges| {
-        let moc = cellcellranges.into_cellcellrange_moc_iter().ranges().into_range_moc();
+        let moc = cellcellranges
+          .into_cellcellrange_moc_iter()
+          .ranges()
+          .into_range_moc();
         store::add(moc)
       })
   }
 
   pub fn load_fmoc_from_ascii(&self, content: &str) -> Result<usize, String> {
-    from_ascii_ivoa::<u64, Frequency::<u64>>(content)
+    from_ascii_ivoa::<u64, Frequency<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cellcellranges| {
-        let moc = cellcellranges.into_cellcellrange_moc_iter().ranges().into_range_moc();
+        let moc = cellcellranges
+          .into_cellcellrange_moc_iter()
+          .ranges()
+          .into_range_moc();
         store::add(moc)
       })
   }
 
   pub fn load_stmoc_from_ascii(&self, content: &str) -> Result<usize, String> {
-    moc2d_from_ascii_ivoa::<u64, Time::<u64>, u64, Hpx::<u64>>(content)
+    moc2d_from_ascii_ivoa::<u64, Time<u64>, u64, Hpx<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cellrange2| {
-        let moc2 = cellrange2.into_cellcellrange_moc2_iter().into_range_moc2_iter().into_range_moc2();
+        let moc2 = cellrange2
+          .into_cellcellrange_moc2_iter()
+          .into_range_moc2_iter()
+          .into_range_moc2();
         store::add(moc2)
       })
   }
@@ -657,9 +662,8 @@ impl U64MocStore {
       .and_then(|s| self.load_stmoc_from_json(&s))
   }
 
-
   pub fn load_smoc_from_json(&self, content: &str) -> Result<usize, String> {
-    from_json_aladin::<u64, Hpx::<u64>>(content)
+    from_json_aladin::<u64, Hpx<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cellrange2| {
         let moc = cellrange2.into_cell_moc_iter().ranges().into_range_moc();
@@ -668,7 +672,7 @@ impl U64MocStore {
   }
 
   pub fn load_tmoc_from_json(&self, content: &str) -> Result<usize, String> {
-    from_json_aladin::<u64, Time::<u64>>(content)
+    from_json_aladin::<u64, Time<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cells| {
         let moc = cells.into_cell_moc_iter().ranges().into_range_moc();
@@ -677,7 +681,7 @@ impl U64MocStore {
   }
 
   pub fn load_fmoc_from_json(&self, content: &str) -> Result<usize, String> {
-    from_json_aladin::<u64, Frequency::<u64>>(content)
+    from_json_aladin::<u64, Frequency<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cells| {
         let moc = cells.into_cell_moc_iter().ranges().into_range_moc();
@@ -686,10 +690,13 @@ impl U64MocStore {
   }
 
   pub fn load_stmoc_from_json(&self, content: &str) -> Result<usize, String> {
-    cellmoc2d_from_json_aladin::<u64, Time::<u64>, u64, Hpx::<u64>>(content)
+    cellmoc2d_from_json_aladin::<u64, Time<u64>, u64, Hpx<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cell2| {
-        let moc2 = cell2.into_cell_moc2_iter().into_range_moc2_iter().into_range_moc2();
+        let moc2 = cell2
+          .into_cell_moc2_iter()
+          .into_range_moc2_iter()
+          .into_range_moc2();
         store::add(moc2)
       })
   }
@@ -700,11 +707,7 @@ impl U64MocStore {
   /// # Params
   /// * `smoc`: the Spatial MOC to be print;
   /// * `img_y_size`: the `Y` number of pixels in the image, the image size will be `(2*Y, Y)`;
-  pub fn to_png(
-    &self,
-    moc_index: usize,
-    img_y_size: u16,
-  ) -> Result<Box<[u8]>, String> {
+  pub fn to_png(&self, moc_index: usize, img_y_size: u16) -> Result<Box<[u8]>, String> {
     let xsize = (img_y_size << 1) as usize;
     let ysize = img_y_size as usize;
     let op = move |moc: &InternalMoc| match moc {
@@ -714,34 +717,30 @@ impl U64MocStore {
         let mut encoder = png::Encoder::new(&mut buff, xsize as u32, ysize as u32);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
-        encoder.write_header()
+        encoder
+          .write_header()
           .map_err(|e| e.to_string())
-          .and_then(move |mut writer|
-            writer.write_image_data(&data)
-              .map_err(|e| e.to_string())
-          ).map(move |_| buff.into_boxed_slice())
+          .and_then(move |mut writer| writer.write_image_data(&data).map_err(|e| e.to_string()))
+          .map(move |_| buff.into_boxed_slice())
       }
-      _ => Err(String::from("Can't make a PNG for a MOC different from a S-MOC")),
+      _ => Err(String::from(
+        "Can't make a PNG for a MOC different from a S-MOC",
+      )),
     };
     store::exec_on_one_readonly_moc(moc_index, op)
   }
 
   /// Returns an RGBA array (each pixel is made of 4 successive u8: RGBA) using the Mollweide projection.
-  pub fn to_image(
-    &self,
-    moc_index: usize,
-    img_y_size: u16,
-  ) -> Result<Box<[u8]>, String> {
+  pub fn to_image(&self, moc_index: usize, img_y_size: u16) -> Result<Box<[u8]>, String> {
     let xsize = (img_y_size << 1) as usize;
     let ysize = img_y_size as usize;
     let op = move |moc: &InternalMoc| match moc {
       InternalMoc::Space(smoc) => {
-        Ok(
-          to_img_default(smoc, (xsize as u16, ysize as u16), None, None)
-            .into_boxed_slice()
-        )
+        Ok(to_img_default(smoc, (xsize as u16, ysize as u16), None, None).into_boxed_slice())
       }
-      _ => Err(String::from("Can't make an image for a MOC different from a S-MOC")),
+      _ => Err(String::from(
+        "Can't make an image for a MOC different from a S-MOC",
+      )),
     };
     store::exec_on_one_readonly_moc(moc_index, op)
   }
@@ -751,21 +750,20 @@ impl U64MocStore {
   ///
   pub fn to_ascii_str(&self, moc_index: usize, fold: Option<usize>) -> Result<String, String> {
     // from_str creates a copy :o/
-    store::exec_on_one_readonly_moc(
-      moc_index,
-      move |moc| moc.to_ascii_str(fold),
-    )
+    store::exec_on_one_readonly_moc(moc_index, move |moc| moc.to_ascii_str(fold))
   }
 
   /// Write the ASCII serialization of the given MOC in the given path.
   /// # Args
   ///
-  pub fn to_ascii_file<P: AsRef<Path>>(&self, moc_index: usize, destination: P, fold: Option<usize>) -> Result<(), String> {
+  pub fn to_ascii_file<P: AsRef<Path>>(
+    &self,
+    moc_index: usize,
+    destination: P,
+    fold: Option<usize>,
+  ) -> Result<(), String> {
     // from_str creates a copy :o/
-    store::exec_on_one_readonly_moc(
-      moc_index,
-      move |moc| moc.to_ascii_file(destination, fold),
-    )
+    store::exec_on_one_readonly_moc(moc_index, move |moc| moc.to_ascii_file(destination, fold))
   }
 
   // Instead of returning a String, we should probably return a map of (depth, array of indices) values :o/
@@ -773,80 +771,82 @@ impl U64MocStore {
   /// # Args
   ///
   pub fn to_json_str(&self, moc_index: usize, fold: Option<usize>) -> Result<String, String> {
-    store::exec_on_one_readonly_moc(
-      moc_index,
-      move |moc| moc.to_json_str(fold),
-    )
+    store::exec_on_one_readonly_moc(moc_index, move |moc| moc.to_json_str(fold))
   }
 
   /// Write the KSON serialization of the given MOC in the given path.
   /// # Args
   ///
-  pub fn to_json_file<P: AsRef<Path>>(&self, moc_index: usize, destination: P, fold: Option<usize>) -> Result<(), String> {
-    store::exec_on_one_readonly_moc(
-      moc_index,
-      move |moc| moc.to_json_file(destination, fold),
-    )
+  pub fn to_json_file<P: AsRef<Path>>(
+    &self,
+    moc_index: usize,
+    destination: P,
+    fold: Option<usize>,
+  ) -> Result<(), String> {
+    store::exec_on_one_readonly_moc(moc_index, move |moc| moc.to_json_file(destination, fold))
   }
 
   /// Returns in memory the FITS serialization of the MOC of given `name`.
   /// # Args
   /// * `name`: name of the MOC in the internal store
-  /// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard. 
-  pub fn to_fits_buff(&self, moc_index: usize, force_v1_compatibility: Option<bool>) -> Result<Box<[u8]>, String> {
-    store::exec_on_one_readonly_moc(
-      moc_index,
-      move |moc| moc.to_fits_buff(force_v1_compatibility.unwrap_or(false)),
-    )
+  /// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard.
+  pub fn to_fits_buff(
+    &self,
+    moc_index: usize,
+    force_v1_compatibility: Option<bool>,
+  ) -> Result<Box<[u8]>, String> {
+    store::exec_on_one_readonly_moc(moc_index, move |moc| {
+      moc.to_fits_buff(force_v1_compatibility.unwrap_or(false))
+    })
   }
 
   /// Returns in memory the FITS serialization of the MOC of given `name` in the given path.
   /// # Args
   /// * `name`: name of the MOC in the internal store
-  /// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard. 
-  pub fn to_fits_file<P: AsRef<Path>>(&self, moc_index: usize, destination: P, force_v1_compatibility: Option<bool>) -> Result<(), String> {
-    store::exec_on_one_readonly_moc(
-      moc_index,
-      move |moc| moc.to_fits_file(destination, force_v1_compatibility.unwrap_or(false)),
-    )
+  /// * `force_v1_compatibility`: for S-MOCs, force compatibility with Version 1 of the MOC standard.
+  pub fn to_fits_file<P: AsRef<Path>>(
+    &self,
+    moc_index: usize,
+    destination: P,
+    force_v1_compatibility: Option<bool>,
+  ) -> Result<(), String> {
+    store::exec_on_one_readonly_moc(moc_index, move |moc| {
+      moc.to_fits_file(destination, force_v1_compatibility.unwrap_or(false))
+    })
   }
-
-
 
   //////////////////
   // MOC CREATION //
 
-
   // * S-MOC CREATION //
-
 
   pub fn from_hpx_cells<T: Idx, I>(
     &self,
     depth: u8,
     cells_it: I,
-    buf_capacity: Option<usize>
+    buf_capacity: Option<usize>,
   ) -> Result<usize, String>
-    where
-      I: Iterator<Item=(u8, T)>
+  where
+    I: Iterator<Item = (u8, T)>,
   {
     let it = cells_it.map(|(depth, idx)| (depth, idx.to_u64()));
-    let moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_cells(depth, it, buf_capacity);
+    let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_cells(depth, it, buf_capacity);
     store::add(moc)
   }
 
-  pub fn from_hpx_ranges<T: Idx, I>(&self,
-                                    depth: u8,
-                                    ranges_it: I,
-                                    buf_capacity: Option<usize>
+  pub fn from_hpx_ranges<T: Idx, I>(
+    &self,
+    depth: u8,
+    ranges_it: I,
+    buf_capacity: Option<usize>,
   ) -> Result<usize, String>
-    where
-      I: Iterator<Item=Range<T>>
+  where
+    I: Iterator<Item = Range<T>>,
   {
     let it = ranges_it.map(|range| T::to_u64_idx(range.start)..T::to_u64_idx(range.end));
-    let moc: RangeMOC<u64, Hpx::<u64>> = RangeMOC::from_maxdepth_ranges(depth, it, buf_capacity);
+    let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_maxdepth_ranges(depth, it, buf_capacity);
     store::add(moc)
   }
-
 
   /// Create and store a MOC from the given cone.
   ///
@@ -913,7 +913,9 @@ impl U64MocStore {
     } else if r_ext <= 0.0 || PI <= r_ext {
       Err(String::from("External radius must be in ]0, pi["))
     } else if r_ext < r_int {
-      Err(String::from("External radius must be larger than the internal radius"))
+      Err(String::from(
+        "External radius must be larger than the internal radius",
+      ))
     } else {
       let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
       let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_ring(lon, lat, r_int, r_ext, depth, dd);
@@ -959,7 +961,8 @@ impl U64MocStore {
       Err(String::from("Position angle must be in [0, pi["))
     } else {
       let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
-      let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth, dd);
+      let moc: RangeMOC<u64, Hpx<u64>> =
+        RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth, dd);
       store::add(moc)
     }
   }
@@ -992,7 +995,8 @@ impl U64MocStore {
     let lat_min = lat_deg2rad(lat_deg_min)?;
     let lon_max = lon_deg2rad(lon_deg_max)?;
     let lat_max = lat_deg2rad(lat_deg_max)?;
-    let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_zone(lon_min, lat_min, lon_max, lat_max, depth);
+    let moc: RangeMOC<u64, Hpx<u64>> =
+      RangeMOC::from_zone(lon_min, lat_min, lon_max, lat_max, depth);
     store::add(moc)
   }
 
@@ -1050,21 +1054,20 @@ impl U64MocStore {
     complement: bool,
     depth: u8,
   ) -> Result<usize, String>
-    where
-      T: Iterator<Item=(f64, f64)>
+  where
+    T: Iterator<Item = (f64, f64)>,
   {
     check_depth::<Hpx<u64>>(depth)?;
-    let vertices = vertices_it.map(
-      |(lon_deg, lat_deg)| {
+    let vertices = vertices_it
+      .map(|(lon_deg, lat_deg)| {
         let lon = lon_deg2rad(lon_deg)?;
         let lat = lat_deg2rad(lat_deg)?;
         Ok((lon, lat))
-      }
-    ).collect::<Result<Vec<(f64, f64)>, String>>()?;
+      })
+      .collect::<Result<Vec<(f64, f64)>, String>>()?;
     let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_polygon(&vertices, complement, depth);
     store::add(moc)
   }
-
 
   /// Create and store a new MOC from the given list of coordinates (assumed to be equatorial)
   /// # Params
@@ -1074,8 +1077,8 @@ impl U64MocStore {
   /// # Output
   /// - The index in the storage
   pub fn from_coo<T>(&self, depth: u8, coos_deg: T) -> Result<usize, String>
-    where
-      T: Iterator<Item=(f64, f64)>
+  where
+    T: Iterator<Item = (f64, f64)>,
   {
     check_depth::<Hpx<u64>>(depth)?;
     let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_coos(
@@ -1110,8 +1113,8 @@ impl U64MocStore {
     delta_depth: u8,
     coos_and_radius_deg: T,
   ) -> Result<usize, String>
-    where
-      T: Iterator<Item=((f64, f64), f64)>
+  where
+    T: Iterator<Item = ((f64, f64), f64)>,
   {
     check_depth::<Hpx<u64>>(depth)?;
     let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
@@ -1144,8 +1147,8 @@ impl U64MocStore {
     delta_depth: u8,
     coos_and_radius_deg: T,
   ) -> Result<usize, String>
-    where
-      T: Iterator<Item=((f64, f64), f64)>
+  where
+    T: Iterator<Item = ((f64, f64), f64)>,
   {
     check_depth::<Hpx<u64>>(depth)?;
     let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
@@ -1160,7 +1163,6 @@ impl U64MocStore {
     let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_large_cones(depth, dd, coos_rad);
     store::add(moc)
   }
-
 
   /// Create a new S-MOC from the given lists of UNIQ and Values.
   /// # Params
@@ -1186,40 +1188,60 @@ impl U64MocStore {
     revese_recursive_descent: bool,
     uniq_vals: T,
   ) -> Result<usize, String>
-    where
-      T: Iterator<Item=(u64, f64)>
+  where
+    T: Iterator<Item = (u64, f64)>,
   {
     if to_threshold < from_threshold {
-      return Err(String::from("`cumul_from` has to be < to `cumul_to`."))
+      return Err(String::from("`cumul_from` has to be < to `cumul_to`."));
     }
-    let area_per_cell = (PI / 3.0) / (1_u64 << (depth << 1) as u32) as f64;  // = 4pi / (12*4^depth)
+    let area_per_cell = (PI / 3.0) / (1_u64 << (depth << 1) as u32) as f64; // = 4pi / (12*4^depth)
     let ranges: HpxRanges<u64> = if density {
       valued_cells_to_moc_with_opt::<u64, f64>(
         depth,
-        uniq_vals.map(|(uniq, dens)| {
-          let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
-          if cdepth > depth {
-            Err(format!("Too deep cell depth. Expected: <= {}; Actual: {}", depth, cdepth))
-          } else {
-            let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
-            Ok((uniq, dens * n_sub_cells * area_per_cell, dens))
-          }
-        }).collect::<Result<_, String>>()?,
-        from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent,
+        uniq_vals
+          .map(|(uniq, dens)| {
+            let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
+            if cdepth > depth {
+              Err(format!(
+                "Too deep cell depth. Expected: <= {}; Actual: {}",
+                depth, cdepth
+              ))
+            } else {
+              let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
+              Ok((uniq, dens * n_sub_cells * area_per_cell, dens))
+            }
+          })
+          .collect::<Result<_, String>>()?,
+        from_threshold,
+        to_threshold,
+        asc,
+        !not_strict,
+        !split,
+        revese_recursive_descent,
       )
     } else {
       valued_cells_to_moc_with_opt::<u64, f64>(
         depth,
-        uniq_vals.map(|(uniq, val)| {
-          let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
-          if cdepth > depth {
-            Err(format!("Too deep cell depth. Expected: <= {}; Actual: {}", depth, cdepth))
-          } else {
-            let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
-            Ok((uniq, val, val / (n_sub_cells * area_per_cell)))
-          }
-        }).collect::<Result<_, String>>()?,
-        from_threshold, to_threshold, asc, !not_strict, !split, revese_recursive_descent,
+        uniq_vals
+          .map(|(uniq, val)| {
+            let (cdepth, _ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
+            if cdepth > depth {
+              Err(format!(
+                "Too deep cell depth. Expected: <= {}; Actual: {}",
+                depth, cdepth
+              ))
+            } else {
+              let n_sub_cells = (1_u64 << (((depth - cdepth) << 1) as u32)) as f64;
+              Ok((uniq, val, val / (n_sub_cells * area_per_cell)))
+            }
+          })
+          .collect::<Result<_, String>>()?,
+        from_threshold,
+        to_threshold,
+        asc,
+        !not_strict,
+        !split,
+        revese_recursive_descent,
       )
     };
     let moc = RangeMOC::new(depth, ranges);
@@ -1228,14 +1250,14 @@ impl U64MocStore {
 
   /// Create and store a new S-MOC from the given STC-S string.
   /// # WARNING
-  /// * `DIFFERENCE` is interpreted as a symmetrical difference (it is a `MINUS` in the STC standard) 
+  /// * `DIFFERENCE` is interpreted as a symmetrical difference (it is a `MINUS` in the STC standard)
   /// * `Polygon` do not follow the STC-S standard: here self-intersecting polygons are supported
   /// * No implicit conversion: the STC-S will be rejected if
   ///     + the frame is different from `ICRS`
   ///     + the flavor is different from `Spher2`
   ///     + the units are different from `degrees`
-  /// * Time, Spectral and Redshift sub-phrases are ignored 
-  /// 
+  /// * Time, Spectral and Redshift sub-phrases are ignored
+  ///
   /// # Params
   /// * `depth`: MOC maximum depth in `[0, 29]`
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
@@ -1244,36 +1266,31 @@ impl U64MocStore {
   ///
   /// # Output
   /// - The index in the storage
-  pub fn from_stcs(
-    &self,
-    depth: u8,
-    delta_depth: u8,
-    ascii_stcs: &str,
-  ) -> Result<usize, String> {
+  pub fn from_stcs(&self, depth: u8, delta_depth: u8, ascii_stcs: &str) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
-    let moc: RangeMOC<u64, Hpx<u64>> = stcs2moc(depth, Some(dd), ascii_stcs)
-      .map_err(|e| e.to_string())?;
+    let moc: RangeMOC<u64, Hpx<u64>> =
+      stcs2moc(depth, Some(dd), ascii_stcs).map_err(|e| e.to_string())?;
     store::add(moc)
   }
-  
-  
-  // - SMOC MutliOrder
 
+  // - SMOC MutliOrder
 
   // - SMOC SkyMaps
 
-
   // * T-MOC CREATION //
 
-  pub fn from_microsec_since_jd0<T>(&self, depth: u8, microsec_since_jd0_it: T) -> Result<usize, String>
-    where
-      T: Iterator<Item=u64>
+  pub fn from_microsec_since_jd0<T>(
+    &self,
+    depth: u8,
+    microsec_since_jd0_it: T,
+  ) -> Result<usize, String>
+  where
+    T: Iterator<Item = u64>,
   {
     check_depth::<Time<u64>>(depth)?;
-    let moc = RangeMOC::<u64, Time<u64>>::from_microsec_since_jd0(
-      depth, microsec_since_jd0_it, None,
-    );
+    let moc =
+      RangeMOC::<u64, Time<u64>>::from_microsec_since_jd0(depth, microsec_since_jd0_it, None);
     store::add(moc)
   }
 
@@ -1285,54 +1302,61 @@ impl U64MocStore {
   /// # WARNING
   /// Using decimal Julian Days stored on `f64`, the precision does not reach the microsecond
   /// since JD=0.
-  /// In Javascript, there is no `u64` type (integers are stored on the mantissa of 
+  /// In Javascript, there is no `u64` type (integers are stored on the mantissa of
   /// a double -- a `f64` --, which is made of 52 bits).
   /// The other approach is to use a couple of `f64`: one for the integer part of the JD, the
   /// other for the fractional part of the JD.
   /// We will add such a method later if required by users.
   pub fn from_decimal_jd_values<T>(&self, depth: u8, jd: T) -> Result<usize, String>
-    where
-      T: Iterator<Item=f64>
+  where
+    T: Iterator<Item = f64>,
   {
     self.from_microsec_since_jd0(depth, jd.map(|jd| (jd * JD_TO_USEC) as u64))
   }
 
-  pub fn from_microsec_ranges_since_jd0<T>(&self, depth: u8, microsec_ranges_since_jd0_it: T) -> Result<usize, String>
-    where
-      T: Iterator<Item=Range<u64>>
+  pub fn from_microsec_ranges_since_jd0<T>(
+    &self,
+    depth: u8,
+    microsec_ranges_since_jd0_it: T,
+  ) -> Result<usize, String>
+  where
+    T: Iterator<Item = Range<u64>>,
   {
     check_depth::<Time<u64>>(depth)?;
     let moc = RangeMOC::<u64, Time<u64>>::from_microsec_ranges_since_jd0(
-      depth, microsec_ranges_since_jd0_it, None,
+      depth,
+      microsec_ranges_since_jd0_it,
+      None,
     );
     store::add(moc)
   }
 
   pub fn from_decimal_jd_ranges<T>(&self, depth: u8, jd_ranges: T) -> Result<usize, String>
-    where
-      T: Iterator<Item=Range<f64>>
+  where
+    T: Iterator<Item = Range<f64>>,
   {
     self.from_microsec_ranges_since_jd0(
       depth,
-      jd_ranges.map(|Range { start: jd_min, end: jd_max }| (jd_min * JD_TO_USEC) as u64..(jd_max * JD_TO_USEC) as u64),
+      jd_ranges.map(
+        |Range {
+           start: jd_min,
+           end: jd_max,
+         }| (jd_min * JD_TO_USEC) as u64..(jd_max * JD_TO_USEC) as u64,
+      ),
     )
   }
 
   // * F-MOC CREATION //
 
-  pub fn from_fmoc_ranges<T: Idx, I>(
-    &self,
-    depth: u8,
-    ranges_it: I,
-  ) -> Result<usize, String>
-    where
-      I: Iterator<Item=Range<T>>
+  pub fn from_fmoc_ranges<T: Idx, I>(&self, depth: u8, ranges_it: I) -> Result<usize, String>
+  where
+    I: Iterator<Item = Range<T>>,
   {
     let it = ranges_it.map(|range| T::to_u64_idx(range.start)..T::to_u64_idx(range.end));
-    let moc: RangeMOC<u64, Frequency::<u64>> = RangeMOC::from_maxdepth_ranges(depth, it, None);
+    let moc: RangeMOC<u64, Frequency<u64>> = RangeMOC::from_maxdepth_ranges(depth, it, None);
     store::add(moc)
   }
-  
+
   /// Create an store a new F-MOC from the given list of frequencies (Hz).
   ///
   /// # Input
@@ -1342,8 +1366,8 @@ impl U64MocStore {
   /// # Output
   /// - The index in the storage
   pub fn from_hz_values<T>(&self, depth: u8, freq: T) -> Result<usize, String>
-    where
-      T: Iterator<Item=f64>
+  where
+    T: Iterator<Item = f64>,
   {
     check_depth::<Frequency<u64>>(depth)?;
     let moc = RangeMOC::<u64, Frequency<u64>>::from_freq_in_hz(depth, freq, None);
@@ -1359,8 +1383,8 @@ impl U64MocStore {
   /// # Output
   /// - The index in the storage
   pub fn from_hz_ranges<T>(&self, depth: u8, freq_ranges: T) -> Result<usize, String>
-    where
-      T: Iterator<Item=Range<f64>>
+  where
+    T: Iterator<Item = Range<f64>>,
   {
     check_depth::<Frequency<u64>>(depth)?;
     let moc = RangeMOC::<u64, Frequency<u64>>::from_freq_ranges_in_hz(depth, freq_ranges, None);
@@ -1416,14 +1440,33 @@ impl U64MocStore {
     space_depth: u8,
   ) -> Result<usize, String> {
     if time_depth > Time::<u64>::MAX_DEPTH {
-      Err(format!("Time depth must be in [0, {}]", Time::<u64>::MAX_DEPTH))
+      Err(format!(
+        "Time depth must be in [0, {}]",
+        Time::<u64>::MAX_DEPTH
+      ))
     } else if times.len() != lon.len() {
-      Err(format!("Times and longitudes do not have the same size: {} != {}", times.len(), lon.len()))
+      Err(format!(
+        "Times and longitudes do not have the same size: {} != {}",
+        times.len(),
+        lon.len()
+      ))
     } else {
       lonlat2hash(space_depth, lon, lat)
-        .map(|ipix| TimeSpaceMoc::<u64, u64>::create_from_times_positions(
-          times, ipix, time_depth, space_depth,
-        )).and_then(|moc| store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2()))
+        .map(|ipix| {
+          TimeSpaceMoc::<u64, u64>::create_from_times_positions(
+            times,
+            ipix,
+            time_depth,
+            space_depth,
+          )
+        })
+        .and_then(|moc| {
+          store::add(
+            moc
+              .time_space_iter(time_depth, space_depth)
+              .into_range_moc2(),
+          )
+        })
     }
   }
 
@@ -1463,7 +1506,14 @@ impl U64MocStore {
   ) -> Result<usize, String> {
     let times_start = jd2mas_approx(times_start);
     let times_end = jd2mas_approx(times_end);
-    self.create_from_time_ranges_positions(times_start, times_end, time_depth, lon, lat, space_depth)
+    self.create_from_time_ranges_positions(
+      times_start,
+      times_end,
+      time_depth,
+      lon,
+      lat,
+      space_depth,
+    )
   }
 
   /// Create a time-spatial coverage (2D) from a list of sky coordinates
@@ -1500,17 +1550,27 @@ impl U64MocStore {
     space_depth: u8,
   ) -> Result<usize, String> {
     if times_start.len() != lon.len() {
-      Err(format!("Times and coos do not have the same size: {} != {}.", times_start.len(), lon.len()))
+      Err(format!(
+        "Times and coos do not have the same size: {} != {}.",
+        times_start.len(),
+        lon.len()
+      ))
     } else {
       let ipix = lonlat2hash(space_depth, lon, lat)?;
       let times = times2hash(time_depth, times_start, times_end)?;
       let moc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_positions(
-        times, ipix, time_depth, space_depth
+        times,
+        ipix,
+        time_depth,
+        space_depth,
       );
-      store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2())
+      store::add(
+        moc
+          .time_space_iter(time_depth, space_depth)
+          .into_range_moc2(),
+      )
     }
   }
-
 
   /// Create a time-spatial coverage (2D) from a list of cones
   /// and time ranges.
@@ -1537,7 +1597,11 @@ impl U64MocStore {
     let times_start = jd2mas_approx(times_start);
     let times_end = jd2mas_approx(times_end);
     self.from_time_ranges_spatial_coverages(
-      times_start, times_end, time_depth, spatial_coverages, space_depth
+      times_start,
+      times_end,
+      time_depth,
+      spatial_coverages,
+      space_depth,
     )
   }
 
@@ -1574,9 +1638,15 @@ impl U64MocStore {
   ) -> Result<usize, String> {
     let times = times2hash(time_depth, times_start, times_end)?;
     let moc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_spatial_coverage(
-      times, spatial_coverages, time_depth,
+      times,
+      spatial_coverages,
+      time_depth,
     );
-    store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2())
+    store::add(
+      moc
+        .time_space_iter(time_depth, space_depth)
+        .into_range_moc2(),
+    )
   }
 
   /// Create a time-spatial coverage (2D) from a list of cones
@@ -1604,7 +1674,10 @@ impl U64MocStore {
     let times_start = jd2mas_approx(times_start);
     let times_end = jd2mas_approx(times_end);
     self.from_time_ranges_spatial_coverages_in_store(
-      times_start, times_end, time_depth, spatial_coverages//, space_depth
+      times_start,
+      times_end,
+      time_depth,
+      spatial_coverages, //, space_depth
     )
   }
 
@@ -1642,20 +1715,28 @@ impl U64MocStore {
     // space_depth: u8,
   ) -> Result<usize, String> {
     let times = times2hash(time_depth, times_start, times_end)?;
-    let space_depth = spatial_coverage_indices.iter()
+    let space_depth = spatial_coverage_indices
+      .iter()
       .filter_map(|index| self.get_smoc_depth(*index).ok())
       .max()
       .unwrap_or(0);
-    let spatial_coverages: Vec<HpxRanges<u64>> = spatial_coverage_indices.into_iter().map(
-      |index| self.get_smoc_copy(index).map(|moc| moc.into_moc_ranges())
-      // |index| self.degrade(index, space_depth).map(|moc| moc.into_moc_ranges())
-    ).collect::<Result<_, _>>()?;
+    let spatial_coverages: Vec<HpxRanges<u64>> = spatial_coverage_indices
+      .into_iter()
+      .map(
+        |index| self.get_smoc_copy(index).map(|moc| moc.into_moc_ranges()), // |index| self.degrade(index, space_depth).map(|moc| moc.into_moc_ranges())
+      )
+      .collect::<Result<_, _>>()?;
     let moc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_spatial_coverage(
-      times, spatial_coverages, time_depth,
+      times,
+      spatial_coverages,
+      time_depth,
     );
-    store::add(moc.time_space_iter(time_depth, space_depth).into_range_moc2())
+    store::add(
+      moc
+        .time_space_iter(time_depth, space_depth)
+        .into_range_moc2(),
+    )
   }
-
 
   /////////////////////////
   // OPERATIONS ON 1 MOC //
@@ -1663,12 +1744,16 @@ impl U64MocStore {
   // return a hierachical view (Json like) for display?
   // (not necessary if display made from rust code too)
 
-
   pub fn barycenter(&self, index: usize) -> Result<(f64, f64), String> {
     op1_moc_barycenter(index)
   }
 
-  pub fn largest_distance_from_coo_to_moc_vertices(&self, index: usize, lon: f64, lat: f64) -> Result<f64, String> {
+  pub fn largest_distance_from_coo_to_moc_vertices(
+    &self,
+    index: usize,
+    lon: f64,
+    lat: f64,
+  ) -> Result<f64, String> {
     op1_moc_largest_distance_from_coo_to_moc_vertices(index, lon, lat)
   }
 
@@ -1678,7 +1763,6 @@ impl U64MocStore {
   pub fn complement(&self, index: usize) -> Result<usize, String> {
     Op1::Complement.exec(index)
   }
-
 
   pub fn flatten_to_moc_depth(&self, index: usize) -> Result<Vec<u64>, String> {
     op1_flatten_to_moc_depth(index)
@@ -1712,7 +1796,6 @@ impl U64MocStore {
   pub fn split_indirect_count(&self, index: usize) -> Result<u32, String> {
     op1_count_split(index, true)
   }
-
 
   pub fn degrade(&self, index: usize, new_depth: u8) -> Result<usize, String> {
     Op1::Degrade { new_depth }.exec(index)
@@ -1754,7 +1837,11 @@ impl U64MocStore {
   pub fn xor(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
     self.symmetric_difference(left_index, right_index)
   }
-  pub fn symmetric_difference(&self, left_index: usize, right_index: usize) -> Result<usize, String> {
+  pub fn symmetric_difference(
+    &self,
+    left_index: usize,
+    right_index: usize,
+  ) -> Result<usize, String> {
     Op2::SymmetricDifference.exec(left_index, right_index)
   }
 
@@ -1789,7 +1876,7 @@ impl U64MocStore {
     Op2::TFold.exec(time_moc_index, st_moc_index)
   }
 
-  /// Returns the union of the T-MOCs associated to S-MOCs intersecting the given S-MOC. 
+  /// Returns the union of the T-MOCs associated to S-MOCs intersecting the given S-MOC.
   /// Left: S-MOC, right: ST-MOC, result: T-MOC.
   pub fn space_fold(&self, space_moc_index: usize, st_moc_index: usize) -> Result<usize, String> {
     Op2::SFold.exec(space_moc_index, st_moc_index)
@@ -1811,10 +1898,15 @@ impl U64MocStore {
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
-  pub fn filter_pos<T, F, R>(&self, moc_index: usize, coos_deg: T, fn_bool: F) -> Result<Vec<R>, String>
-    where
-      T: Iterator<Item=(f64, f64)>,
-      F: Fn(bool) -> R
+  pub fn filter_pos<T, F, R>(
+    &self,
+    moc_index: usize,
+    coos_deg: T,
+    fn_bool: F,
+  ) -> Result<Vec<R>, String>
+  where
+    T: Iterator<Item = (f64, f64)>,
+    F: Fn(bool) -> R,
   {
     let filter = |moc: &InternalMoc| match moc {
       InternalMoc::Space(moc) => {
@@ -1822,20 +1914,24 @@ impl U64MocStore {
         let layer = healpix::nested::get(depth);
         let shift = Hpx::<u64>::shift_from_depth_max(depth) as u32;
         Ok(
-          coos_deg.map(|(lon_deg, lat_deg)| {
-            let lon = lon_deg2rad(lon_deg);
-            let lat = lat_deg2rad(lat_deg);
-            match (lon, lat) {
-              (Ok(lon), Ok(lat)) => {
-                let icell = layer.hash(lon, lat) << shift;
-                fn_bool(moc.contains_val(&icell))
+          coos_deg
+            .map(|(lon_deg, lat_deg)| {
+              let lon = lon_deg2rad(lon_deg);
+              let lat = lat_deg2rad(lat_deg);
+              match (lon, lat) {
+                (Ok(lon), Ok(lat)) => {
+                  let icell = layer.hash(lon, lat) << shift;
+                  fn_bool(moc.contains_val(&icell))
+                }
+                _ => fn_bool(false),
               }
-              _ => fn_bool(false),
-            }
-          }).collect::<Vec<R>>()
+            })
+            .collect::<Vec<R>>(),
         )
       }
-      _ => Err(String::from("Can't filter coos on a MOC different from a S-MOC")),
+      _ => Err(String::from(
+        "Can't filter coos on a MOC different from a S-MOC",
+      )),
     };
     store::exec_on_one_readonly_moc(moc_index, filter)
   }
@@ -1850,15 +1946,20 @@ impl U64MocStore {
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be careful not to use an input Iterator based on costly operations...
-  pub fn filter_time_approx<T, F, R>(&self, moc_index: usize, jds_it: T, fn_bool: F) -> Result<Vec<R>, String>
-    where
-      T: Iterator<Item=f64>,
-      F: Fn(bool) -> R
+  pub fn filter_time_approx<T, F, R>(
+    &self,
+    moc_index: usize,
+    jds_it: T,
+    fn_bool: F,
+  ) -> Result<Vec<R>, String>
+  where
+    T: Iterator<Item = f64>,
+    F: Fn(bool) -> R,
   {
     self.filter_time(
       moc_index,
       jds_it.map(|jd| (jd * JD_TO_USEC) as u64),
-      fn_bool
+      fn_bool,
     )
   }
 
@@ -1872,29 +1973,48 @@ impl U64MocStore {
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
-  pub fn filter_time<T, F, R>(&self, moc_index: usize, usec_it: T, fn_bool: F) -> Result<Vec<R>, String>
-    where
-      T: Iterator<Item=u64>,
-      F: Fn(bool) -> R
+  pub fn filter_time<T, F, R>(
+    &self,
+    moc_index: usize,
+    usec_it: T,
+    fn_bool: F,
+  ) -> Result<Vec<R>, String>
+  where
+    T: Iterator<Item = u64>,
+    F: Fn(bool) -> R,
   {
     let filter = move |moc: &InternalMoc| match moc {
-      InternalMoc::Time(moc) => Ok(usec_it.map(|usec| fn_bool(moc.contains_val(&usec))).collect::<Vec<R>>()),
-      _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
+      InternalMoc::Time(moc) => Ok(
+        usec_it
+          .map(|usec| fn_bool(moc.contains_val(&usec)))
+          .collect::<Vec<R>>(),
+      ),
+      _ => Err(String::from(
+        "Can't filter time on a MOC different from a T-MOC",
+      )),
     };
     store::exec_on_one_readonly_moc(moc_index, filter)
   }
 
-
-  pub fn filter_freq<T, F, R>(&self, moc_index: usize, hz_it: T, fn_bool: F) -> Result<Vec<R>, String>
-    where
-      T: Iterator<Item=f64>,
-      F: Fn(bool) -> R
+  pub fn filter_freq<T, F, R>(
+    &self,
+    moc_index: usize,
+    hz_it: T,
+    fn_bool: F,
+  ) -> Result<Vec<R>, String>
+  where
+    T: Iterator<Item = f64>,
+    F: Fn(bool) -> R,
   {
     let filter = move |moc: &InternalMoc| match moc {
       InternalMoc::Frequency(moc) => Ok(
-        hz_it.map(|hz| fn_bool(moc.contains_val(&Frequency::<u64>::freq2hash(hz)))).collect::<Vec<R>>()
+        hz_it
+          .map(|hz| fn_bool(moc.contains_val(&Frequency::<u64>::freq2hash(hz))))
+          .collect::<Vec<R>>(),
       ),
-      _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
+      _ => Err(String::from(
+        "Can't filter time on a MOC different from a T-MOC",
+      )),
     };
     store::exec_on_one_readonly_moc(moc_index, filter)
   }
@@ -1909,10 +2029,15 @@ impl U64MocStore {
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
-  pub fn filter_timepos_approx<T, F, R>(&self, moc_index: usize, jd_pos_it: T, fn_bool: F) -> Result<Vec<R>, String>
-    where
-      T: Iterator<Item=(f64, (f64, f64))>,
-      F: Fn(bool) -> R
+  pub fn filter_timepos_approx<T, F, R>(
+    &self,
+    moc_index: usize,
+    jd_pos_it: T,
+    fn_bool: F,
+  ) -> Result<Vec<R>, String>
+  where
+    T: Iterator<Item = (f64, (f64, f64))>,
+    F: Fn(bool) -> R,
   {
     self.filter_timepos(
       moc_index,
@@ -1920,76 +2045,86 @@ impl U64MocStore {
         let usec = (jd * JD_TO_USEC) as u64;
         (usec, pos)
       }),
-      fn_bool
+      fn_bool,
     )
   }
-
 
   /// Returns an array (of boolean or u8 or ...) telling if the pairs of coordinates
   /// in the input slice are in (true=1) or out of (false=0) the S-MOC.
   /// # Args
   /// * `moc_index`: index of the S-MOC to be used for filtering
-  /// * `usec_pos_it`: iterator on tuples made of a time, in microsec since JD=0, and coordinates 
+  /// * `usec_pos_it`: iterator on tuples made of a time, in microsec since JD=0, and coordinates
   ///                  in degrees `(lon, lat)`
   /// # Remarks
   /// * the size of the returned array is the same as the number of elements on the input iterator.
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
   /// * similarly, be carefull not to use an input Iterator based on costly operations...
-  pub fn filter_timepos<T, F, R>(&self, moc_index: usize, usec_pos_it: T, fn_bool: F) -> Result<Vec<R>, String>
-    where
-      T: Iterator<Item=(u64, (f64, f64))>,
-      F: Fn(bool) -> R
+  pub fn filter_timepos<T, F, R>(
+    &self,
+    moc_index: usize,
+    usec_pos_it: T,
+    fn_bool: F,
+  ) -> Result<Vec<R>, String>
+  where
+    T: Iterator<Item = (u64, (f64, f64))>,
+    F: Fn(bool) -> R,
   {
     let layer = healpix::nested::get(Hpx::<u64>::MAX_DEPTH);
     let filter = move |moc: &InternalMoc| match moc {
       InternalMoc::TimeSpace(stmoc) => Ok(
-        usec_pos_it.map(|(usec, (lon, lat))| {
-          let idx = layer.hash(lon, lat);
-          fn_bool(stmoc.contains_val(&usec, &idx))
-        }).collect::<Vec<R>>()
+        usec_pos_it
+          .map(|(usec, (lon, lat))| {
+            let idx = layer.hash(lon, lat);
+            fn_bool(stmoc.contains_val(&usec, &idx))
+          })
+          .collect::<Vec<R>>(),
       ),
-      _ => Err(String::from("Can't filter time on a MOC different from a T-MOC")),
+      _ => Err(String::from(
+        "Can't filter time on a MOC different from a T-MOC",
+      )),
     };
     store::exec_on_one_readonly_moc(moc_index, filter)
   }
-
 }
-
 
 fn jd2mas_approx(times: Vec<f64>) -> Vec<u64> {
   let jd2mas = |t: f64| (t * 86400000000_f64).floor() as u64;
   #[cfg(not(target_arch = "wasm32"))]
   {
-    times.into_par_iter()
-      .map(jd2mas)
-      .collect::<Vec<_>>()
+    times.into_par_iter().map(jd2mas).collect::<Vec<_>>()
   }
   #[cfg(target_arch = "wasm32")]
   {
-    times.into_iter()
-      .map(jd2mas)
-      .collect::<Vec<_>>()
+    times.into_iter().map(jd2mas).collect::<Vec<_>>()
   }
 }
 
-
 fn lonlat2hash(depth: u8, lon: Vec<f64>, lat: Vec<f64>) -> Result<Vec<u64>, String> {
   if depth > Hpx::<u64>::MAX_DEPTH {
-    Err(format!("Space depth must be in [0, {}]", Hpx::<u64>::MAX_DEPTH))
+    Err(format!(
+      "Space depth must be in [0, {}]",
+      Hpx::<u64>::MAX_DEPTH
+    ))
   } else if lon.len() != lat.len() {
-    Err(format!("Longitudes and latitudes do not have the same size: {} != {}", lon.len(), lat.len()))
+    Err(format!(
+      "Longitudes and latitudes do not have the same size: {} != {}",
+      lon.len(),
+      lat.len()
+    ))
   } else {
     let mut ipix = vec![0; lon.len()];
     let layer = healpix::nested::get(depth);
     #[cfg(not(target_arch = "wasm32"))]
-    ipix.par_iter_mut()
+    ipix
+      .par_iter_mut()
       .zip_eq(lon.into_par_iter().zip_eq(lat.into_par_iter()))
       .for_each(|(p, (l, b))| {
         *p = layer.hash(l, b);
       });
     #[cfg(target_arch = "wasm32")]
-    ipix.iter_mut()
+    ipix
+      .iter_mut()
       .zip(lon.into_iter().zip(lat.into_iter()))
       .for_each(|(p, (l, b))| {
         *p = layer.hash(l, b);
@@ -1998,21 +2133,38 @@ fn lonlat2hash(depth: u8, lon: Vec<f64>, lat: Vec<f64>) -> Result<Vec<u64>, Stri
   }
 }
 
-fn times2hash(depth: u8, times_start: Vec<u64>, times_end: Vec<u64>) -> Result<Vec<Range<u64>>, String> {
+fn times2hash(
+  depth: u8,
+  times_start: Vec<u64>,
+  times_end: Vec<u64>,
+) -> Result<Vec<Range<u64>>, String> {
   if depth > Time::<u64>::MAX_DEPTH {
-    Err(format!("Time depth must be in [0, {}]", Hpx::<u64>::MAX_DEPTH))
+    Err(format!(
+      "Time depth must be in [0, {}]",
+      Hpx::<u64>::MAX_DEPTH
+    ))
   } else if times_start.len() != times_end.len() {
-    Err(format!("Times start and end do not have the same size: {} != {}", times_start.len(), times_end.len()))
+    Err(format!(
+      "Times start and end do not have the same size: {} != {}",
+      times_start.len(),
+      times_end.len()
+    ))
   } else {
     let mut times = vec![0..0; times_start.len()];
     #[cfg(not(target_arch = "wasm32"))]
-    times.par_iter_mut()
-      .zip_eq(times_start.into_par_iter().zip_eq(times_end.into_par_iter()))
+    times
+      .par_iter_mut()
+      .zip_eq(
+        times_start
+          .into_par_iter()
+          .zip_eq(times_end.into_par_iter()),
+      )
       .for_each(|(t, (t1, t2))| {
         *t = t1..t2;
       });
     #[cfg(target_arch = "wasm32")]
-    times.iter_mut()
+    times
+      .iter_mut()
       .zip(times_start.into_iter().zip(times_end.into_iter()))
       .for_each(|(t, (t1, t2))| {
         *t = t1..t2;
@@ -2020,7 +2172,6 @@ fn times2hash(depth: u8, times_start: Vec<u64>, times_end: Vec<u64>) -> Result<V
     Ok(times)
   }
 }
-
 
 // See maybe https://github.com/mikaelmello/inquire
 //   to build an interactive prompt ?

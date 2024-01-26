@@ -1,4 +1,4 @@
-use std::{error::Error, mem::size_of, path::PathBuf, io::Write};
+use std::{error::Error, io::Write, mem::size_of, path::PathBuf};
 
 use clap::Parser;
 
@@ -37,7 +37,8 @@ impl List {
           size_of::<u64>()
         };
         let n_ranges = byte_size / (elem_byte_size << 1); // x2 since 1 range = 2 elems
-        let _ = writeln!(&mut out,
+        let _ = writeln!(
+          &mut out,
           "{},{},{},{},{},{}",
           id,
           status.str_value(),
@@ -60,7 +61,8 @@ impl List {
           size_of::<u64>()
         };
         let n_ranges = byte_size / (elem_byte_size << 1); // x2 since 1 range = 2 elems
-        let _ = writeln!(&mut out,
+        let _ = writeln!(
+          &mut out,
           "{},{},{},{},{}",
           id,
           status.str_value(),

@@ -1,32 +1,28 @@
-
-use std::ops::Range;
 use std::cmp::Ordering;
+use std::ops::Range;
 
 use crate::idx::Idx;
+use crate::moc::{HasMaxDepth, MOCProperties, NonOverlapping, RangeMOCIterator, ZSorted};
 use crate::qty::MocQty;
-use crate::moc::{HasMaxDepth, ZSorted, NonOverlapping, MOCProperties, RangeMOCIterator};
 
 /// Performs a logical `AND` between the two input iterators of ranges.
-pub fn and<T, Q, I1, I2>(
-  left_it: I1, 
-  right_it: I2
-) -> AndRangeIter<T, Q, I1, I2>
-  where 
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: RangeMOCIterator<T, Qty=Q> 
+pub fn and<T, Q, I1, I2>(left_it: I1, right_it: I2) -> AndRangeIter<T, Q, I1, I2>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  I1: RangeMOCIterator<T, Qty = Q>,
+  I2: RangeMOCIterator<T, Qty = Q>,
 {
   AndRangeIter::new(left_it, right_it)
 }
 
 /// Performs an `AND` operation between two iterators of ranges on-the-fly, while iterating.
 pub struct AndRangeIter<T, Q, I1, I2>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: RangeMOCIterator<T, Qty=Q> 
+where
+  T: Idx,
+  Q: MocQty<T>,
+  I1: RangeMOCIterator<T, Qty = Q>,
+  I2: RangeMOCIterator<T, Qty = Q>,
 {
   left_it: I1,
   right_it: I2,
@@ -34,26 +30,35 @@ pub struct AndRangeIter<T, Q, I1, I2>
   right: Option<Range<T>>,
 }
 
-impl <T, Q, I1, I2> AndRangeIter<T, Q, I1, I2>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: RangeMOCIterator<T, Qty=Q>
+impl<T, Q, I1, I2> AndRangeIter<T, Q, I1, I2>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  I1: RangeMOCIterator<T, Qty = Q>,
+  I2: RangeMOCIterator<T, Qty = Q>,
 {
-  
   fn new(mut left_it: I1, mut right_it: I2) -> AndRangeIter<T, Q, I1, I2> {
     let left = left_it.next();
     let right = right_it.next();
     // Quick rejection tests
     if let (Some(up_left), Some(low_right)) = (left_it.peek_last(), &right) {
       if up_left.end <= low_right.start {
-        return AndRangeIter { left_it, right_it, left: None, right: None };
+        return AndRangeIter {
+          left_it,
+          right_it,
+          left: None,
+          right: None,
+        };
       }
-    } 
+    }
     if let (Some(low_left), Some(up_right)) = (&left, right_it.peek_last()) {
       if up_right.end <= low_left.start {
-        return AndRangeIter { left_it, right_it, left: None, right: None };
+        return AndRangeIter {
+          left_it,
+          right_it,
+          left: None,
+          right: None,
+        };
       }
     }
     // Normal behaviour
@@ -64,49 +69,50 @@ impl <T, Q, I1, I2> AndRangeIter<T, Q, I1, I2>
       right,
     }
   }
-
 }
 
-impl<T, Q, I1, I2> HasMaxDepth for  AndRangeIter<T, Q, I1, I2>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: RangeMOCIterator<T, Qty=Q>
+impl<T, Q, I1, I2> HasMaxDepth for AndRangeIter<T, Q, I1, I2>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  I1: RangeMOCIterator<T, Qty = Q>,
+  I2: RangeMOCIterator<T, Qty = Q>,
 {
   fn depth_max(&self) -> u8 {
     u8::max(self.left_it.depth_max(), self.right_it.depth_max())
   }
 }
-impl<T, Q, I1, I2> ZSorted for  AndRangeIter<T, Q, I1, I2>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: RangeMOCIterator<T, Qty=Q> 
-{ }
-impl<T, Q, I1, I2> NonOverlapping for AndRangeIter<T, Q, I1, I2>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: RangeMOCIterator<T, Qty=Q> 
-{ }
-impl<T, Q, I1, I2> MOCProperties for AndRangeIter<T, Q, I1, I2>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: RangeMOCIterator<T, Qty=Q>
-{ }
-impl<T, Q, I1, I2> Iterator for AndRangeIter<T, Q, I1, I2>
-  where 
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: RangeMOCIterator<T, Qty=Q>
+impl<T, Q, I1, I2> ZSorted for AndRangeIter<T, Q, I1, I2>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  I1: RangeMOCIterator<T, Qty = Q>,
+  I2: RangeMOCIterator<T, Qty = Q>,
 {
-
+}
+impl<T, Q, I1, I2> NonOverlapping for AndRangeIter<T, Q, I1, I2>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  I1: RangeMOCIterator<T, Qty = Q>,
+  I2: RangeMOCIterator<T, Qty = Q>,
+{
+}
+impl<T, Q, I1, I2> MOCProperties for AndRangeIter<T, Q, I1, I2>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  I1: RangeMOCIterator<T, Qty = Q>,
+  I2: RangeMOCIterator<T, Qty = Q>,
+{
+}
+impl<T, Q, I1, I2> Iterator for AndRangeIter<T, Q, I1, I2>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  I1: RangeMOCIterator<T, Qty = Q>,
+  I2: RangeMOCIterator<T, Qty = Q>,
+{
   type Item = Range<T>;
 
   fn next(&mut self) -> Option<Self::Item> {
@@ -132,7 +138,8 @@ impl<T, Q, I1, I2> Iterator for AndRangeIter<T, Q, I1, I2>
       if from < to {
         return Some(from..to);
       }*/
-      if l.end <= r.start { // |--l--| |--r--|
+      if l.end <= r.start {
+        // |--l--| |--r--|
         self.left = self.left_it.next();
         while let Some(l) = &self.left {
           if l.end <= r.start {
@@ -141,7 +148,8 @@ impl<T, Q, I1, I2> Iterator for AndRangeIter<T, Q, I1, I2>
             break;
           }
         }
-      } else if r.end <= l.start { // |--r--| |--l--|
+      } else if r.end <= l.start {
+        // |--r--| |--l--|
         self.right = self.right_it.next();
         while let Some(r) = &self.right {
           if r.end <= l.start {
@@ -157,19 +165,19 @@ impl<T, Q, I1, I2> Iterator for AndRangeIter<T, Q, I1, I2>
             let range = from..l.end;
             self.left = self.left_it.next();
             range
-          },
+          }
           Ordering::Greater => {
             let range = from..r.end;
             self.right = self.right_it.next();
             range
-          },
+          }
           Ordering::Equal => {
             let range = from..l.end;
             self.left = self.left_it.next();
             self.right = self.right_it.next();
             range
           }
-        })
+        });
       }
     }
     None
@@ -187,16 +195,14 @@ impl<T, Q, I1, I2> Iterator for AndRangeIter<T, Q, I1, I2>
       (0, None)
     }
   }
-
 }
 
-
 impl<T, Q, I1, I2> RangeMOCIterator<T> for AndRangeIter<T, Q, I1, I2>
-  where
-    T: Idx,
-    Q: MocQty<T>,
-    I1: RangeMOCIterator<T, Qty=Q>,
-    I2: RangeMOCIterator<T, Qty=Q>
+where
+  T: Idx,
+  Q: MocQty<T>,
+  I1: RangeMOCIterator<T, Qty = Q>,
+  I2: RangeMOCIterator<T, Qty = Q>,
 {
   type Qty = Q;
 
@@ -206,41 +212,35 @@ impl<T, Q, I1, I2> RangeMOCIterator<T> for AndRangeIter<T, Q, I1, I2>
   }
 }
 
-
-
 #[cfg(test)]
 mod tests {
   use std::fs::File;
   use std::io::BufReader;
   use std::path::PathBuf;
 
-  use crate::qty::Hpx;
-  use crate::moc::range::RangeMOC;
-  use crate::deser::fits::{
-    from_fits_ivoa,
-    MocIdxType, MocQtyType, MocType
-  };
-  use crate::moc::{HasMaxDepth, RangeMOCIntoIterator, CellMOCIntoIterator, CellMOCIterator};
+  use crate::deser::fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType};
   use crate::moc::range::op::and::and;
+  use crate::moc::range::RangeMOC;
+  use crate::moc::{CellMOCIntoIterator, CellMOCIterator, HasMaxDepth, RangeMOCIntoIterator};
+  use crate::qty::Hpx;
   use crate::ranges::SNORanges;
 
   fn load_moc(filename: &str) -> RangeMOC<u32, Hpx<u32>> {
     let path_buf1 = PathBuf::from(format!("resources/{}", filename));
     let path_buf2 = PathBuf::from(format!("../resources/{}", filename));
-    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
     let reader = BufReader::new(file);
     match from_fits_ivoa(reader) {
       Ok(MocIdxType::U32(MocQtyType::Hpx(MocType::Ranges(moc)))) => {
         let moc = RangeMOC::new(moc.depth_max(), moc.collect());
         moc
-      },
+      }
       Ok(MocIdxType::U32(MocQtyType::Hpx(MocType::Cells(moc)))) => {
-        let moc = RangeMOC::new(
-          moc.depth_max(),
-          moc.into_cell_moc_iter().ranges().collect()
-        );
+        let moc = RangeMOC::new(moc.depth_max(), moc.into_cell_moc_iter().ranges().collect());
         moc
-      },
+      }
       _ => unreachable!(),
     }
   }
@@ -251,7 +251,10 @@ mod tests {
     (sdss, other)
   }
 
-  fn and_ranges(moc_l: RangeMOC<u32, Hpx<u32>>, moc_r: RangeMOC<u32, Hpx<u32>>) -> RangeMOC<u32, Hpx<u32>> {
+  fn and_ranges(
+    moc_l: RangeMOC<u32, Hpx<u32>>,
+    moc_r: RangeMOC<u32, Hpx<u32>>,
+  ) -> RangeMOC<u32, Hpx<u32>> {
     let depth = u8::max(moc_l.depth_max(), moc_r.depth_max());
     let ranges_l = moc_l.into_moc_ranges();
     let ranges_r = moc_r.into_moc_ranges();
@@ -260,7 +263,10 @@ mod tests {
 
   // we could also perform the operation without having first collected the iteartor we obtain from
   // the FITS file
-  fn and_ranges_it(moc_l: RangeMOC<u32, Hpx<u32>>, moc_r: RangeMOC<u32, Hpx<u32>>) -> RangeMOC<u32, Hpx<u32>> {
+  fn and_ranges_it(
+    moc_l: RangeMOC<u32, Hpx<u32>>,
+    moc_r: RangeMOC<u32, Hpx<u32>>,
+  ) -> RangeMOC<u32, Hpx<u32>> {
     let and = and(moc_l.into_range_moc_iter(), moc_r.into_range_moc_iter());
     RangeMOC::new(and.depth_max(), and.collect())
   }
@@ -270,7 +276,7 @@ mod tests {
     let (sdss, other) = load_mocs();
     let and_1 = and_ranges(sdss.clone(), other.clone());
     let and_2 = and_ranges_it(sdss.clone(), other.clone());
-    println!("and size: {}", and_1.moc_ranges().0.0.len());
-    assert_eq!(and_1.moc_ranges().0.0.len(), and_2.moc_ranges().0.0.len());
+    println!("and size: {}", and_1.moc_ranges().0 .0.len());
+    assert_eq!(and_1.moc_ranges().0 .0.len(), and_2.moc_ranges().0 .0.len());
   }
 }

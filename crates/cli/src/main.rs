@@ -1,18 +1,11 @@
-
 use std::error::Error;
 
-use structopt::StructOpt;
 use structopt::clap::AppSettings;
+use structopt::StructOpt;
 
 use moc_cli::{
-  info::Info,
-  constants::Constants,
-  from::From,
-  op::Op,
-  filter::Filter,
-  convert::Convert,
-  hprint::HumanPrint,
-  view::View
+  constants::Constants, convert::Convert, filter::Filter, from::From, hprint::HumanPrint,
+  info::Info, op::Op, view::View,
 };
 
 #[derive(Debug, StructOpt)]
@@ -44,7 +37,7 @@ enum Args {
   HumanPrint(HumanPrint),
   #[structopt(name = "view")]
   /// Save a PNG of a S-MOC and visualize it.
-  View(View)
+  View(View),
 }
 
 impl Args {

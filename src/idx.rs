@@ -1,21 +1,36 @@
 //! This module contains the trait defining the type `Idx` that can be used to represent the
 //! index value of a MOC cell, associated with utility constants and methods.
 
-use std::mem;
-use std::io::{Read, Write};
-use std::str::FromStr;
 use std::fmt::{Debug, Display};
-use std::ops::{AddAssign, SubAssign, BitAndAssign, BitOrAssign};
+use std::io::{Read, Write};
+use std::mem;
+use std::ops::{AddAssign, BitAndAssign, BitOrAssign, SubAssign};
+use std::str::FromStr;
 
-use num::{Integer, PrimInt, ToPrimitive};
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
+use num::{Integer, PrimInt, ToPrimitive};
 
 use crate::deser::fits::keywords::TForm1;
 
 // 'static mean that Idx does not contains any reference
-pub trait Idx: 'static + Integer + PrimInt + ToPrimitive
-+ AddAssign + SubAssign + BitAndAssign + BitOrAssign
-+ FromStr + From<u8> + Send + Sync + Debug + Display + Copy + Clone {
+pub trait Idx:
+  'static
+  + Integer
+  + PrimInt
+  + ToPrimitive
+  + AddAssign
+  + SubAssign
+  + BitAndAssign
+  + BitOrAssign
+  + FromStr
+  + From<u8>
+  + Send
+  + Sync
+  + Debug
+  + Display
+  + Copy
+  + Clone
+{
   const N_BYTES: u8 = mem::size_of::<Self>() as u8;
   const N_BITS: u8 = Self::N_BYTES << 3;
   /// Associated TFORM for the FITS serializion
@@ -202,10 +217,8 @@ impl Idx for i64 {
 }*/
 
 /*impl<T> Idx for T where T: 'static + Integer + PrimInt + ToPrimitive + AddAssign
-                                   + FromStr + From<u8> + TryFrom<u64>
-                                   + Send + Sync + Debug + Display + Copy {}*/
-
-
++ FromStr + From<u8> + TryFrom<u64>
++ Send + Sync + Debug + Display + Copy {}*/
 
 /*
 pub struct IdxConvert<F: Idx, T: Idx + From<F>> {
@@ -227,4 +240,3 @@ impl<F: Idx, T: Idx + From<F>> IdxConvert<F, T> {
     to.unsigned_shl(self.n_bits)
   }
 }*/
-

@@ -1,5 +1,4 @@
-
-use std::io::{Read, Seek, BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read, Seek};
 
 use flate2::read::GzDecoder;
 
@@ -21,7 +20,7 @@ pub fn uncompress<R: BufRead>(reader: R) -> BufReader<GzDecoder<R>> {
 /*pub fn uncompress_if_needed<R, O, F>(
   mut reader: BufReader<R>,
   op: F
-) -> Result<O, std::io::Error> 
+) -> Result<O, std::io::Error>
   where
     R: Read + Seek,
     O: ,

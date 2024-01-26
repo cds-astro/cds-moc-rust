@@ -1,20 +1,19 @@
-
-use std::str::FromStr;
 use std::error::Error;
+use std::str::FromStr;
 
-use time::PrimitiveDateTime;
 use time::format_description::{self, well_known::Rfc3339};
+use time::PrimitiveDateTime;
 // use chrono::prelude::*;
 
-pub mod input;
-pub mod info;
 pub mod constants;
 pub mod convert;
-pub mod from;
-pub mod op;
 pub mod filter;
-pub mod output;
+pub mod from;
 pub mod hprint;
+pub mod info;
+pub mod input;
+pub mod op;
+pub mod output;
 pub mod view;
 
 // See https://www.ivoa.net/rdf/timescale/2019-03-15/timescale.html
@@ -32,37 +31,36 @@ pub enum InputTime {
   /// ISO time in Gregorian, following RFC3339, i.e. YYYY-MM-DDTHH:MM:SS.SSZ+... (no conversion from UT to TCB)
   IsoRfc,
   /// ISO time in Gregorian, simple format: YYYY-MM-DDTHH:MM:SS (no conversion from UT to TCB)
-  IsoSimple
+  IsoSimple,
 }
 
 impl InputTime {
   pub fn parse(&self, value: &str) -> Result<u64, Box<dyn Error>> {
     match self {
-      InputTime::JD =>
-        value.parse::<f64>()
-          .map(|v| (v * N_MICROSEC_IN_DAY) as u64)
-          .map_err(|e| e.into()),
-      InputTime::MJD =>
-        value.parse::<f64>()
-          .map(|v| (mjd2jd(v) * N_MICROSEC_IN_DAY) as u64)
-          .map_err(|e| e.into()),
-      InputTime::MicroSecSinceJD0 =>
-        value.parse::<u64>()
-          .map_err(|e| e.into()),
-      InputTime::IsoRfc => 
-        PrimitiveDateTime::parse(value, &DATE_TIME_FMT)
-          .map(|date_time| {
-            let year = date_time.year() as i16;
-            let month: u8 = date_time.month().into();
-            let day = date_time.day();
-            let (h, m, s, u) = date_time.as_hms_micro();
-            let jd = gregorian2jd(year, month, day) as i64 * 86400000000_i64;
-            let jday_frac = u as i64 + (hms2jday_fract(h, m, s as f64) * N_MICROSEC_IN_DAY) as i64;
-            (jd + jday_frac) as u64
-          }).map_err(|e| e.into()),
+      InputTime::JD => value
+        .parse::<f64>()
+        .map(|v| (v * N_MICROSEC_IN_DAY) as u64)
+        .map_err(|e| e.into()),
+      InputTime::MJD => value
+        .parse::<f64>()
+        .map(|v| (mjd2jd(v) * N_MICROSEC_IN_DAY) as u64)
+        .map_err(|e| e.into()),
+      InputTime::MicroSecSinceJD0 => value.parse::<u64>().map_err(|e| e.into()),
+      InputTime::IsoRfc => PrimitiveDateTime::parse(value, &DATE_TIME_FMT)
+        .map(|date_time| {
+          let year = date_time.year() as i16;
+          let month: u8 = date_time.month().into();
+          let day = date_time.day();
+          let (h, m, s, u) = date_time.as_hms_micro();
+          let jd = gregorian2jd(year, month, day) as i64 * 86400000000_i64;
+          let jday_frac = u as i64 + (hms2jday_fract(h, m, s as f64) * N_MICROSEC_IN_DAY) as i64;
+          (jd + jday_frac) as u64
+        })
+        .map_err(|e| e.into()),
       InputTime::IsoSimple => {
         // value.parse::<DateTime<Utc>>()
-        let format = format_description::parse("[year]-[month]-[day]T[hour]:[minute]:[second]").unwrap();
+        let format =
+          format_description::parse("[year]-[month]-[day]T[hour]:[minute]:[second]").unwrap();
         PrimitiveDateTime::parse(value, &format)
           .map(|date_time| {
             let year = date_time.year() as i16;
@@ -72,7 +70,8 @@ impl InputTime {
             let jd = gregorian2jd(year, month, day) as i64 * 86400000000_i64;
             let jday_frac = u as i64 + (hms2jday_fract(h, m, s as f64) * N_MICROSEC_IN_DAY) as i64;
             (jd + jday_frac) as u64
-          }).map_err(|e| e.into())
+          })
+          .map_err(|e| e.into())
       }
     }
   }

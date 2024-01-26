@@ -166,6 +166,14 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in this project by you, as defined in the Apache-2.0 license,
 shall be dual licensed as above, without any additional terms or conditions.
 
+### Warning
+
+The code is formatted using 2 tab spaces instead of the regular 4:
+
+```bash
+cargo fmt -- --config tab_spaces=2
+```
+
 
 ## Acknowledgements
 

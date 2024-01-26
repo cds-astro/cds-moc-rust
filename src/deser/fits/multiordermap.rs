@@ -1,28 +1,23 @@
-
-use std::io::{Read, Seek, BufRead, BufReader};
 use std::f64::consts::PI;
+use std::io::{BufRead, BufReader, Read, Seek};
 
-use byteorder::{ReadBytesExt, BigEndian};
+use byteorder::{BigEndian, ReadBytesExt};
 
-use crate::idx::Idx;
-use crate::qty::Hpx;
-use crate::elem::valuedcell::valued_cells_to_moc_with_opt;
-use crate::moc::range::RangeMOC;
 use crate::deser::{
-  gz::{is_gz, uncompress},
   fits::{
-    error::FitsError,
-    keywords::{
-      MocKeywordsMap, MocKeywords, FitsCard,
-      Ordering, MocOrder
-    },
     common::{
-      consume_primary_hdu, next_36_chunks_of_80_bytes, check_keyword_and_val,
-      check_keyword_and_parse_uint_val
-    }
-  }
+      check_keyword_and_parse_uint_val, check_keyword_and_val, consume_primary_hdu,
+      next_36_chunks_of_80_bytes,
+    },
+    error::FitsError,
+    keywords::{FitsCard, MocKeywords, MocKeywordsMap, MocOrder, Ordering},
+  },
+  gz::{is_gz, uncompress},
 };
-
+use crate::elem::valuedcell::valued_cells_to_moc_with_opt;
+use crate::idx::Idx;
+use crate::moc::range::RangeMOC;
+use crate::qty::Hpx;
 
 /// We expect the FITS file to be a BINTABLE containing a multi-order map.
 /// To be fast (in execution and development), we start by a non-flexible approach in which we
@@ -30,7 +25,7 @@ use crate::deser::{
 /// ```bash
 /// XTENSION= 'BINTABLE'           / binary table extension                         
 /// BITPIX  =                    8 / array data type                                
-/// NAXIS   =                    2 / number of array dimensions 
+/// NAXIS   =                    2 / number of array dimensions
 /// NAXIS1  =                    ?? / length of dimension 1                          
 /// NAXIS2  =                   ?? / length of dimension 2                          
 /// PCOUNT  =                    0 / number of group parameters                     
@@ -40,17 +35,17 @@ use crate::deser::{
 /// TFORM1  = 'K       '                                                            
 /// TTYPE2  = 'PROBDENSITY'                                                         
 /// TFORM2  = 'D       '                                                            
-/// TUNIT2  = 'sr-1    ' 
+/// TUNIT2  = 'sr-1    '
 /// ...
 /// MOC     =                    T                                                  
 /// PIXTYPE = 'HEALPIX '           / HEALPIX pixelisation                           
 /// ORDERING= 'NUNIQ   '           / Pixel ordering scheme: RING, NESTED, or NUNIQ  
 /// COORDSYS= 'C       '           / Ecliptic, Galactic or Celestial (equatorial)   
-/// MOCORDER=                   ?? / MOC resolution (best order) 
+/// MOCORDER=                   ?? / MOC resolution (best order)
 /// ...
 /// END
 /// ```
-/// 
+///
 /// # Params
 /// * `reader`: the reader over the FITS content
 /// * `cumul_from`: the cumulative value from which cells are put in the MOC
@@ -59,10 +54,10 @@ use crate::deser::{
 /// * `strict`: (sub-)cells overlapping the `cumul_from` or `cumul_to` values are not added
 /// * `no_split`: cells overlapping the `cumul_from` or `cumul_to` values are not recursively split
 /// * `reverse_decent`: perform the recursive decent from the highest cell number to the lowest (to be compatible with Aladin)
-/// 
+///
 /// # Info
 ///   Supports gz input stream
-/// 
+///
 pub fn from_fits_multiordermap<R: Read + Seek>(
   mut reader: BufReader<R>,
   cumul_from: f64,
@@ -71,12 +66,28 @@ pub fn from_fits_multiordermap<R: Read + Seek>(
   strict: bool,
   no_split: bool,
   reverse_decent: bool,
-) -> Result<RangeMOC<u64, Hpx::<u64>>, FitsError> {
+) -> Result<RangeMOC<u64, Hpx<u64>>, FitsError> {
   if is_gz(&mut reader)? {
     let reader = uncompress(reader);
-    from_fits_multiordermap_internal(reader,cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
+    from_fits_multiordermap_internal(
+      reader,
+      cumul_from,
+      cumul_to,
+      asc,
+      strict,
+      no_split,
+      reverse_decent,
+    )
   } else {
-    from_fits_multiordermap_internal(reader, cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
+    from_fits_multiordermap_internal(
+      reader,
+      cumul_from,
+      cumul_to,
+      asc,
+      strict,
+      no_split,
+      reverse_decent,
+    )
   }
 }
 
@@ -88,7 +99,7 @@ fn from_fits_multiordermap_internal<R: BufRead>(
   strict: bool,
   no_split: bool,
   reverse_decent: bool,
-) -> Result<RangeMOC<u64, Hpx::<u64>>, FitsError> {
+) -> Result<RangeMOC<u64, Hpx<u64>>, FitsError> {
   let mut header_block = [b' '; 2880];
   consume_primary_hdu(&mut reader, &mut header_block)?;
   // Read the extention HDU
@@ -141,7 +152,7 @@ fn from_fits_multiordermap_internal<R: BufRead>(
   // Read data
   let n_byte_skip = (n_bytes_per_row - 16) as usize;
   let mut sink = vec![0; n_byte_skip];
-  let area_per_cell = (PI / 3.0) / (1_u64 << (depth_max << 1) as u32) as f64;  // = 4pi / (12*4^depth)
+  let area_per_cell = (PI / 3.0) / (1_u64 << (depth_max << 1) as u32) as f64; // = 4pi / (12*4^depth)
   let mut uniq_val_dens: Vec<(u64, f64, f64)> = Vec::with_capacity(n_rows as usize);
   for _ in 0..n_rows {
     let uniq = u64::read::<_, BigEndian>(&mut reader)?;
@@ -169,32 +180,32 @@ fn from_fits_multiordermap_internal<R: BufRead>(
   Ok(RangeMOC::new(depth_max, ranges))
 }
 
-
 #[cfg(test)]
 mod tests {
-  
-  use std::path::PathBuf;
+
+  use super::from_fits_multiordermap;
   use std::fs::File;
   use std::io::BufReader;
-  use super::from_fits_multiordermap;
-  
+  use std::path::PathBuf;
+
   #[test]
   fn test_mutliordermap() {
     let path_buf1 = PathBuf::from("resources/LALInference.multiorder.fits");
     let path_buf2 = PathBuf::from("../resources/LALInference.multiorder.fits");
-    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
     let reader = BufReader::new(file);
     let res = from_fits_multiordermap(reader, 0.0, 0.9, false, true, true, false);
     match res {
       Ok(o) => {
         print!("{:?}", o);
         assert!(true)
-      },
+      }
       Err(e) => {
         print!("{:?}", e);
         assert!(false)
-      },
+      }
     }
   }
-
 }

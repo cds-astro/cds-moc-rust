@@ -1,48 +1,38 @@
-
-use std::io::{self, Read, Seek, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Read, Seek};
 use std::mem::size_of;
 
-use byteorder::{ReadBytesExt, BigEndian};
+use byteorder::{BigEndian, ReadBytesExt};
 use healpix::depth;
 
-use crate::qty::Hpx;
+use crate::deser::{
+  fits::{
+    common::{
+      check_keyword_and_get_str_val, check_keyword_and_parse_uint_val, check_keyword_and_val,
+      consume_primary_hdu, next_36_chunks_of_80_bytes,
+    },
+    error::FitsError,
+    keywords::{FitsCard, IndexSchema, MocKeywords, MocKeywordsMap, MocOrder, Nside, Ordering},
+  },
+  gz::{is_gz, uncompress},
+};
 use crate::elem::{
-  range::MocRange,
-  cell::Cell,
-  cellrange::CellRange,
-  valuedcell::valued_cells_to_moc_with_opt
+  cell::Cell, cellrange::CellRange, range::MocRange, valuedcell::valued_cells_to_moc_with_opt,
 };
 use crate::moc::range::RangeMOC;
-use crate::deser::{
-  gz::{is_gz, uncompress},
-  fits::{
-    error::FitsError,
-    keywords::{
-      MocKeywordsMap, MocKeywords, FitsCard,
-      Ordering, MocOrder, Nside, IndexSchema
-    },
-    common::{
-      consume_primary_hdu, 
-      next_36_chunks_of_80_bytes,
-      check_keyword_and_val,
-      check_keyword_and_parse_uint_val,
-      check_keyword_and_get_str_val
-    }
-  }
-};
+use crate::qty::Hpx;
 
 /// We expect the FITS file to be a BINTABLE containing a skymap.
-/// [Here](https://gamma-astro-data-formats.readthedocs.io/en/latest/skymaps/healpix/index.html) 
+/// [Here](https://gamma-astro-data-formats.readthedocs.io/en/latest/skymaps/healpix/index.html)
 /// a description of the format.
-/// We so far implemented a subset of the format only: 
+/// We so far implemented a subset of the format only:
 /// * `INDXSCHM= 'IMPLICIT'`
-/// * `ORDERING= 'NESTED  '` 
+/// * `ORDERING= 'NESTED  '`
 /// To be fast (in execution and development), we start by a non-flexible approach in which we
 /// expect the BINTABLE extension to contains:
 /// ```bash
 /// XTENSION= 'BINTABLE'           / binary table extension                         
 /// BITPIX  =                    8 / array data type                                
-/// NAXIS   =                    2 / number of array dimensions 
+/// NAXIS   =                    2 / number of array dimensions
 /// NAXIS1  =                    ?? / length of dimension 1                          
 /// NAXIS2  =                   ?? / length of dimension 2                          
 /// PCOUNT  =                    0 / number of group parameters                     
@@ -58,10 +48,10 @@ use crate::deser::{
 /// PIXTYPE = 'HEALPIX '           / HEALPIX pixelisation                           
 /// ORDERING= 'NESTED  '           / Pixel ordering scheme: RING, NESTED, or NUNIQ  
 /// COORDSYS= 'C       '  // WARNING if not found
-/// NSIDE    =                  ?? / MOC resolution (best nside) 
+/// NSIDE    =                  ?? / MOC resolution (best nside)
 ///  or
 /// ORDER    =                  ?? / MOC resolution (best order), superseded by NSIDE
-///                                / (because NSIDE which are not power of 2 are possible in RING) 
+///                                / (because NSIDE which are not power of 2 are possible in RING)
 /// INDXSCHM= 'IMPLICIT'           / Indexing: IMPLICIT or EXPLICIT
 /// ...
 /// END
@@ -78,7 +68,7 @@ use crate::deser::{
 ///
 /// # Info
 ///   Supports gz input stream
-/// 
+///
 pub fn from_fits_skymap<R: Read + Seek>(
   mut reader: BufReader<R>,
   skip_value_le_this: f64,
@@ -88,12 +78,30 @@ pub fn from_fits_skymap<R: Read + Seek>(
   strict: bool,
   no_split: bool,
   reverse_decent: bool,
-) -> Result<RangeMOC<u64, Hpx::<u64>>, FitsError> {
+) -> Result<RangeMOC<u64, Hpx<u64>>, FitsError> {
   if is_gz(&mut reader)? {
     let reader = uncompress(reader);
-    from_fits_skymap_internal(reader, skip_value_le_this, cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
+    from_fits_skymap_internal(
+      reader,
+      skip_value_le_this,
+      cumul_from,
+      cumul_to,
+      asc,
+      strict,
+      no_split,
+      reverse_decent,
+    )
   } else {
-    from_fits_skymap_internal(reader, skip_value_le_this, cumul_from, cumul_to, asc, strict, no_split, reverse_decent)
+    from_fits_skymap_internal(
+      reader,
+      skip_value_le_this,
+      cumul_from,
+      cumul_to,
+      asc,
+      strict,
+      no_split,
+      reverse_decent,
+    )
   }
 }
 
@@ -106,7 +114,7 @@ fn from_fits_skymap_internal<R: BufRead>(
   strict: bool,
   no_split: bool,
   reverse_decent: bool,
-) -> Result<RangeMOC<u64, Hpx::<u64>>, FitsError> {
+) -> Result<RangeMOC<u64, Hpx<u64>>, FitsError> {
   let mut header_block = [b' '; 2880];
   consume_primary_hdu(&mut reader, &mut header_block)?;
   // Read the extention HDU
@@ -126,8 +134,8 @@ fn from_fits_skymap_internal<R: BufRead>(
   if !ttype1.to_uppercase().starts_with("PROB") {
     let err = FitsError::UnexpectedValue(
       String::from("TTYPE1"),
-      String::from("starts with 'PROB'"), 
-      String::from(ttype1)
+      String::from("starts with 'PROB'"),
+      String::from(ttype1),
     );
     eprintln!("WARNING: {}", err);
   }
@@ -136,19 +144,17 @@ fn from_fits_skymap_internal<R: BufRead>(
     Ok((true, 1_u64))
   } else if tform1 == "E" || tform1 == "1E" {
     Ok((false, 1_u64))
-  } else if tform1 =="1024E" {
+  } else if tform1 == "1024E" {
     Ok((false, 1024_u64))
   } else {
     // TODO: ALSO SUPPORT B or 1B and TTYPE = M (for MASK)!!
-    Err(
-      FitsError::UnexpectedValue(
-        String::from("TFORM1"),
-        String::from("'D', '1D', 'E', '1E' or '1024E'"),
-        String::from(tform1)
-      )
-    )
+    Err(FitsError::UnexpectedValue(
+      String::from("TFORM1"),
+      String::from("'D', '1D', 'E', '1E' or '1024E'"),
+      String::from(tform1),
+    ))
   }?;
-  
+
   // nbits = |BITPIX|xGCOUNTx(PCOUNT+NAXIS1xNAXIS2x...xNAXISn)
   // In our case (bitpix = 8, GCOUNT = 1, PCOUNT = 0) => nbytes = n_cells * size_of(T)
   // let data_size n_bytes as usize * n_cells as usize; // N_BYTES ok since BITPIX = 8
@@ -182,32 +188,41 @@ fn from_fits_skymap_internal<R: BufRead>(
   // - get MOC depth
   let depth_max = match moc_kws.get::<MocOrder>() {
     Some(MocKeywords::MOCOrder(MocOrder { depth })) => *depth,
-    _ => {
-      match moc_kws.get::<Nside>() {
-        Some(MocKeywords::Nside(Nside { nside })) => {
-          if healpix::is_nside(*nside) {
-            depth(*nside)
-          } else {
-            return Err(FitsError::Custom(format!("Nside is not valid (to be used in nested mode at least): {}", nside)));
-          }
-        },
-        _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string()))
+    _ => match moc_kws.get::<Nside>() {
+      Some(MocKeywords::Nside(Nside { nside })) => {
+        if healpix::is_nside(*nside) {
+          depth(*nside)
+        } else {
+          return Err(FitsError::Custom(format!(
+            "Nside is not valid (to be used in nested mode at least): {}",
+            nside
+          )));
+        }
       }
+      _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
     },
   };
   if n_rows * n_pack != healpix::n_hash(depth_max) {
-    return Err(FitsError::Custom(format!("Number of elements {} do not match number of HEALPix cells {}", n_rows * n_pack, healpix::n_hash(depth_max))))
+    return Err(FitsError::Custom(format!(
+      "Number of elements {} do not match number of HEALPix cells {}",
+      n_rows * n_pack,
+      healpix::n_hash(depth_max)
+    )));
   }
   // Read data
   let (uniq_val_dens, cumul_skipped) = match moc_kws.get::<Ordering>() {
-    Some(MocKeywords::Ordering(Ordering::Nested)) =>
+    Some(MocKeywords::Ordering(Ordering::Nested)) => {
       if is_f64 {
         let first_elem_byte_size = size_of::<f64>() * n_pack as usize;
         let n_byte_skip = n_bytes_per_row as usize - first_elem_byte_size;
         load_from_nested(
           reader,
           |r| r.read_f64::<BigEndian>(),
-          skip_value_le_this, depth_max, n_pack, n_byte_skip, n_rows
+          skip_value_le_this,
+          depth_max,
+          n_pack,
+          n_byte_skip,
+          n_rows,
         )
       } else {
         let first_elem_byte_size = size_of::<f32>() * n_pack as usize;
@@ -215,17 +230,26 @@ fn from_fits_skymap_internal<R: BufRead>(
         load_from_nested(
           reader,
           |r| r.read_f32::<BigEndian>().map(|v| v as f64),
-          skip_value_le_this, depth_max, n_pack, n_byte_skip, n_rows
+          skip_value_le_this,
+          depth_max,
+          n_pack,
+          n_byte_skip,
+          n_rows,
         )
-      }?,
-    Some(MocKeywords::Ordering(Ordering::Ring)) =>
+      }?
+    }
+    Some(MocKeywords::Ordering(Ordering::Ring)) => {
       if is_f64 {
         let first_elem_byte_size = size_of::<f64>() * n_pack as usize;
         let n_byte_skip = n_bytes_per_row as usize - first_elem_byte_size;
         load_from_ring(
           reader,
           |r| r.read_f64::<BigEndian>(),
-          skip_value_le_this, depth_max, n_pack, n_byte_skip, n_rows
+          skip_value_le_this,
+          depth_max,
+          n_pack,
+          n_byte_skip,
+          n_rows,
         )
       } else {
         let first_elem_byte_size = size_of::<f32>() * n_pack as usize;
@@ -233,15 +257,25 @@ fn from_fits_skymap_internal<R: BufRead>(
         load_from_ring(
           reader,
           |r| r.read_f32::<BigEndian>().map(|v| v as f64),
-          skip_value_le_this, depth_max, n_pack, n_byte_skip, n_rows
+          skip_value_le_this,
+          depth_max,
+          n_pack,
+          n_byte_skip,
+          n_rows,
         )
-      }?,
-    Some(MocKeywords::Ordering(other_ordering)) => 
+      }?
+    }
+    Some(MocKeywords::Ordering(other_ordering)) => {
       return Err(FitsError::UnexpectedValue(
         Ordering::keyword_string(),
-        format!("{} or {}", Ordering::Nested.to_fits_value(), Ordering::Ring.to_fits_value()),
-        other_ordering.to_fits_value()
-      )),
+        format!(
+          "{} or {}",
+          Ordering::Nested.to_fits_value(),
+          Ordering::Ring.to_fits_value()
+        ),
+        other_ordering.to_fits_value(),
+      ))
+    }
     Some(_other_keyword) => unreachable!(),
     None => return Err(FitsError::MissingKeyword(Ordering::keyword_string())),
   };
@@ -259,7 +293,6 @@ fn from_fits_skymap_internal<R: BufRead>(
   Ok(RangeMOC::new(depth_max, ranges))
 }
 
-
 fn load_from_nested<R, F>(
   mut reader: R,
   read_f64: F,
@@ -268,10 +301,10 @@ fn load_from_nested<R, F>(
   n_pack: u64,
   n_byte_skip: usize,
   n_rows: u64,
-) -> io::Result<(Vec<(u64, f64, f64)>, f64)> 
-  where
-    R: BufRead,
-    F: Fn(&mut R) -> io::Result<f64>
+) -> io::Result<(Vec<(u64, f64, f64)>, f64)>
+where
+  R: BufRead,
+  F: Fn(&mut R) -> io::Result<f64>,
 {
   let mut sink = vec![0; n_byte_skip];
   let mut prev_range = 0..0;
@@ -289,10 +322,8 @@ fn load_from_nested<R, F>(
           prev_range.end = ipix + 1;
         } else {
           if prev_range.start != prev_range.end {
-            let moc_range: MocRange<u64, Hpx<u64>> = CellRange::from_depth_range(
-              depth_max,
-              prev_range.clone()
-            ).into();
+            let moc_range: MocRange<u64, Hpx<u64>> =
+              CellRange::from_depth_range(depth_max, prev_range.clone()).into();
             for moc_cell in moc_range {
               let n_cells = 1_u64 << ((depth_max - moc_cell.depth()) << 1);
               let uniq = Cell::<u64>::from(moc_cell).uniq_hpx();
@@ -322,10 +353,8 @@ fn load_from_nested<R, F>(
             prev_range.end = ipix + 1;
           } else {
             if prev_range.start != prev_range.end {
-              let moc_range: MocRange<u64, Hpx<u64>> = CellRange::from_depth_range(
-                depth_max,
-                prev_range.clone()
-              ).into();
+              let moc_range: MocRange<u64, Hpx<u64>> =
+                CellRange::from_depth_range(depth_max, prev_range.clone()).into();
               for moc_cell in moc_range {
                 let n_cells = 1_u64 << ((depth_max - moc_cell.depth()) << 1);
                 let uniq = Cell::<u64>::from(moc_cell).uniq_hpx();
@@ -345,10 +374,8 @@ fn load_from_nested<R, F>(
     }
   }
   if prev_range.start != prev_range.end {
-    let moc_range: MocRange<u64, Hpx<u64>> = CellRange::from_depth_range(
-      depth_max,
-      prev_range
-    ).into();
+    let moc_range: MocRange<u64, Hpx<u64>> =
+      CellRange::from_depth_range(depth_max, prev_range).into();
     for moc_cell in moc_range {
       let n_cells = 1_u64 << ((depth_max - moc_cell.depth()) << 1);
       let uniq = Cell::<u64>::from(moc_cell).uniq_hpx();
@@ -368,9 +395,9 @@ fn load_from_ring<R, F>(
   n_byte_skip: usize,
   n_rows: u64,
 ) -> io::Result<(Vec<(u64, f64, f64)>, f64)>
-  where
-    R: BufRead,
-    F: Fn(&mut R) -> io::Result<f64>
+where
+  R: BufRead,
+  F: Fn(&mut R) -> io::Result<f64>,
 {
   let nested_layer = healpix::nested::get(depth_max);
   let mut sink = vec![0; n_byte_skip];
@@ -411,16 +438,15 @@ fn load_from_ring<R, F>(
   Ok((uniq_val_dens, cumul_skipped))
 }
 
-
 #[cfg(test)]
 mod tests {
 
-  use std::path::PathBuf;
-  use std::fs::File;
-  use std::io::{BufReader, BufWriter};
+  use super::from_fits_skymap;
   use crate::deser::fits::ranges_to_fits_ivoa;
   use crate::moc::RangeMOCIntoIterator;
-  use super::from_fits_skymap;
+  use std::fs::File;
+  use std::io::{BufReader, BufWriter};
+  use std::path::PathBuf;
 
   // Perform only in release mode (else slow: the decompressed fits files is 1.6GB large)!
   #[cfg(not(debug_assertions))]
@@ -428,29 +454,28 @@ mod tests {
   fn test_skymap_v1() {
     let path_buf1 = PathBuf::from("resources/Skymap/bayestar.fits.gz");
     let path_buf2 = PathBuf::from("../resources/Skymap/bayestar.fits.gz");
-    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
     let reader = BufReader::new(file);
-    
+
     let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
     match res {
       Ok(o) => {
         let path_buf1 = PathBuf::from("resources/Skymap/bayestar.moc.out.fits");
         let path_buf2 = PathBuf::from("../resources/Skymap/bayestar.moc.out.fits");
-        let file = File::create(&path_buf1).or_else(|_| File::create(&path_buf2)).unwrap();
+        let file = File::create(&path_buf1)
+          .or_else(|_| File::create(&path_buf2))
+          .unwrap();
         let writer = BufWriter::new(file);
         print!("{:?}", &o);
-        ranges_to_fits_ivoa(
-          o.into_range_moc_iter(),
-          None,
-          None,
-          writer
-        ).unwrap();
+        ranges_to_fits_ivoa(o.into_range_moc_iter(), None, None, writer).unwrap();
         assert!(true)
-      },
+      }
       Err(e) => {
         print!("{:?}", e);
         assert!(false)
-      },
+      }
     }
   }
 
@@ -459,7 +484,9 @@ mod tests {
     let path_buf1 = PathBuf::from("resources/Skymap/gbuts_healpix_systematic.fits");
     let path_buf2 = PathBuf::from("../resources/Skymap/gbuts_healpix_systematic.fits");
 
-    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
     let reader = BufReader::new(file);
 
     let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
@@ -467,31 +494,30 @@ mod tests {
       Ok(o) => {
         let path_buf1 = PathBuf::from("resources/Skymap/gbuts_healpix_systematic.moc.out.fits");
         let path_buf2 = PathBuf::from("../resources/Skymap/gbuts_healpix_systematic.moc.out.fits");
-        let file = File::create(&path_buf1).or_else(|_| File::create(&path_buf2)).unwrap();
+        let file = File::create(&path_buf1)
+          .or_else(|_| File::create(&path_buf2))
+          .unwrap();
         let writer = BufWriter::new(file);
         print!("{:?}", &o);
-        ranges_to_fits_ivoa(
-          o.into_range_moc_iter(),
-          None,
-          None,
-          writer
-        ).unwrap();
+        ranges_to_fits_ivoa(o.into_range_moc_iter(), None, None, writer).unwrap();
         assert!(true)
-      },
+      }
       Err(e) => {
         print!("{:?}", e);
         assert!(false)
-      },
+      }
     }
   }
-
 
   #[test]
   fn test_skymap_v3() {
     let path_buf1 = PathBuf::from("resources/Skymap/gbm_subthresh_514434454.487999_healpix.fits");
-    let path_buf2 = PathBuf::from("../resources/Skymap/gbm_subthresh_514434454.487999_healpix.fits");
+    let path_buf2 =
+      PathBuf::from("../resources/Skymap/gbm_subthresh_514434454.487999_healpix.fits");
 
-    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
     let reader = BufReader::new(file);
 
     let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
@@ -500,23 +526,25 @@ mod tests {
         print!("{:?}", o);
 
         print!("{}", o.to_ascii().unwrap());
-        
+
         assert!(true)
-      },
+      }
       Err(e) => {
         print!("{:?}", e);
         assert!(false)
-      },
+      }
     }
   }
-
 
   #[test]
   fn test_skymap_v4() {
     let path_buf1 = PathBuf::from("resources/Skymap/hese_59031_run00134244.evt000034406854.fits");
-    let path_buf2 = PathBuf::from("../resources/Skymap/hese_59031_run00134244.evt000034406854.fits");
+    let path_buf2 =
+      PathBuf::from("../resources/Skymap/hese_59031_run00134244.evt000034406854.fits");
 
-    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
     let reader = BufReader::new(file);
 
     let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
@@ -525,13 +553,13 @@ mod tests {
         // print!("{:?}", o);
 
         print!("{}", o.to_ascii().unwrap());
-        
+
         assert!(true)
-      },
+      }
       Err(e) => {
         print!("{:?}", e);
         assert!(false)
-      },
+      }
     }
   }
 
@@ -540,7 +568,9 @@ mod tests {
     let path_buf1 = PathBuf::from("resources/Skymap/cWB.fits.gz");
     let path_buf2 = PathBuf::from("../resources/Skymap/cWB.fits.gz");
 
-    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
     let reader = BufReader::new(file);
 
     let res = from_fits_skymap(reader, 0.0, 0.0, 0.9, false, true, true, false);
@@ -549,13 +579,11 @@ mod tests {
         // print!("{:?}", o);
         print!("{}", o.to_ascii().unwrap());
         assert!(true)
-      },
+      }
       Err(e) => {
         print!("{:?}", e);
         assert!(false)
-      },
+      }
     }
   }
-
-
 }

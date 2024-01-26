@@ -1,41 +1,33 @@
 //! Contains code to generate an image from a given MOC
 
 use std::{
-  io::{self, Write, BufWriter},
   f64::consts::PI,
   fs::File,
-  path::Path,
+  io::{self, BufWriter, Write},
   ops::RangeInclusive,
+  path::Path,
 };
 
 use healpix::nested;
 
 use mapproj::{
-  math::HALF_PI,
-  LonLat, ImgXY, CanonicalProjection, CenteredProjection,
-  img2proj::ReversedEastPngImgXY2ProjXY,
-  img2celestial::Img2Celestial,
-  pseudocyl::mol::Mol,
-  zenithal::sin::Sin,
+  img2celestial::Img2Celestial, img2proj::ReversedEastPngImgXY2ProjXY, math::HALF_PI,
+  pseudocyl::mol::Mol, zenithal::sin::Sin, CanonicalProjection, CenteredProjection, ImgXY, LonLat,
 };
 
 use crate::{
-  idx::Idx,
-  qty::{Hpx, MocQty},
   elem::cell::Cell,
-  moc::{
-    RangeMOCIntoIterator, RangeMOCIterator, CellMOCIterator,
-    range::RangeMOC,
-  },
+  idx::Idx,
+  moc::{range::RangeMOC, CellMOCIterator, RangeMOCIntoIterator, RangeMOCIterator},
+  qty::{Hpx, MocQty},
 };
 
-
-pub fn to_img_auto<T: Idx>(
-  smoc: &RangeMOC<T, Hpx::<T>>,
-  img_size_y: u16,
-) -> (Vec<u8>, (u16, u16)) {
+pub fn to_img_auto<T: Idx>(smoc: &RangeMOC<T, Hpx<T>>, img_size_y: u16) -> (Vec<u8>, (u16, u16)) {
   let (lon, lat) = smoc.into_range_moc_iter().cells().mean_center();
-  let r_max = smoc.into_range_moc_iter().cells().max_distance_from(lon, lat);
+  let r_max = smoc
+    .into_range_moc_iter()
+    .cells()
+    .max_distance_from(lon, lat);
 
   let proj_center = Some((lon, lat));
   if r_max > HALF_PI {
@@ -53,19 +45,18 @@ pub fn to_img_auto<T: Idx>(
   }
 }
 
-
 /// Returns an RGBA array (each pixel is made of 4 successive u8: RGBA) using the Mollweide projection.
-/// 
+///
 /// # Params
 /// * `smoc`: the Spatial MOC to be print;
-/// * `size`: the `(X, Y)` number of pixels in the image; 
-/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians, 
+/// * `size`: the `(X, Y)` number of pixels in the image;
+/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians,
 ///                      if different from `(0, 0)`;
-/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values 
+/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values
 ///                  which depends on the projection. For unbounded projections, de default value
 ///                  is `(-PI..PI, -PI..PI)`.
 pub fn to_img_default<T: Idx>(
-  smoc: &RangeMOC<T, Hpx::<T>>,
+  smoc: &RangeMOC<T, Hpx<T>>,
   img_size: (u16, u16),
   proj_center: Option<(f64, f64)>,
   proj_bounds: Option<(RangeInclusive<f64>, RangeInclusive<f64>)>,
@@ -74,18 +65,18 @@ pub fn to_img_default<T: Idx>(
 }
 
 /// Returns an RGBA array (each pixel is made of 4 successive u8: RGBA).
-/// 
+///
 /// # Params
 /// * `smoc`: the Spatial MOC to be print;
-/// * `size`: the `(X, Y)` number of pixels in the image; 
+/// * `size`: the `(X, Y)` number of pixels in the image;
 /// * `proj`: a projection, if different from Mollweide;
-/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians, 
+/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians,
 ///                      if different from `(0, 0)`;
-/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values 
+/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values
 ///                  which depends on the projection. For unbounded projections, de default value
 ///                  is `(-PI..PI, -PI..PI)`.
 pub fn to_img<T: Idx, P: CanonicalProjection>(
-  smoc: &RangeMOC<T, Hpx::<T>>,
+  smoc: &RangeMOC<T, Hpx<T>>,
   img_size: (u16, u16),
   proj: P,
   proj_center: Option<(f64, f64)>,
@@ -93,13 +84,24 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
 ) -> Vec<u8> {
   let (size_x, size_y) = img_size;
   let mut v: Vec<u8> = Vec::with_capacity((size_x as usize * size_y as usize) << 2);
-  
+
   let (proj_range_x, proj_range_y) = proj_bounds.unwrap_or((
-    proj.bounds().x_bounds().as_ref().cloned().unwrap_or_else(|| -PI..=PI),
-    proj.bounds().y_bounds().as_ref().cloned().unwrap_or_else(|| -PI..=PI)
+    proj
+      .bounds()
+      .x_bounds()
+      .as_ref()
+      .cloned()
+      .unwrap_or_else(|| -PI..=PI),
+    proj
+      .bounds()
+      .y_bounds()
+      .as_ref()
+      .cloned()
+      .unwrap_or_else(|| -PI..=PI),
   ));
 
-  let img2proj = ReversedEastPngImgXY2ProjXY::from((size_x, size_y), (&proj_range_x, &proj_range_y));
+  let img2proj =
+    ReversedEastPngImgXY2ProjXY::from((size_x, size_y), (&proj_range_x, &proj_range_y));
   let mut img2cel = Img2Celestial::new(img2proj, CenteredProjection::new(proj));
   if let Some((lon, lat)) = proj_center {
     img2cel.set_proj_center_from_lonlat(&LonLat::new(lon, lat));
@@ -137,8 +139,8 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
   for Cell { depth, idx } in smoc.into_range_moc_iter().cells() {
     let (lon_rad, lat_rad) = nested::center(depth, idx.to_u64());
     if let Some(xy) = img2cel.lonlat2img(&LonLat::new(lon_rad, lat_rad)) {
-      let ix =  xy.x() as u16;
-      let iy =  xy.y() as u16;
+      let ix = xy.x() as u16;
+      let iy = xy.y() as u16;
       if ix < img_size.0 && iy < img_size.1 {
         let from = (xy.y() as usize * size_x as usize + ix as usize) << 2; // <<2 <=> *4
         if v[from] == 0 {
@@ -153,24 +155,23 @@ pub fn to_img<T: Idx, P: CanonicalProjection>(
   v
 }
 
-
 /// # Params
 /// * `smoc`: the Spatial MOC to be print;
-/// * `size`: the `(X, Y)` number of pixels in the image; 
+/// * `size`: the `(X, Y)` number of pixels in the image;
 /// * `proj`: a projection, if different from Mollweide;
-/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians, 
+/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians,
 ///                      if different from `(0, 0)`;
-/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values 
+/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values
 ///                  which depends on the projection. For unbounded projections, de default value
 ///                  is `(-PI..PI, -PI..PI)`.
 /// * `writer`: the writer in which the image is going to be written
 pub fn to_png<T: Idx, P: CanonicalProjection, W: Write>(
-  smoc: &RangeMOC<T, Hpx::<T>>,
+  smoc: &RangeMOC<T, Hpx<T>>,
   img_size: (u16, u16),
   proj: Option<P>,
   proj_center: Option<(f64, f64)>,
   proj_bounds: Option<(RangeInclusive<f64>, RangeInclusive<f64>)>,
-  writer: W
+  writer: W,
 ) -> Result<(), io::Error> {
   let (xsize, ysize) = img_size;
   let data = if let Some(proj) = proj {
@@ -188,14 +189,14 @@ pub fn to_png<T: Idx, P: CanonicalProjection, W: Write>(
 
 /// Automatically determines the center of the projection and if the projection to be used
 /// is an allsky (Mollweide) ou bound limited (Sinus) projection.
-/// In the first case, the image size along the x-axis is `2 * size_y`, and `size_y` 
+/// In the first case, the image size along the x-axis is `2 * size_y`, and `size_y`
 /// # Params
 /// * `smoc`: the Spatial MOC to be print;
 /// * `img_size_y`: the size of the image along the y-axis.
 pub fn to_png_auto<T: Idx, W: Write>(
-  smoc: &RangeMOC<T, Hpx::<T>>,
+  smoc: &RangeMOC<T, Hpx<T>>,
   img_size_y: u16,
-  writer: W
+  writer: W,
 ) -> Result<(u16, u16), io::Error> {
   let (data, img_size) = to_img_auto(smoc, img_size_y);
   let mut encoder = png::Encoder::new(writer, img_size.0 as u32, img_size.1 as u32);
@@ -208,18 +209,18 @@ pub fn to_png_auto<T: Idx, W: Write>(
 
 /// # Params
 /// * `smoc`: the Spatial MOC to be print;
-/// * `size`: the `(X, Y)` number of pixels in the image; 
+/// * `size`: the `(X, Y)` number of pixels in the image;
 /// * `proj`: a projection, if different from Mollweide;
-/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians, 
+/// * `proj_center`: the `(lon, lat)` coordinates of the center of the projection, in radians,
 ///                      if different from `(0, 0)`;
-/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values 
+/// * `proj_bounds`: the `(X, Y)` bounds of the projection, if different from the default values
 ///                  which depends on the projection. For unbounded projections, de default value
 ///                  is `(-PI..PI, -PI..PI)`.
 /// * `path`: the path of th PNG file to be written.
 /// * `view`: set to true to visualize the saved image.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn to_png_file<T: Idx, P: CanonicalProjection>(
-  smoc: &RangeMOC<T, Hpx::<T>>,
+  smoc: &RangeMOC<T, Hpx<T>>,
   img_size: (u16, u16),
   proj: Option<P>,
   proj_center: Option<(f64, f64)>,
@@ -241,7 +242,7 @@ pub fn to_png_file<T: Idx, P: CanonicalProjection>(
 
 /// Automatically determines the center of the projection and if the projection to be used
 /// is an allsky (Mollweide) ou bound limited (Sinus) projection.
-/// In the first case, the image size along the x-axis is `2 * size_y`, and `size_y` 
+/// In the first case, the image size along the x-axis is `2 * size_y`, and `size_y`
 /// # Params
 /// * `smoc`: the Spatial MOC to be print;
 /// * `img_size_y`: the size of the image along the y-axis.
@@ -249,7 +250,7 @@ pub fn to_png_file<T: Idx, P: CanonicalProjection>(
 /// * `view`: set to true to visualize the saved image.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn to_png_file_auto<T: Idx>(
-  smoc: &RangeMOC<T, Hpx::<T>>,
+  smoc: &RangeMOC<T, Hpx<T>>,
   img_size_y: u16,
   path: &Path,
   view: bool,
@@ -266,15 +267,12 @@ pub fn to_png_file_auto<T: Idx>(
   Ok(img_size)
 }
 
-
 // Adapted from https://github.com/igiagkiozis/plotly/blob/master/plotly/src/plot.rs
 
 #[cfg(target_os = "linux")]
 fn show_with_default_app(path: &str) -> Result<(), io::Error> {
   use std::process::Command;
-  Command::new("xdg-open")
-    .args([path])
-    .output()?;
+  Command::new("xdg-open").args([path]).output()?;
   // .map_err(|e| e.into())?;
   Ok(())
 }
@@ -282,9 +280,7 @@ fn show_with_default_app(path: &str) -> Result<(), io::Error> {
 #[cfg(target_os = "macos")]
 fn show_with_default_app(path: &str) -> Result<(), io::Error> {
   use std::process::Command;
-  Command::new("open")
-    .args(&[path])
-    .output()?;
+  Command::new("open").args(&[path]).output()?;
   Ok(())
 }
 
@@ -298,59 +294,34 @@ fn show_with_default_app(path: &str) -> Result<(), io::Error> {
   Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
-  
+
   use std::{
     fs::File,
     io::BufReader,
     path::{Path, PathBuf},
   };
-  
+
   use mapproj::{
-    pseudocyl::{
-      mol::Mol,
-      ait::Ait,
-      par::Par,
-      sfl::Sfl,
-    }, 
-    conic::{
-      cod::Cod,
-      coe::Coe,
-      coo::Coo,
-      cop::Cop,
-    }, 
-    cylindrical::{
-      car::Car,
-      cea::Cea,
-      cyp::Cyp,
-      mer::Mer,
-    },
+    conic::{cod::Cod, coe::Coe, coo::Coo, cop::Cop},
+    cylindrical::{car::Car, cea::Cea, cyp::Cyp, mer::Mer},
     hybrid::hpx::Hpx,
+    pseudocyl::{ait::Ait, mol::Mol, par::Par, sfl::Sfl},
     zenithal::{
-      air::Air,
-      arc::Arc,
-      azp::Azp,
-      feye::Feye,
-      ncp::Ncp,
-      sin::Sin,
-      stg::Stg,
-      szp::Szp,
-      tan::Tan,
-      zea::Zea,
-      zpn::Zpn,
-    }
-  };
-  
-  use crate::{
-    moc::{CellMOCIterator, CellMOCIntoIterator, RangeMOCIterator},
-    deser::{
-      img::to_png_file,
-      fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType}
+      air::Air, arc::Arc, azp::Azp, feye::Feye, ncp::Ncp, sin::Sin, stg::Stg, szp::Szp, tan::Tan,
+      zea::Zea, zpn::Zpn,
     },
   };
+
   use crate::deser::img::to_img_auto;
+  use crate::{
+    deser::{
+      fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType},
+      img::to_png_file,
+    },
+    moc::{CellMOCIntoIterator, CellMOCIterator, RangeMOCIterator},
+  };
 
   #[test]
   fn test_img() {
@@ -358,7 +329,9 @@ mod tests {
     let path_buf2 = PathBuf::from("../resources/V_147_sdss12.moc.fits");
     // let path_buf1 = PathBuf::from("resources/V_147_sdss12.moc.u64.fits");
     // let path_buf2 = PathBuf::from("../resources/V_147_sdss12.moc.u64.fits");
-    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
     let reader = BufReader::new(file);
     match from_fits_ivoa(reader) {
       Ok(MocIdxType::U32(MocQtyType::Hpx(MocType::Cells(moc)))) => {
@@ -366,41 +339,284 @@ mod tests {
         // let moc = moc.into_range_moc();
         let moc = moc.into_cell_moc_iter().ranges().into_range_moc();
         let view = false;
-        let img_size= (1600, 800); 
-        to_png_file(&moc, img_size, Some(Mol::new()), None, None, &Path::new("sdss_mol.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Ait::new()), None, None, &Path::new("sdss_ait.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Par::new()), None, None, &Path::new("sdss_par.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Sfl::new()), None, None, &Path::new("sdss_sfl.png"), view).unwrap();
+        let img_size = (1600, 800);
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Mol::new()),
+          None,
+          None,
+          &Path::new("sdss_mol.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Ait::new()),
+          None,
+          None,
+          &Path::new("sdss_ait.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Par::new()),
+          None,
+          None,
+          &Path::new("sdss_par.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Sfl::new()),
+          None,
+          None,
+          &Path::new("sdss_sfl.png"),
+          view,
+        )
+        .unwrap();
 
-        to_png_file(&moc, img_size, Some(Car::new()), None, None, &Path::new("sdss_car.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Cea::new()), None, None, &Path::new("sdss_cea.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Cyp::new()), None, None, &Path::new("sdss_cyp.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Mer::new()), None, None, &Path::new("sdss_mer.png"), view).unwrap();
-        let img_size= (800, 800);
-        to_png_file(&moc, img_size, Some(Cod::new()), None, None, &Path::new("sdss_cod.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Coe::new()), None, None, &Path::new("sdss_coe.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Coo::new()), None, None, &Path::new("sdss_coo.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Cop::new()), None, None, &Path::new("sdss_cop.png"), view).unwrap();
-        let img_size= (1600, 800);
-        to_png_file(&moc, img_size, Some(Hpx::new()), None, None, &Path::new("sdss_hpx.png"), view).unwrap();
-        let img_size= (800, 800);
-        to_png_file(&moc, img_size, Some(Air::new()), None, None, &Path::new("sdss_air.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Arc::new()), None, None, &Path::new("sdss_arc.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Azp::new()), None, Some((-3.0..=3.0, -3.0..=3.0)), &Path::new("sdss_azp.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Feye::new()), None, None, &Path::new("sdss_feye_front.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Feye::new()), Some((180.0, 0.0)), None, &Path::new("sdss_feye_back.png"), view).unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Car::new()),
+          None,
+          None,
+          &Path::new("sdss_car.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Cea::new()),
+          None,
+          None,
+          &Path::new("sdss_cea.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Cyp::new()),
+          None,
+          None,
+          &Path::new("sdss_cyp.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Mer::new()),
+          None,
+          None,
+          &Path::new("sdss_mer.png"),
+          view,
+        )
+        .unwrap();
+        let img_size = (800, 800);
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Cod::new()),
+          None,
+          None,
+          &Path::new("sdss_cod.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Coe::new()),
+          None,
+          None,
+          &Path::new("sdss_coe.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Coo::new()),
+          None,
+          None,
+          &Path::new("sdss_coo.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Cop::new()),
+          None,
+          None,
+          &Path::new("sdss_cop.png"),
+          view,
+        )
+        .unwrap();
+        let img_size = (1600, 800);
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Hpx::new()),
+          None,
+          None,
+          &Path::new("sdss_hpx.png"),
+          view,
+        )
+        .unwrap();
+        let img_size = (800, 800);
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Air::new()),
+          None,
+          None,
+          &Path::new("sdss_air.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Arc::new()),
+          None,
+          None,
+          &Path::new("sdss_arc.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Azp::new()),
+          None,
+          Some((-3.0..=3.0, -3.0..=3.0)),
+          &Path::new("sdss_azp.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Feye::new()),
+          None,
+          None,
+          &Path::new("sdss_feye_front.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Feye::new()),
+          Some((180.0, 0.0)),
+          None,
+          &Path::new("sdss_feye_back.png"),
+          view,
+        )
+        .unwrap();
 
-        to_png_file(&moc, img_size, Some(Ncp::new()), None, None, &Path::new("sdss_ncp_front.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Ncp::new()), Some((180.0, 0.0)), None, &Path::new("sdss_ncp_back.png"), view).unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Ncp::new()),
+          None,
+          None,
+          &Path::new("sdss_ncp_front.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Ncp::new()),
+          Some((180.0, 0.0)),
+          None,
+          &Path::new("sdss_ncp_back.png"),
+          view,
+        )
+        .unwrap();
 
-        to_png_file(&moc, img_size, Some(Sin::new()), None, None, &Path::new("sdss_sin_front.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Sin::new()), Some((180.0, 0.0)), None, &Path::new("sdss_sin_back.png"), view).unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Sin::new()),
+          None,
+          None,
+          &Path::new("sdss_sin_front.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Sin::new()),
+          Some((180.0, 0.0)),
+          None,
+          &Path::new("sdss_sin_back.png"),
+          view,
+        )
+        .unwrap();
 
-        to_png_file(&moc, img_size, Some(Stg::new()), None, None, &Path::new("sdss_stg.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Szp::new()), None, Some((-10.0..=10.0, -10.0..=10.0)), &Path::new("sdss_szp.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Tan::new()), None, None, &Path::new("sdss_tan.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Zea::new()), None, None, &Path::new("sdss_zea.png"), view).unwrap();
-        to_png_file(&moc, img_size, Some(Zpn::from_params(vec![0.0, 1.0, 0.0, -50.0]).unwrap()), None, None, &Path::new("sdss_zpn.png"), view).unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Stg::new()),
+          None,
+          None,
+          &Path::new("sdss_stg.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Szp::new()),
+          None,
+          Some((-10.0..=10.0, -10.0..=10.0)),
+          &Path::new("sdss_szp.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Tan::new()),
+          None,
+          None,
+          &Path::new("sdss_tan.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Zea::new()),
+          None,
+          None,
+          &Path::new("sdss_zea.png"),
+          view,
+        )
+        .unwrap();
+        to_png_file(
+          &moc,
+          img_size,
+          Some(Zpn::from_params(vec![0.0, 1.0, 0.0, -50.0]).unwrap()),
+          None,
+          None,
+          &Path::new("sdss_zpn.png"),
+          view,
+        )
+        .unwrap();
         assert!(true);
       }
       Err(e) => println!("{}", e),
@@ -414,7 +630,9 @@ mod tests {
     // let path_buf2 = PathBuf::from("../resources/V_147_sdss12.moc.fits");
     let path_buf1 = PathBuf::from("resources/MOC2.0/SMOC_test.fits");
     let path_buf2 = PathBuf::from("../resources/MOC2.0/SMOC_test.fits");
-    let file = File::open(&path_buf1).or_else(|_| File::open(&path_buf2)).unwrap();
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
     let reader = BufReader::new(file);
     match from_fits_ivoa(reader) {
       Ok(MocIdxType::U64(MocQtyType::Hpx(MocType::Cells(moc)))) => {
@@ -426,5 +644,4 @@ mod tests {
       _ => assert!(false),
     }
   }
-
 }

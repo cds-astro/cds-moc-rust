@@ -1,4 +1,3 @@
-
 // cell
 // ucell
 // zcell
@@ -12,7 +11,7 @@
 // - 0  -> zcell (like a range, but << 1 and with a sentinel bit coding the depth)
 
 pub mod cell;
-pub mod cellrange;
 pub mod cellcellrange;
+pub mod cellrange;
 pub mod range;
 pub mod valuedcell;

@@ -5,300 +5,295 @@ use std::ops::Range;
 
 use num::{CheckedAdd, One, Zero};
 
+use crate::elemset::range::{HpxRanges, SNORanges};
 use crate::idx::Idx;
-use crate::qty::{MocQty, Hpx};
-use crate::elemset::range::{
-    SNORanges, HpxRanges
-};
-
+use crate::qty::{Hpx, MocQty};
 
 pub struct HpxToUniqIter<T>
-    where
-        T: Idx + CheckedAdd,
+where
+  T: Idx + CheckedAdd,
 {
-    ranges: HpxRanges<T>,
-    id: usize,
-    buffer: Vec<Range<T>>,
-    depth: u8,
-    shift: u32,
-    off: T,
-    depth_off: T,
+  ranges: HpxRanges<T>,
+  id: usize,
+  buffer: Vec<Range<T>>,
+  depth: u8,
+  shift: u32,
+  off: T,
+  depth_off: T,
 }
 
 impl<T> HpxToUniqIter<T>
-    where
-        T: Idx + CheckedAdd,
+where
+  T: Idx + CheckedAdd,
 {
-    pub fn new(ranges: HpxRanges<T>) -> HpxToUniqIter<T> {
-        let id = 0;
-        let buffer = Vec::<Range<T>>::new();
-        let depth = 0;
-        // ((T::MAXDEPTH - depth) << 1) as u32;
-        let shift = Hpx::<T>::MAX_SHIFT; // ok since depth init == 0
+  pub fn new(ranges: HpxRanges<T>) -> HpxToUniqIter<T> {
+    let id = 0;
+    let buffer = Vec::<Range<T>>::new();
+    let depth = 0;
+    // ((T::MAXDEPTH - depth) << 1) as u32;
+    let shift = Hpx::<T>::MAX_SHIFT; // ok since depth init == 0
 
-        let mut off: T = One::one();
-        off = off.unsigned_shl(shift) - One::one();
+    let mut off: T = One::one();
+    off = off.unsigned_shl(shift) - One::one();
 
-        let mut depth_off: T = One::one();
-        depth_off = depth_off.unsigned_shl(((depth + 1) << 1) as u32);
+    let mut depth_off: T = One::one();
+    depth_off = depth_off.unsigned_shl(((depth + 1) << 1) as u32);
 
-        HpxToUniqIter {
-            ranges,
-            id,
-            buffer,
+    HpxToUniqIter {
+      ranges,
+      id,
+      buffer,
 
-            depth,
-            shift,
-            off,
-            depth_off,
-        }
+      depth,
+      shift,
+      off,
+      depth_off,
     }
+  }
 }
 
 impl<T> Iterator for HpxToUniqIter<T>
-    where
-        T: Idx + CheckedAdd,
+where
+  T: Idx + CheckedAdd,
 {
-    type Item = Range<T>;
+  type Item = Range<T>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        while !self.ranges.is_empty() {
-            let start_id = self.id;
-            let end_id = self.ranges.0.0.len();
-            for i in start_id..end_id {
-                let range = &self.ranges.0.0[i];
-                self.id += 1;
+  fn next(&mut self) -> Option<Self::Item> {
+    while !self.ranges.is_empty() {
+      let start_id = self.id;
+      let end_id = self.ranges.0 .0.len();
+      for i in start_id..end_id {
+        let range = &self.ranges.0 .0[i];
+        self.id += 1;
 
-                let t1 = range.start + self.off;
-                let t2 = range.end;
+        let t1 = range.start + self.off;
+        let t2 = range.end;
 
-                let pix1 = t1.unsigned_shr(self.shift);
-                let pix2 = t2.unsigned_shr(self.shift);
+        let pix1 = t1.unsigned_shr(self.shift);
+        let pix2 = t2.unsigned_shr(self.shift);
 
-                let c1 = pix1.unsigned_shl(self.shift);
-                let c2 = pix2.unsigned_shl(self.shift);
+        let c1 = pix1.unsigned_shl(self.shift);
+        let c2 = pix2.unsigned_shl(self.shift);
 
-                if c2 > c1 {
-                    self.buffer.push(c1..c2);
+        if c2 > c1 {
+          self.buffer.push(c1..c2);
 
-                    let e1 = self.depth_off.checked_add(&pix1).unwrap();
-                    let e2 = self.depth_off.checked_add(&pix2).unwrap();
+          let e1 = self.depth_off.checked_add(&pix1).unwrap();
+          let e2 = self.depth_off.checked_add(&pix2).unwrap();
 
-                    return Some(e1..e2);
-                }
-            }
-
-            // new_from_sorted?
-            let buffer_ranges = HpxRanges::<T>::new_from(self.buffer.clone());
-            self.ranges = self.ranges.difference(&buffer_ranges);
-            self.id = 0;
-            self.buffer.clear();
-
-            self.depth += 1;
-            assert!(self.depth <= Hpx::<T>::MAX_DEPTH || self.ranges.is_empty());
-            if self.depth > Hpx::<T>::MAX_DEPTH && self.ranges.is_empty() {
-                break;
-            }
-
-            // Recompute the constants for the new depth
-            self.shift = Hpx::<T>::shift_from_depth_max(self.depth) as u32;
-            self.off = One::one();
-            self.off = self.off.unsigned_shl(self.shift) - One::one();
-
-            self.depth_off = One::one();
-            self.depth_off = self.depth_off.unsigned_shl(((self.depth + 1) << 1) as u32);
+          return Some(e1..e2);
         }
-        None
+      }
+
+      // new_from_sorted?
+      let buffer_ranges = HpxRanges::<T>::new_from(self.buffer.clone());
+      self.ranges = self.ranges.difference(&buffer_ranges);
+      self.id = 0;
+      self.buffer.clear();
+
+      self.depth += 1;
+      assert!(self.depth <= Hpx::<T>::MAX_DEPTH || self.ranges.is_empty());
+      if self.depth > Hpx::<T>::MAX_DEPTH && self.ranges.is_empty() {
+        break;
+      }
+
+      // Recompute the constants for the new depth
+      self.shift = Hpx::<T>::shift_from_depth_max(self.depth) as u32;
+      self.off = One::one();
+      self.off = self.off.unsigned_shl(self.shift) - One::one();
+
+      self.depth_off = One::one();
+      self.depth_off = self.depth_off.unsigned_shl(((self.depth + 1) << 1) as u32);
     }
+    None
+  }
 }
 
 // Iterator responsible for converting
 // ranges of uniq numbers to ranges of
 // nested numbers
 pub struct UniqToHpxIter<T>
-    where
-        T: Idx + CheckedAdd,
+where
+  T: Idx + CheckedAdd,
 {
-    ranges: HpxRanges<T>,
-    cur: T,
-    id: usize,
+  ranges: HpxRanges<T>,
+  cur: T,
+  id: usize,
 }
 
 impl<T> UniqToHpxIter<T>
-    where
-        T: Idx + CheckedAdd,
+where
+  T: Idx + CheckedAdd,
 {
-    pub fn new(ranges: HpxRanges<T>) -> UniqToHpxIter<T> {
-        let id = 0;
+  pub fn new(ranges: HpxRanges<T>) -> UniqToHpxIter<T> {
+    let id = 0;
 
-        let cur = if ranges.is_empty() {
-            Zero::zero()
-        } else {
-            ranges[id].start
-        };
-        UniqToHpxIter { ranges, cur, id }
-    }
+    let cur = if ranges.is_empty() {
+      Zero::zero()
+    } else {
+      ranges[id].start
+    };
+    UniqToHpxIter { ranges, cur, id }
+  }
 }
 
 impl<T> Iterator for UniqToHpxIter<T>
-    where
-        T: Idx + CheckedAdd,
+where
+  T: Idx + CheckedAdd,
 {
-    type Item = Range<T>;
+  type Item = Range<T>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        // Iteration through the ranges
-        if self.id < self.ranges.0.0.len() {
-            // We get the depth/ipix values of the
-            // current uniq number
-            let (depth, ipix) = Hpx::<T>::from_uniq_hpx(self.cur);
+  fn next(&mut self) -> Option<Self::Item> {
+    // Iteration through the ranges
+    if self.id < self.ranges.0 .0.len() {
+      // We get the depth/ipix values of the
+      // current uniq number
+      let (depth, ipix) = Hpx::<T>::from_uniq_hpx(self.cur);
 
-            // We compute the number of bit to shift
-            let shift = ((Hpx::<T>::MAX_DEPTH - depth) << 1) as u32;
+      // We compute the number of bit to shift
+      let shift = ((Hpx::<T>::MAX_DEPTH - depth) << 1) as u32;
 
-            let one: T = One::one();
-            // Compute the final nested range
-            // for the depth given
-            let e1 = ipix.unsigned_shl(shift);
-            let e2 = ipix.checked_add(&one).unwrap().unsigned_shl(shift);
+      let one: T = One::one();
+      // Compute the final nested range
+      // for the depth given
+      let e1 = ipix.unsigned_shl(shift);
+      let e2 = ipix.checked_add(&one).unwrap().unsigned_shl(shift);
 
-            self.cur = self.cur.checked_add(&one).unwrap();
+      self.cur = self.cur.checked_add(&one).unwrap();
 
-            let end = self.ranges[self.id].end;
-            if self.cur == end {
-                self.id += 1;
+      let end = self.ranges[self.id].end;
+      if self.cur == end {
+        self.id += 1;
 
-                if self.id < self.ranges.0.0.len() {
-                    self.cur = self.ranges[self.id].start;
-                }
-            }
-
-            Some(e1..e2)
-        } else {
-            None
+        if self.id < self.ranges.0 .0.len() {
+          self.cur = self.ranges[self.id].start;
         }
-    }
-}
+      }
 
+      Some(e1..e2)
+    } else {
+      None
+    }
+  }
+}
 
 /// IMPORTANT: the iterator is ordered according first to the cell depth
 /// and then to the cell index.
 /// See `ranges2cells` bench, using `CellMOCIteratorFromRanges` and then sorting the result
 /// may be more efficient (x3 on the only bench done so far).
 pub struct HpxUniq2DepthIdxIter<T>
-    where
-        T: Idx + CheckedAdd,
+where
+  T: Idx + CheckedAdd,
 {
-    ranges: HpxRanges<T>,
-    current: Option<Range<T>>,
+  ranges: HpxRanges<T>,
+  current: Option<Range<T>>,
 
-    last: Option<T>,
-    depth: u8,
-    shift: u32,
+  last: Option<T>,
+  depth: u8,
+  shift: u32,
 
-    offset: T,
-    depth_offset: T,
+  offset: T,
+  depth_offset: T,
 }
 
 impl<T> HpxUniq2DepthIdxIter<T>
-    where
-        T: Idx + CheckedAdd,
+where
+  T: Idx + CheckedAdd,
 {
-    pub fn new(ranges: HpxRanges<T>) -> HpxUniq2DepthIdxIter<T> {
-        let depth = 0;
-        let shift =  ((Hpx::<T>::MAX_DEPTH - depth) << 1) as u32;
-        // More generic (but slower): let shift = Hpx::<T>::shift_from_depth_max(depth)
+  pub fn new(ranges: HpxRanges<T>) -> HpxUniq2DepthIdxIter<T> {
+    let depth = 0;
+    let shift = ((Hpx::<T>::MAX_DEPTH - depth) << 1) as u32;
+    // More generic (but slower): let shift = Hpx::<T>::shift_from_depth_max(depth)
 
-        let mut offset: T = One::one();
-        offset = offset.unsigned_shl(shift) - One::one();
+    let mut offset: T = One::one();
+    offset = offset.unsigned_shl(shift) - One::one();
 
-        let mut depth_offset: T = One::one();
-        depth_offset = depth_offset.unsigned_shl(((depth + 1) << 1) as u32);
+    let mut depth_offset: T = One::one();
+    depth_offset = depth_offset.unsigned_shl(((depth + 1) << 1) as u32);
 
-        let current = None;
-        let last = None;
-        HpxUniq2DepthIdxIter {
-            ranges,
-            current,
-            last,
-            depth,
-            shift,
-            offset,
-            depth_offset,
-        }
+    let current = None;
+    let last = None;
+    HpxUniq2DepthIdxIter {
+      ranges,
+      current,
+      last,
+      depth,
+      shift,
+      offset,
+      depth_offset,
     }
+  }
 
-    fn next_item_range(&mut self) -> Option<(i8, T)> {
-        if let Some(current) = self.current.clone() {
-            let last = self.last.unwrap();
-            if last < current.end {
-                let (depth, pix) = Hpx::<T>::from_uniq_hpx(last);
-                self.last = last.checked_add(&One::one());
+  fn next_item_range(&mut self) -> Option<(i8, T)> {
+    if let Some(current) = self.current.clone() {
+      let last = self.last.unwrap();
+      if last < current.end {
+        let (depth, pix) = Hpx::<T>::from_uniq_hpx(last);
+        self.last = last.checked_add(&One::one());
 
-                Some((depth as i8, pix))
-            } else {
-                self.current = None;
-                self.last = None;
-                None
-            }
-        } else {
-            None
-        }
+        Some((depth as i8, pix))
+      } else {
+        self.current = None;
+        self.last = None;
+        None
+      }
+    } else {
+      None
     }
+  }
 }
 
 impl<T> Iterator for HpxUniq2DepthIdxIter<T>
-    where
-        T: Idx + CheckedAdd,
+where
+  T: Idx + CheckedAdd,
 {
-    type Item = (i8, T);
+  type Item = (i8, T);
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let next_depth_pix = self.next_item_range();
-        if next_depth_pix.is_some() {
-            next_depth_pix
-        } else {
-            while !self.ranges.is_empty() {
-                for range in self.ranges.iter() {
-                    let t1 = range.start + self.offset;
-                    let t2 = range.end;
+  fn next(&mut self) -> Option<Self::Item> {
+    let next_depth_pix = self.next_item_range();
+    if next_depth_pix.is_some() {
+      next_depth_pix
+    } else {
+      while !self.ranges.is_empty() {
+        for range in self.ranges.iter() {
+          let t1 = range.start + self.offset;
+          let t2 = range.end;
 
-                    let pix1 = t1.unsigned_shr(self.shift);
-                    let pix2 = t2.unsigned_shr(self.shift);
+          let pix1 = t1.unsigned_shr(self.shift);
+          let pix2 = t2.unsigned_shr(self.shift);
 
-                    let c1 = pix1.unsigned_shl(self.shift);
-                    let c2 = pix2.unsigned_shl(self.shift);
+          let c1 = pix1.unsigned_shl(self.shift);
+          let c2 = pix2.unsigned_shl(self.shift);
 
-                    if c2 > c1 {
-                        let range_to_remove = HpxRanges::<T>::new_unchecked(vec![c1..c2]);
-                        self.ranges = self.ranges.difference(&range_to_remove);
+          if c2 > c1 {
+            let range_to_remove = HpxRanges::<T>::new_unchecked(vec![c1..c2]);
+            self.ranges = self.ranges.difference(&range_to_remove);
 
-                        let e1 = self.depth_offset.checked_add(&pix1).unwrap();
-                        let e2 = self.depth_offset.checked_add(&pix2).unwrap();
+            let e1 = self.depth_offset.checked_add(&pix1).unwrap();
+            let e2 = self.depth_offset.checked_add(&pix2).unwrap();
 
-                        self.last = Some(e1);
-                        self.current = Some(e1..e2);
+            self.last = Some(e1);
+            self.current = Some(e1..e2);
 
-                        return self.next_item_range();
-                    }
-                }
-                self.depth += 1;
-
-                // Recompute the constants for the new depth
-                self.shift = ((Hpx::<T>::MAX_DEPTH - self.depth) << 1) as u32;
-                // <=> let shift = Hpx::<T>::shift_from_depth_max(depth)
-
-                self.offset = One::one();
-                self.offset = self.offset.unsigned_shl(self.shift) - One::one();
-
-                self.depth_offset = One::one();
-                self.depth_offset = self.depth_offset.unsigned_shl((2 * self.depth + 2) as u32);
-            }
-            None
+            return self.next_item_range();
+          }
         }
-    }
-}
+        self.depth += 1;
 
+        // Recompute the constants for the new depth
+        self.shift = ((Hpx::<T>::MAX_DEPTH - self.depth) << 1) as u32;
+        // <=> let shift = Hpx::<T>::shift_from_depth_max(depth)
+
+        self.offset = One::one();
+        self.offset = self.offset.unsigned_shl(self.shift) - One::one();
+
+        self.depth_offset = One::one();
+        self.depth_offset = self.depth_offset.unsigned_shl((2 * self.depth + 2) as u32);
+      }
+      None
+    }
+  }
+}
 
 /*
 // I rename Nested in Hpx because it works the same for Nested or Ring indexes.

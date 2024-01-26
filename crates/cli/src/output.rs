@@ -1,32 +1,28 @@
-
 use std::{
-  str,
-  fs::File,
   error::Error,
-  path::PathBuf,
+  fs::File,
   io::{self, BufWriter},
+  path::PathBuf,
+  str,
 };
 
 use structopt::StructOpt;
 
 use moclib::{
+  deser::{
+    ascii::{moc2d_to_ascii_ivoa, to_ascii_ivoa, to_ascii_stream},
+    fits::{self, ranges2d_to_fits_ivoa, ranges_to_fits_ivoa},
+    json::{cellmoc2d_to_json_aladin, to_json_aladin},
+  },
   idx::Idx,
-  qty::{MocQty, Hpx, Time, Frequency},
   moc::{
-    RangeMOCIterator, CellMOCIterator, CellHpxMOCIterator,
-    range::op::convert::{convert_to_u64, convert_from_u64}
+    range::op::convert::{convert_from_u64, convert_to_u64},
+    CellHpxMOCIterator, CellMOCIterator, RangeMOCIterator,
   },
   moc2d::{
-    RangeMOC2Iterator,
-    RangeMOC2ElemIt,
-    CellMOC2IntoIterator,
-    CellOrCellRangeMOC2IntoIterator,
+    CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator, RangeMOC2ElemIt, RangeMOC2Iterator,
   },
-  deser::{
-    fits::{self, ranges_to_fits_ivoa, ranges2d_to_fits_ivoa},
-    json::{to_json_aladin, cellmoc2d_to_json_aladin},
-    ascii::{to_ascii_ivoa, to_ascii_stream, moc2d_to_ascii_ivoa},
-  }
+  qty::{Frequency, Hpx, MocQty, Time},
 };
 
 #[derive(StructOpt, Clone, Debug)]
@@ -34,10 +30,10 @@ pub enum OutputFormat {
   #[structopt(name = "ascii")]
   /// Output an ASCII MOC (VO compatible)
   Ascii {
-    #[structopt(short="-w", long = "--fold")]
+    #[structopt(short = "-w", long = "--fold")]
     /// Width of a cheep fold formatting
     fold: Option<usize>,
-    #[structopt(short="-l", long = "--range-len")]
+    #[structopt(short = "-l", long = "--range-len")]
     /// Use range len instead of range end (not VO compatible)
     range_len: bool,
     /// Path of the output file (stdout if empty)
@@ -46,7 +42,7 @@ pub enum OutputFormat {
   #[structopt(name = "json")]
   /// Output a JSON MOC (Aladin compatible)
   Json {
-    #[structopt(short="-w", long = "--fold")]
+    #[structopt(short = "-w", long = "--fold")]
     /// Width of a cheep fold formatting
     fold: Option<usize>,
     /// Path of the output file (stdout if empty)
@@ -61,14 +57,14 @@ pub enum OutputFormat {
     #[structopt(short = "-p", long = "--force-v1")]
     /// Force compatibility with MOC v1.0 (i.e. save NUNIQ instead of Ranges; ignored if MOC is not a S-MOC)
     force_v1: bool,
-    #[structopt(short="-i", long = "--moc-id")]
+    #[structopt(short = "-i", long = "--moc-id")]
     /// MOC ID to be written in the FITS header
     moc_id: Option<String>,
-    #[structopt(short="-y", long = "--moc-type")]
+    #[structopt(short = "-y", long = "--moc-type")]
     /// MOC Type to be written in the FITS header (IMAGE or CATALOG)
     moc_type: Option<fits::keywords::MocType>,
     /// Path of the output file
-    file: PathBuf
+    file: PathBuf,
   },
   #[structopt(name = "stream")]
   /// Output a streamed MOC (not yet implemented!)
@@ -76,15 +72,20 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
-
   /// Clone this output format, providing a number to possibly change the name
   pub fn clone_with_number(&self, num: usize) -> Self {
     let mut new = self.clone();
     match &mut new {
-      OutputFormat::Ascii { opt_file: Some(path), .. } => add_number_before_extension(num, path),
-      OutputFormat::Json { opt_file: Some(path), .. } => add_number_before_extension(num, path),
+      OutputFormat::Ascii {
+        opt_file: Some(path),
+        ..
+      } => add_number_before_extension(num, path),
+      OutputFormat::Json {
+        opt_file: Some(path),
+        ..
+      } => add_number_before_extension(num, path),
       OutputFormat::Fits { file, .. } => add_number_before_extension(num, file),
-      _ => { },
+      _ => {}
     };
     new
   }
@@ -96,18 +97,30 @@ impl OutputFormat {
   pub fn is_fits_forced_to_v1_std(&self) -> bool {
     matches!(self, OutputFormat::Fits { force_v1: true, .. })
   }
-  
+
   pub fn is_fits_forced_to_u64(&self) -> bool {
-    matches!(self, OutputFormat::Fits { force_u64: true, .. })
+    matches!(
+      self,
+      OutputFormat::Fits {
+        force_u64: true,
+        ..
+      }
+    )
   }
 
   pub fn is_fits_not_forced_to_u64(&self) -> bool {
-    matches!(self, OutputFormat::Fits { force_u64: false, .. })
+    matches!(
+      self,
+      OutputFormat::Fits {
+        force_u64: false,
+        ..
+      }
+    )
   }
 
   pub fn write_smoc_possibly_auto_converting_from_u64<I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      I: RangeMOCIterator<u64, Qty=Hpx<u64>>
+  where
+    I: RangeMOCIterator<u64, Qty = Hpx<u64>>,
   {
     let depth = it.depth_max();
     if self.is_fits_not_forced_to_u64() && depth <= Hpx::<u32>::MAX_DEPTH {
@@ -115,7 +128,7 @@ impl OutputFormat {
         if self.is_fits_forced_to_v1_std() {
           self.write_smoc_fits_v1(convert_from_u64::<Hpx<u64>, u16, Hpx<u16>, _>(it))
         } else {
-          self.write_moc(convert_from_u64::<Hpx<u64>, u16, Hpx<u16>, _>(it)) 
+          self.write_moc(convert_from_u64::<Hpx<u64>, u16, Hpx<u16>, _>(it))
         }
       } else {
         assert!(depth <= Hpx::<u32>::MAX_DEPTH);
@@ -128,19 +141,19 @@ impl OutputFormat {
     } else if self.is_fits_forced_to_v1_std() {
       self.write_smoc_fits_v1(it)
     } else {
-      self.write_moc(it)  
+      self.write_moc(it)
     }
   }
 
   pub fn write_smoc_possibly_converting_to_u64<T: Idx, I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      I: RangeMOCIterator<T, Qty=Hpx<T>>
+  where
+    I: RangeMOCIterator<T, Qty = Hpx<T>>,
   {
     if self.is_fits_forced_to_u64() {
       if self.is_fits_forced_to_v1_std() {
         self.write_smoc_fits_v1(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it))
       } else {
-        self.write_moc(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it)) 
+        self.write_moc(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it))
       }
     } else if self.is_fits_forced_to_v1_std() {
       self.write_smoc_fits_v1(it)
@@ -149,9 +162,12 @@ impl OutputFormat {
     }
   }
 
-  pub fn write_smoc_from_cells_possibly_converting_to_u64<T: Idx, I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      I: CellMOCIterator<T, Qty=Hpx<T>>
+  pub fn write_smoc_from_cells_possibly_converting_to_u64<T: Idx, I>(
+    self,
+    it: I,
+  ) -> Result<(), Box<dyn Error>>
+  where
+    I: CellMOCIterator<T, Qty = Hpx<T>>,
   {
     if self.is_fits_forced_to_u64() {
       if self.is_fits_forced_to_v1_std() {
@@ -160,15 +176,15 @@ impl OutputFormat {
         self.write_moc(convert_to_u64::<T, Hpx<T>, _, Hpx<u64>>(it.ranges()))
       }
     } else if self.is_fits_forced_to_v1_std() {
-        self.write_smoc_fits_v1_from_cells(it)
+      self.write_smoc_fits_v1_from_cells(it)
     } else {
-        self.write_moc_from_cells(it)
+      self.write_moc_from_cells(it)
     }
   }
 
   pub fn write_tmoc_possibly_auto_converting_from_u64<I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      I: RangeMOCIterator<u64, Qty=Time<u64>>
+  where
+    I: RangeMOCIterator<u64, Qty = Time<u64>>,
   {
     if self.is_fits_not_forced_to_u64() {
       let depth = it.depth_max();
@@ -185,8 +201,8 @@ impl OutputFormat {
   }
 
   pub fn write_tmoc_possibly_converting_to_u64<T: Idx, I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      I: RangeMOCIterator<T, Qty=Time<T>>
+  where
+    I: RangeMOCIterator<T, Qty = Time<T>>,
   {
     if self.is_fits_forced_to_u64() {
       self.write_moc(convert_to_u64::<T, Time<T>, _, Time<u64>>(it))
@@ -196,15 +212,19 @@ impl OutputFormat {
   }
 
   pub fn write_fmoc_possibly_auto_converting_from_u64<I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      I: RangeMOCIterator<u64, Qty=Frequency<u64>>
+  where
+    I: RangeMOCIterator<u64, Qty = Frequency<u64>>,
   {
     if self.is_fits_not_forced_to_u64() {
       let depth = it.depth_max();
       if depth <= Time::<u16>::MAX_DEPTH {
-        self.write_moc(convert_from_u64::<Frequency<u64>, u16, Frequency<u16>, _>(it))
+        self.write_moc(convert_from_u64::<Frequency<u64>, u16, Frequency<u16>, _>(
+          it,
+        ))
       } else if depth <= Time::<u32>::MAX_DEPTH {
-        self.write_moc(convert_from_u64::<Frequency<u64>, u32, Frequency<u32>, _>(it))
+        self.write_moc(convert_from_u64::<Frequency<u64>, u32, Frequency<u32>, _>(
+          it,
+        ))
       } else {
         self.write_moc(it)
       }
@@ -214,8 +234,8 @@ impl OutputFormat {
   }
 
   pub fn write_fmoc_possibly_converting_to_u64<T: Idx, I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      I: RangeMOCIterator<T, Qty=Frequency<T>>
+  where
+    I: RangeMOCIterator<T, Qty = Frequency<T>>,
   {
     if self.is_fits_forced_to_u64() {
       self.write_moc(convert_to_u64::<T, Frequency<T>, _, Frequency<u64>>(it))
@@ -225,144 +245,227 @@ impl OutputFormat {
   }
 
   pub fn write_moc<T, Q, I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      T: Idx,
-      Q: MocQty<T>,
-      I: RangeMOCIterator<T, Qty=Q>
+  where
+    T: Idx,
+    Q: MocQty<T>,
+    I: RangeMOCIterator<T, Qty = Q>,
   {
     match self {
-      OutputFormat::Ascii { fold, range_len, opt_file: None } => {
+      OutputFormat::Ascii {
+        fold,
+        range_len,
+        opt_file: None,
+      } => {
         let stdout = io::stdout();
-        to_ascii_ivoa(it.cells().cellranges(), &fold, range_len, stdout.lock()).map_err(|e| e.into())
-      },
-      OutputFormat::Ascii { fold, range_len, opt_file: Some(path) } => {
+        to_ascii_ivoa(it.cells().cellranges(), &fold, range_len, stdout.lock())
+          .map_err(|e| e.into())
+      }
+      OutputFormat::Ascii {
+        fold,
+        range_len,
+        opt_file: Some(path),
+      } => {
         let file = File::create(path)?;
-        to_ascii_ivoa(it.cells().cellranges(), &fold, range_len, BufWriter::new(file)).map_err(|e| e.into())
-      },
-      OutputFormat::Json { fold, opt_file: None } => {
+        to_ascii_ivoa(
+          it.cells().cellranges(),
+          &fold,
+          range_len,
+          BufWriter::new(file),
+        )
+        .map_err(|e| e.into())
+      }
+      OutputFormat::Json {
+        fold,
+        opt_file: None,
+      } => {
         let stdout = io::stdout();
         to_json_aladin(it.cells(), &fold, "", stdout.lock()).map_err(|e| e.into())
-      },
-      OutputFormat::Json { fold, opt_file: Some(path) } => {
+      }
+      OutputFormat::Json {
+        fold,
+        opt_file: Some(path),
+      } => {
         let file = File::create(path)?;
         to_json_aladin(it.cells(), &fold, "", BufWriter::new(file)).map_err(|e| e.into())
-      },
-      OutputFormat::Fits { force_u64: _, force_v1: _ , moc_id, moc_type, file } => {
+      }
+      OutputFormat::Fits {
+        force_u64: _,
+        force_v1: _,
+        moc_id,
+        moc_type,
+        file,
+      } => {
         // Here I don't know how to convert the generic qty MocQty<T> into MocQty<u64>...
         let file = File::create(file)?;
         ranges_to_fits_ivoa(it, moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
-      },
+      }
       OutputFormat::Stream => {
         let stdout = io::stdout();
         to_ascii_stream(it.cells().cellranges(), true, stdout.lock()).map_err(|e| e.into())
-      },
+      }
     }
   }
 
   pub fn write_smoc_fits_v1<T, I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      T: Idx,
-      I: RangeMOCIterator<T, Qty=Hpx<T>>
+  where
+    T: Idx,
+    I: RangeMOCIterator<T, Qty = Hpx<T>>,
   {
     self.write_smoc_fits_v1_from_cells(it.cells())
   }
-  
+
   pub fn write_smoc_fits_v1_from_cells<T, I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      T: Idx,
-      I: CellMOCIterator<T, Qty=Hpx<T>>
+  where
+    T: Idx,
+    I: CellMOCIterator<T, Qty = Hpx<T>>,
   {
     match self {
-      OutputFormat::Fits { force_u64: _, force_v1: _, moc_id, moc_type, file } => {
+      OutputFormat::Fits {
+        force_u64: _,
+        force_v1: _,
+        moc_id,
+        moc_type,
+        file,
+      } => {
         // Here I don't know how to convert the generic qty MocQty<T> into MocQty<u64>...
         let file = File::create(file)?;
-        it.hpx_cells_to_fits_ivoa(moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
-      },
-      _ => unreachable!()
+        it.hpx_cells_to_fits_ivoa(moc_id, moc_type, BufWriter::new(file))
+          .map_err(|e| e.into())
+      }
+      _ => unreachable!(),
     }
   }
-  
+
   pub fn write_moc_from_cells<T, Q, I>(self, it: I) -> Result<(), Box<dyn Error>>
-    where
-      T: Idx,
-      Q: MocQty<T>,
-      I: CellMOCIterator<T, Qty=Q>
+  where
+    T: Idx,
+    Q: MocQty<T>,
+    I: CellMOCIterator<T, Qty = Q>,
   {
     match self {
-      OutputFormat::Ascii { fold, range_len, opt_file: None } => {
+      OutputFormat::Ascii {
+        fold,
+        range_len,
+        opt_file: None,
+      } => {
         let stdout = io::stdout();
         to_ascii_ivoa(it.cellranges(), &fold, range_len, stdout.lock()).map_err(|e| e.into())
-      },
-      OutputFormat::Ascii { fold, range_len, opt_file: Some(path) } => {
+      }
+      OutputFormat::Ascii {
+        fold,
+        range_len,
+        opt_file: Some(path),
+      } => {
         let file = File::create(path)?;
         to_ascii_ivoa(it.cellranges(), &fold, range_len, BufWriter::new(file)).map_err(|e| e.into())
-      },
-      OutputFormat::Json { fold, opt_file: None } => {
+      }
+      OutputFormat::Json {
+        fold,
+        opt_file: None,
+      } => {
         let stdout = io::stdout();
         to_json_aladin(it, &fold, "", stdout.lock()).map_err(|e| e.into())
-      },
-      OutputFormat::Json { fold, opt_file: Some(path) } => {
+      }
+      OutputFormat::Json {
+        fold,
+        opt_file: Some(path),
+      } => {
         let file = File::create(path)?;
         to_json_aladin(it, &fold, "", BufWriter::new(file)).map_err(|e| e.into())
-      },
-      OutputFormat::Fits { force_u64: _, force_v1: _, moc_id, moc_type, file } => {
+      }
+      OutputFormat::Fits {
+        force_u64: _,
+        force_v1: _,
+        moc_id,
+        moc_type,
+        file,
+      } => {
         // Here I don't know how to convert the generic qty MocQty<T> into MocQty<u64>...
         let file = File::create(file)?;
-        ranges_to_fits_ivoa(it.ranges(), moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
-      },
+        ranges_to_fits_ivoa(it.ranges(), moc_id, moc_type, BufWriter::new(file))
+          .map_err(|e| e.into())
+      }
       OutputFormat::Stream => {
         let stdout = io::stdout();
         to_ascii_stream(it.cellranges(), true, stdout.lock()).map_err(|e| e.into())
-      },
+      }
     }
   }
-  
-  pub fn write_stmoc<T, I, J, K, L>(self, stmoc: L)
-                           -> Result<(), Box<dyn Error>>
-    where
-      T: Idx, 
-      I: RangeMOCIterator<T, Qty=Time::<T>>,
-      J: RangeMOCIterator<T, Qty=Hpx::<T>>,
-      K: RangeMOC2ElemIt<T, Time::<T>, T, Hpx::<T>, It1=I, It2=J>,
-      L: RangeMOC2Iterator<
-        T, Time::<T>, I,
-        T, Hpx::<T>, J,
-        K
-      >
+
+  pub fn write_stmoc<T, I, J, K, L>(self, stmoc: L) -> Result<(), Box<dyn Error>>
+  where
+    T: Idx,
+    I: RangeMOCIterator<T, Qty = Time<T>>,
+    J: RangeMOCIterator<T, Qty = Hpx<T>>,
+    K: RangeMOC2ElemIt<T, Time<T>, T, Hpx<T>, It1 = I, It2 = J>,
+    L: RangeMOC2Iterator<T, Time<T>, I, T, Hpx<T>, J, K>,
   {
     // In case of ascii or json inputs, we perform useless conversions:
     //            cell -> range -> cell
     //   cellcellrange -> range -> cellcellrange
     // We could make 2 other `write_stmoc` methods (taking different iterators) to avoid this
     match self {
-      OutputFormat::Ascii { fold, range_len, opt_file: None } => {
+      OutputFormat::Ascii {
+        fold,
+        range_len,
+        opt_file: None,
+      } => {
         let stdout = io::stdout();
-        moc2d_to_ascii_ivoa(stmoc.into_cellcellrange_moc2_iter(), &fold, range_len, stdout.lock()).map_err(|e| e.into())
-      },
-      OutputFormat::Ascii { fold, range_len, opt_file: Some(path) } => {
+        moc2d_to_ascii_ivoa(
+          stmoc.into_cellcellrange_moc2_iter(),
+          &fold,
+          range_len,
+          stdout.lock(),
+        )
+        .map_err(|e| e.into())
+      }
+      OutputFormat::Ascii {
+        fold,
+        range_len,
+        opt_file: Some(path),
+      } => {
         let file = File::create(path)?;
-        moc2d_to_ascii_ivoa(stmoc.into_cellcellrange_moc2_iter(), &fold, range_len, BufWriter::new(file)).map_err(|e| e.into())
-      },
-      OutputFormat::Json { fold, opt_file: None } => {
+        moc2d_to_ascii_ivoa(
+          stmoc.into_cellcellrange_moc2_iter(),
+          &fold,
+          range_len,
+          BufWriter::new(file),
+        )
+        .map_err(|e| e.into())
+      }
+      OutputFormat::Json {
+        fold,
+        opt_file: None,
+      } => {
         let stdout = io::stdout();
-        cellmoc2d_to_json_aladin(stmoc.into_cell_moc2_iter(), &fold, stdout.lock()).map_err(|e| e.into())
-      },
-      OutputFormat::Json { fold, opt_file: Some(path) } => {
+        cellmoc2d_to_json_aladin(stmoc.into_cell_moc2_iter(), &fold, stdout.lock())
+          .map_err(|e| e.into())
+      }
+      OutputFormat::Json {
+        fold,
+        opt_file: Some(path),
+      } => {
         let file = File::create(path)?;
-        cellmoc2d_to_json_aladin(stmoc.into_cell_moc2_iter(), &fold, BufWriter::new(file)).map_err(|e| e.into())
-      },
-      OutputFormat::Fits { force_u64: _, force_v1: _ , moc_id, moc_type, file } => {
+        cellmoc2d_to_json_aladin(stmoc.into_cell_moc2_iter(), &fold, BufWriter::new(file))
+          .map_err(|e| e.into())
+      }
+      OutputFormat::Fits {
+        force_u64: _,
+        force_v1: _,
+        moc_id,
+        moc_type,
+        file,
+      } => {
         // TODO handle the forced to u64??
         let file = File::create(file)?;
         ranges2d_to_fits_ivoa(stmoc, moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
-      },
+      }
       OutputFormat::Stream => {
         // let stdout = io::stdout();
         Err(String::from("No stream format for ST-MOCs yet.").into())
-      },
+      }
     }
   }
-  
 }
 
 fn add_number_before_extension(num: usize, path: &mut PathBuf) {

@@ -2,14 +2,10 @@
 
 use std::cmp::Ordering;
 
+use crate::moc::{builder::fixed_depth::FixedDepthMocBuilder, range::RangeMOC};
 use crate::moc2d::Idx;
+use crate::moc2d::{RangeMOC2, RangeMOC2Elem};
 use crate::qty::MocQty;
-use crate::moc::{
-  range::RangeMOC,
-  builder::fixed_depth::FixedDepthMocBuilder
-};
-use crate::moc2d::{RangeMOC2Elem, RangeMOC2};
-
 
 pub struct FixedDepthSTMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
   depth_1: u8,
@@ -26,13 +22,13 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
       depth_2,
       buff: Vec::with_capacity(buf_capacity.unwrap_or(100_000)),
       sorted: true,
-      moc: None
+      moc: None,
     }
   }
 
   pub fn push(&mut self, idx_1: T, idx_2: U) {
     if let Some((h1, h2)) = self.buff.last() {
-      if *h1 == idx_1 && *h2 == idx_2  {
+      if *h1 == idx_1 && *h2 == idx_2 {
         return;
       } else if self.sorted && *h1 > idx_1 {
         self.sorted = false;
@@ -48,13 +44,17 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
     self.drain_buffer();
     let depth_1 = self.depth_1;
     let depth_2 = self.depth_2;
-    self.moc.unwrap_or_else(|| RangeMOC2::new(depth_1, depth_2, Default::default()))
+    self
+      .moc
+      .unwrap_or_else(|| RangeMOC2::new(depth_1, depth_2, Default::default()))
   }
 
   fn drain_buffer(&mut self) {
     if !self.sorted {
       // Sort on the firs dim
-      self.buff.sort_unstable_by(|(h1_a, _), (h1_b, _)| h1_a.cmp(h1_b));
+      self
+        .buff
+        .sort_unstable_by(|(h1_a, _), (h1_b, _)| h1_a.cmp(h1_b));
     }
     let new_moc = self.buff_to_moc();
     self.clear_buff();
@@ -71,12 +71,12 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
     // Build first Vec<T, RangeMOC<U, R>>
     // Then merge successive T having the same  RangeMOC<U, R>
     let mut range_mocs: Vec<RangeMOC2Elem<T, Q, U, R>> = Vec::with_capacity(self.buff.len());
-    
+
     // We assume here that the buffer is ordered, but may contains duplicates
     let mut it = self.buff.iter();
     if let Some((from_1, from_2)) = it.next() {
       let mut from_1 = *from_1;
-      let     from_2 = *from_2;
+      let from_2 = *from_2;
       let mut moc_builder_1 = FixedDepthMocBuilder::<T, Q>::new(self.depth_1, Some(64));
       moc_builder_1.push(from_1);
       let mut moc_builder_2 = FixedDepthMocBuilder::<U, R>::new(self.depth_2, Some(1000));
@@ -89,9 +89,10 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
             // There is a change in time, build moc_2
             let moc_2 = moc_builder_2.into_moc();
             debug_assert!(!moc_2.is_empty());
-            // Check whether or not the moc_2 is the same as the on in the current moc_1_builder 
+            // Check whether or not the moc_2 is the same as the on in the current moc_1_builder
             if let Some(p_moc_2) = prev_moc_2.as_ref() {
-              if !moc_2.eq(p_moc_2) { // if not create a new entry
+              if !moc_2.eq(p_moc_2) {
+                // if not create a new entry
                 let p_moc_1 = moc_builder_1.into_moc();
                 let p_moc_2 = prev_moc_2.replace(moc_2).unwrap();
                 debug_assert!(!p_moc_1.is_empty());
@@ -113,13 +114,14 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
             moc_builder_2 = FixedDepthMocBuilder::<U, R>::new(self.depth_2, Some(1000));
             moc_builder_2.push(*curr_2);
             from_1 = *curr_1;
-          },
+          }
           Ordering::Greater => unreachable!(), // self.buff supposed to be sorted!
         }
       }
       let moc_2 = moc_builder_2.into_moc();
       if let Some(p_moc_2) = prev_moc_2.as_ref() {
-        if !moc_2.eq(p_moc_2) { // if not create a new entry
+        if !moc_2.eq(p_moc_2) {
+          // if not create a new entry
           let p_moc_1 = moc_builder_1.into_moc();
           let p_moc_2 = prev_moc_2.replace(moc_2).unwrap();
           debug_assert!(!p_moc_1.is_empty());
@@ -150,5 +152,4 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
     self.sorted = true;
     self.buff.clear();
   }
-  
 }

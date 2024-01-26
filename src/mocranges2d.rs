@@ -1,16 +1,15 @@
-
-use std::ops::Range;
 use std::marker::PhantomData;
+use std::ops::Range;
 
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
+use crate::elemset::range::MocRanges;
 use crate::idx::Idx;
 use crate::qty::MocQty;
-use crate::elemset::range::MocRanges;
 use crate::ranges::{
+  ranges2d::{Ranges2D, SNORanges2D},
   Ranges,
-  ranges2d::{Ranges2D, SNORanges2D}
 };
 
 // Declaration of the ST-MOC type mage in hpxranges2d
@@ -19,11 +18,11 @@ use crate::ranges::{
 // only removing the depth() from Ranges2D<T, S> and let it in Moc2DRanges<TT, T, ST, S>
 #[derive(Debug)]
 pub struct Moc2DRanges<TT, T, ST, S>
-  where
-    TT: Idx,
-    T: MocQty<TT>,
-    ST: Idx,
-    S: MocQty<ST>,
+where
+  TT: Idx,
+  T: MocQty<TT>,
+  ST: Idx,
+  S: MocQty<ST>,
 {
   pub ranges2d: Ranges2D<TT, ST>,
   _t_type: PhantomData<T>,
@@ -31,13 +30,12 @@ pub struct Moc2DRanges<TT, T, ST, S>
 }
 
 impl<'a, TT, T, ST, S> SNORanges2D<'a, TT, ST> for Moc2DRanges<TT, T, ST, S>
-  where
-    TT: Idx,
-    T: MocQty<TT>,
-    ST: Idx,
-    S: MocQty<ST>,
+where
+  TT: Idx,
+  T: MocQty<TT>,
+  ST: Idx,
+  S: MocQty<ST>,
 {
-
   fn make_consistent(mut self) -> Self {
     self.ranges2d = self.ranges2d.make_consistent();
     self
@@ -64,17 +62,18 @@ impl<'a, TT, T, ST, S> SNORanges2D<'a, TT, ST> for Moc2DRanges<TT, T, ST, S>
   }
 }
 
-impl <TT, T, ST, S> From<Ranges2D<TT, ST>> for Moc2DRanges<TT, T, ST, S>
-  where
-    TT: Idx,
-    T: MocQty<TT>,
-    ST: Idx,
-    S: MocQty<ST> {
+impl<TT, T, ST, S> From<Ranges2D<TT, ST>> for Moc2DRanges<TT, T, ST, S>
+where
+  TT: Idx,
+  T: MocQty<TT>,
+  ST: Idx,
+  S: MocQty<ST>,
+{
   fn from(ranges2d: Ranges2D<TT, ST>) -> Self {
     Moc2DRanges {
       ranges2d,
       _t_type: PhantomData,
-      _s_type: PhantomData
+      _s_type: PhantomData,
     }
   }
 }
@@ -90,13 +89,12 @@ impl <TT, T, ST, S> From<Ranges2D<TT, ST>> for Moc2DRanges<TT, T, ST, S>
   }
 }*/
 
-
 impl<TT, T, ST, S> Moc2DRanges<TT, T, ST, S>
-  where
-    TT: Idx,
-    T: MocQty<TT>,
-    ST: Idx,
-    S: MocQty<ST>,
+where
+  TT: Idx,
+  T: MocQty<TT>,
+  ST: Idx,
+  S: MocQty<ST>,
 {
   /// Creates a 2D coverage
   ///
@@ -114,7 +112,7 @@ impl<TT, T, ST, S> Moc2DRanges<TT, T, ST, S>
     Moc2DRanges {
       ranges2d: Ranges2D::new(t, s),
       _t_type: PhantomData,
-      _s_type: PhantomData
+      _s_type: PhantomData,
     }
   }
 
@@ -133,7 +131,9 @@ impl<TT, T, ST, S> Moc2DRanges<TT, T, ST, S>
   /// is set to (0, 0)
   #[cfg(not(target_arch = "wasm32"))]
   pub fn compute_min_depth(&self) -> (u8, u8) {
-    let y = self.ranges2d.y
+    let y = self
+      .ranges2d
+      .y
       .par_iter()
       // Compute the depths of the Ranges<S>
       .map(|ranges| MocRanges::<ST, S>::compute_min_depth_gen(ranges))
@@ -146,11 +146,14 @@ impl<TT, T, ST, S> Moc2DRanges<TT, T, ST, S>
     // The computation is very light (logical OR), so I wonder about the the cost (overhead)
     // of the parallelization here (except for very large MOCs)...
     let x = T::compute_min_depth(
-      self.ranges2d.x.par_iter()
+      self
+        .ranges2d
+        .x
+        .par_iter()
         // Perform a logical 'or' between (upper and lower bounds of) all indices of the first dimension
         // then look at the trailing zeros (in the compute_min_depth method)
         .fold_with(TT::zero(), |acc, range| acc | range.start | range.end)
-        .reduce(TT::zero, |a, b| a | b)
+        .reduce(TT::zero, |a, b| a | b),
     );
 
     (x, y)
@@ -171,7 +174,9 @@ impl<TT, T, ST, S> Moc2DRanges<TT, T, ST, S>
   /// is set to (0, 0)
   #[cfg(target_arch = "wasm32")]
   pub fn compute_min_depth(&self) -> (u8, u8) {
-    let y = self.ranges2d.y
+    let y = self
+      .ranges2d
+      .y
       .iter()
       // Compute the depths of the Ranges<S>
       .map(|ranges| MocRanges::<ST, S>::compute_min_depth_gen(ranges))
@@ -184,23 +189,25 @@ impl<TT, T, ST, S> Moc2DRanges<TT, T, ST, S>
     // The computation is very light (logical OR), so I wonder about the the cost (overhead)
     // of the parallelization here (except for very large MOCs)...
     let x = T::compute_min_depth(
-        self.ranges2d.x.iter()
+      self
+        .ranges2d
+        .x
+        .iter()
         // Perform a logical 'or' between (upper and lower bounds of) all indices of the first dimension
         // then look at the trailing zeros (in the compute_min_depth method)
-        .fold(TT::zero(), |acc, range| acc | range.start | range.end)
+        .fold(TT::zero(), |acc, range| acc | range.start | range.end),
     );
 
     (x, y)
   }
-
 }
 
 impl<TT, T, ST, S> PartialEq for Moc2DRanges<TT, T, ST, S>
-  where
-    TT: Idx,
-    T: MocQty<TT>,
-    ST: Idx,
-    S: MocQty<ST>,
+where
+  TT: Idx,
+  T: MocQty<TT>,
+  ST: Idx,
+  S: MocQty<ST>,
 {
   fn eq(&self, other: &Self) -> bool {
     self.ranges2d.eq(&other.ranges2d)
@@ -211,19 +218,21 @@ impl<TT, T, ST, S> PartialEq for Moc2DRanges<TT, T, ST, S>
 mod tests {
   use std::ops::Range;
 
+  use crate::hpxranges2d::{HpxRanges2D, TimeSpaceMoc};
   use crate::idx::Idx;
-  use crate::ranges::Ranges;
-  use crate::ranges::ranges2d::{SNORanges2D};
-  use crate::qty::{Time, Hpx};
   use crate::mocranges2d::Moc2DRanges;
-  use crate::hpxranges2d::{TimeSpaceMoc, HpxRanges2D};
+  use crate::qty::{Hpx, Time};
+  use crate::ranges::ranges2d::SNORanges2D;
+  use crate::ranges::Ranges;
 
   // Tests are the same as (a sub-part of) range2d test.
   // So  we basically test with the decorator (algo are already tested in rande2d).
 
-  type TimeSpaceRanges<T, S> = Moc2DRanges::<T, Time<T>, S, Hpx<S>>;
+  type TimeSpaceRanges<T, S> = Moc2DRanges<T, Time<T>, S, Hpx<S>>;
 
-  fn time_space_moc<T: Idx, S: Idx>(ranges: Moc2DRanges::<T, Time<T>, S, Hpx<S>>) -> TimeSpaceMoc<T, S> {
+  fn time_space_moc<T: Idx, S: Idx>(
+    ranges: Moc2DRanges<T, Time<T>, S, Hpx<S>>,
+  ) -> TimeSpaceMoc<T, S> {
     HpxRanges2D(ranges)
   }
 
@@ -267,7 +276,7 @@ mod tests {
     let t_expect = vec![0..7, 7..30];
     let s_expect = vec![
       Ranges::<u64>::new_unchecked(vec![0..4, 5..21]),
-      Ranges::<u64>::new_unchecked(vec![16..21])
+      Ranges::<u64>::new_unchecked(vec![16..21]),
     ];
     let coverage_expect = new_time_space_moc(t_expect, s_expect);
     assert_eq!(coverage, coverage_expect);
@@ -289,7 +298,7 @@ mod tests {
     let s_expect = vec![
       Ranges::<u64>::new_unchecked(vec![0..4, 5..16, 17..18]),
       Ranges::<u64>::new_unchecked(vec![0..4, 5..21]),
-      Ranges::<u64>::new_unchecked(vec![0..4, 5..16, 17..18])
+      Ranges::<u64>::new_unchecked(vec![0..4, 5..16, 17..18]),
     ];
     let coverage_expect = new_time_space_moc(t_expect, s_expect);
     assert_eq!(coverage, coverage_expect);
@@ -311,7 +320,7 @@ mod tests {
     let s_expect = vec![
       Ranges::<u64>::new_unchecked(vec![0..4, 5..16, 17..18]),
       Ranges::<u64>::new_unchecked(vec![0..4, 5..21]),
-      Ranges::<u64>::new_unchecked(vec![16..21])
+      Ranges::<u64>::new_unchecked(vec![16..21]),
     ];
     let coverage_expect = new_time_space_moc(t_expect, s_expect);
     assert_eq!(coverage, coverage_expect);
@@ -352,7 +361,7 @@ mod tests {
     let t_expect = vec![0..5, 5..20];
     let s_expect = vec![
       Ranges::<u64>::new_unchecked(vec![0..4, 5..16, 17..18]),
-      Ranges::<u64>::new_unchecked(vec![16..21])
+      Ranges::<u64>::new_unchecked(vec![16..21]),
     ];
     let coverage_expect = new_time_space_moc(t_expect, s_expect);
     assert_eq!(coverage, coverage_expect);
@@ -374,10 +383,9 @@ mod tests {
     let s_expect = vec![
       Ranges::<u64>::new_unchecked(vec![0..4, 5..16, 17..18]),
       Ranges::<u64>::new_unchecked(vec![0..4, 16..21, 25..26]),
-      Ranges::<u64>::new_unchecked(vec![16..21])
+      Ranges::<u64>::new_unchecked(vec![16..21]),
     ];
     let coverage_expect = new_time_space_moc(t_expect, s_expect);
     assert_eq!(coverage, coverage_expect);
   }
-
 }

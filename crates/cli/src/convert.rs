@@ -1,30 +1,23 @@
-
+use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::str::FromStr;
 use std::path::PathBuf;
-use std::error::Error;
+use std::str::FromStr;
 
 use structopt::StructOpt;
 
-use moclib::qty::{Frequency, Hpx, Time};
-use moclib::deser::json::{from_json_aladin, cellmoc2d_from_json_aladin};
 use moclib::deser::ascii::{from_ascii_ivoa, from_ascii_stream, moc2d_from_ascii_ivoa};
-use moclib::deser::fits::{
-  from_fits_ivoa,
-  MocIdxType, MocQtyType, MocType as RMocType, STMocType
-};
+use moclib::deser::fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType as RMocType, STMocType};
+use moclib::deser::json::{cellmoc2d_from_json_aladin, from_json_aladin};
+use moclib::qty::{Frequency, Hpx, Time};
 
 use moclib::moc::{
-  CellMOCIterator, CellMOCIntoIterator,
-  CellOrCellRangeMOCIterator, CellOrCellRangeMOCIntoIterator
+  CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIntoIterator, CellOrCellRangeMOCIterator,
 };
-use moclib::moc2d::{
-  RangeMOC2IntoIterator, CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator,
-};
+use moclib::moc2d::{CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator, RangeMOC2IntoIterator};
 
+use super::input::{fmt_from_extension, InputFormat};
 use super::output::OutputFormat;
-use super::input::{InputFormat, fmt_from_extension};
 
 #[derive(Debug)]
 pub enum MocType {
@@ -42,7 +35,10 @@ impl FromStr for MocType {
       "tmoc" => Ok(MocType::TMOC),
       "stmoc" => Ok(MocType::STMOC),
       "fmoc" => Ok(MocType::FMOC),
-      _ => Err(format!("Unrecognized moc type. Actual: '{}'. Expected: 'moc (or smoc), 'tmoc', 'fmoc' or 'stmoc'", s)),
+      _ => Err(format!(
+        "Unrecognized moc type. Actual: '{}'. Expected: 'moc (or smoc), 'tmoc', 'fmoc' or 'stmoc'",
+        s
+      )),
     }
   }
 }
@@ -66,12 +62,17 @@ impl Convert {
   pub fn exec(self) -> Result<(), Box<dyn Error>> {
     //let path = self.input.unwrap_or_else(|| PathBuf::from("-"));
     let path = self.input;
-    if path ==  PathBuf::from("-") {
+    if path == PathBuf::from("-") {
       if let Some(input_fmt) = self.input_fmt {
         let stdin = std::io::stdin();
         exec(stdin.lock(), input_fmt, self.moc_type, self.output)
       } else {
-        Err(String::from("Using stdin, the MOC format ('ascii', 'json', ...) must be provided, see options.").into())
+        Err(
+          String::from(
+            "Using stdin, the MOC format ('ascii', 'json', ...) must be provided, see options.",
+          )
+          .into(),
+        )
       }
     } else {
       let input_fmt = match self.input_fmt {
@@ -88,157 +89,168 @@ pub fn exec<R: BufRead>(
   mut input: R,
   input_fmt: InputFormat,
   moc_type: Option<MocType>,
-  output: OutputFormat
-) -> Result<(), Box<dyn Error>>
-{
+  output: OutputFormat,
+) -> Result<(), Box<dyn Error>> {
   match (moc_type, input_fmt) {
     // SMOC
     (Some(MocType::SMOC), InputFormat::Ascii) => {
       let mut input_str = Default::default();
       input.read_to_string(&mut input_str)?;
-      let cellcellranges = from_ascii_ivoa::<u64, Hpx::<u64>>(&input_str)?;
-      output.write_smoc_possibly_auto_converting_from_u64(cellcellranges.into_cellcellrange_moc_iter().ranges())
-    },
+      let cellcellranges = from_ascii_ivoa::<u64, Hpx<u64>>(&input_str)?;
+      output.write_smoc_possibly_auto_converting_from_u64(
+        cellcellranges.into_cellcellrange_moc_iter().ranges(),
+      )
+    }
     (Some(MocType::SMOC), InputFormat::Json) => {
       let mut input_str = String::new();
       input.read_to_string(&mut input_str)?;
-      let cells = from_json_aladin::<u64, Hpx::<u64>>(&input_str)?;
+      let cells = from_json_aladin::<u64, Hpx<u64>>(&input_str)?;
       output.write_smoc_possibly_auto_converting_from_u64(cells.into_cell_moc_iter().ranges())
-    },
+    }
     (Some(MocType::SMOC), InputFormat::Stream) => {
-      let cellrange_it = from_ascii_stream::<u64, Hpx::<u64>, _>(input)?;
+      let cellrange_it = from_ascii_stream::<u64, Hpx<u64>, _>(input)?;
       output.write_smoc_possibly_auto_converting_from_u64(cellrange_it.ranges())
-    },
+    }
     // TMOC
     (Some(MocType::TMOC), InputFormat::Ascii) => {
       let mut input_str = String::new();
       input.read_to_string(&mut input_str)?;
-      let cellcellranges = from_ascii_ivoa::<u64, Time::<u64>>(&input_str)?;
-      output.write_tmoc_possibly_auto_converting_from_u64(cellcellranges.into_cellcellrange_moc_iter().ranges())
-    },
+      let cellcellranges = from_ascii_ivoa::<u64, Time<u64>>(&input_str)?;
+      output.write_tmoc_possibly_auto_converting_from_u64(
+        cellcellranges.into_cellcellrange_moc_iter().ranges(),
+      )
+    }
     (Some(MocType::TMOC), InputFormat::Json) => {
       let mut input_str = String::new();
       input.read_to_string(&mut input_str)?;
-      let cells = from_json_aladin::<u64, Time::<u64>>(&input_str)?;
+      let cells = from_json_aladin::<u64, Time<u64>>(&input_str)?;
       output.write_tmoc_possibly_auto_converting_from_u64(cells.into_cell_moc_iter().ranges())
-    },
+    }
     (Some(MocType::TMOC), InputFormat::Stream) => {
-      let cellrange_it = from_ascii_stream::<u64, Time::<u64>, _>(input)?;
+      let cellrange_it = from_ascii_stream::<u64, Time<u64>, _>(input)?;
       output.write_tmoc_possibly_auto_converting_from_u64(cellrange_it.ranges())
-    },
+    }
     // FMOC
     (Some(MocType::FMOC), InputFormat::Ascii) => {
       let mut input_str = String::new();
       input.read_to_string(&mut input_str)?;
-      let cellcellranges = from_ascii_ivoa::<u64, Frequency::<u64>>(&input_str)?;
-      output.write_fmoc_possibly_auto_converting_from_u64(cellcellranges.into_cellcellrange_moc_iter().ranges())
-    },
+      let cellcellranges = from_ascii_ivoa::<u64, Frequency<u64>>(&input_str)?;
+      output.write_fmoc_possibly_auto_converting_from_u64(
+        cellcellranges.into_cellcellrange_moc_iter().ranges(),
+      )
+    }
     (Some(MocType::FMOC), InputFormat::Json) => {
       let mut input_str = String::new();
       input.read_to_string(&mut input_str)?;
-      let cells = from_json_aladin::<u64, Frequency::<u64>>(&input_str)?;
+      let cells = from_json_aladin::<u64, Frequency<u64>>(&input_str)?;
       output.write_fmoc_possibly_auto_converting_from_u64(cells.into_cell_moc_iter().ranges())
-    },
+    }
     (Some(MocType::FMOC), InputFormat::Stream) => {
-      let cellrange_it = from_ascii_stream::<u64, Frequency::<u64>, _>(input)?;
+      let cellrange_it = from_ascii_stream::<u64, Frequency<u64>, _>(input)?;
       output.write_fmoc_possibly_auto_converting_from_u64(cellrange_it.ranges())
-    },
+    }
     // ST-MOC
     (Some(MocType::STMOC), InputFormat::Ascii) => {
       let mut input_str = String::new();
       input.read_to_string(&mut input_str)?;
-      let cellrange2 = moc2d_from_ascii_ivoa::<u64, Time::<u64>, u64, Hpx::<u64>>(&input_str)?;
-      output.write_stmoc(cellrange2.into_cellcellrange_moc2_iter().into_range_moc2_iter())
-    },
+      let cellrange2 = moc2d_from_ascii_ivoa::<u64, Time<u64>, u64, Hpx<u64>>(&input_str)?;
+      output.write_stmoc(
+        cellrange2
+          .into_cellcellrange_moc2_iter()
+          .into_range_moc2_iter(),
+      )
+    }
     (Some(MocType::STMOC), InputFormat::Json) => {
       let mut input_str = String::new();
       input.read_to_string(&mut input_str)?;
-      let cell2 = cellmoc2d_from_json_aladin::<u64, Time::<u64>, u64, Hpx::<u64>>(&input_str)?;
+      let cell2 = cellmoc2d_from_json_aladin::<u64, Time<u64>, u64, Hpx<u64>>(&input_str)?;
       output.write_stmoc(cell2.into_cell_moc2_iter().into_range_moc2_iter())
-    },
+    }
     (Some(MocType::STMOC), InputFormat::Stream) => {
       Err(String::from("No stream format for ST-MOCs yet.").into())
-    },
+    }
     // FITS file (SMOC or TMOC or FMOC, or ST-MOC)
     (_, InputFormat::Fits) => {
       let fits_res = from_fits_ivoa(input)?;
       match fits_res {
-        MocIdxType::U16(moc) =>
-          match moc {
-            MocQtyType::Hpx(moc) =>
-              match moc {
-                RMocType::Ranges(moc) => output.write_smoc_possibly_converting_to_u64(moc),
-                RMocType::Cells(moc) =>  output.write_smoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
-              },
-            MocQtyType::Time(moc) =>
-              match moc {
-                RMocType::Ranges(moc) => output.write_tmoc_possibly_converting_to_u64(moc),
-                RMocType::Cells(moc) => output.write_tmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
-              },
-            MocQtyType::TimeHpx(moc) =>
-              match moc {
-                STMocType::V2(moc) => output.write_stmoc(moc),
-                STMocType::PreV2(moc) => output.write_stmoc(moc),
-              },
-            MocQtyType::Freq(moc) =>
-              match moc {
-                RMocType::Ranges(moc) => output.write_fmoc_possibly_converting_to_u64(moc),
-                RMocType::Cells(moc) => output.write_fmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
-              },
+        MocIdxType::U16(moc) => match moc {
+          MocQtyType::Hpx(moc) => match moc {
+            RMocType::Ranges(moc) => output.write_smoc_possibly_converting_to_u64(moc),
+            RMocType::Cells(moc) => {
+              output.write_smoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges())
+            }
           },
-        MocIdxType::U32(moc) =>
-          match moc {
-            MocQtyType::Hpx(moc) =>
-              match moc {
-                RMocType::Ranges(moc) => output.write_smoc_possibly_converting_to_u64(moc),
-                RMocType::Cells(moc) =>  output.write_smoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
-              },
-            MocQtyType::Time(moc) =>
-              match moc {
-                RMocType::Ranges(moc) => output.write_tmoc_possibly_converting_to_u64(moc),
-                RMocType::Cells(moc) => output.write_tmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
-              },
-            MocQtyType::TimeHpx(moc) =>
-              match moc {
-                STMocType::V2(moc) => output.write_stmoc(moc),
-                STMocType::PreV2(moc) => output.write_stmoc(moc),
-              },
-            MocQtyType::Freq(moc) =>
-              match moc {
-                RMocType::Ranges(moc) => output.write_fmoc_possibly_converting_to_u64(moc),
-                RMocType::Cells(moc) => output.write_fmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
-              },
+          MocQtyType::Time(moc) => match moc {
+            RMocType::Ranges(moc) => output.write_tmoc_possibly_converting_to_u64(moc),
+            RMocType::Cells(moc) => {
+              output.write_tmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges())
+            }
           },
-        MocIdxType::U64(moc) =>
-          match moc {
-            MocQtyType::Hpx(moc) =>
-              match moc {
-                RMocType::Ranges(moc) => output.write_smoc_possibly_converting_to_u64(moc),
-                RMocType::Cells(moc) =>  output.write_smoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
-              },
-            MocQtyType::Time(moc) =>
-              match moc {
-                RMocType::Ranges(moc) => output.write_tmoc_possibly_converting_to_u64(moc),
-                RMocType::Cells(moc) => output.write_tmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
-              },
-            MocQtyType::TimeHpx(moc) =>
-              match moc {
-                STMocType::V2(moc) => output.write_stmoc(moc),
-                STMocType::PreV2(moc) => output.write_stmoc(moc),
-              },
-            MocQtyType::Freq(moc) =>
-              match moc {
-                RMocType::Ranges(moc) => output.write_fmoc_possibly_converting_to_u64(moc),
-                RMocType::Cells(moc) => output.write_fmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges()),
-              },
+          MocQtyType::TimeHpx(moc) => match moc {
+            STMocType::V2(moc) => output.write_stmoc(moc),
+            STMocType::PreV2(moc) => output.write_stmoc(moc),
           },
+          MocQtyType::Freq(moc) => match moc {
+            RMocType::Ranges(moc) => output.write_fmoc_possibly_converting_to_u64(moc),
+            RMocType::Cells(moc) => {
+              output.write_fmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges())
+            }
+          },
+        },
+        MocIdxType::U32(moc) => match moc {
+          MocQtyType::Hpx(moc) => match moc {
+            RMocType::Ranges(moc) => output.write_smoc_possibly_converting_to_u64(moc),
+            RMocType::Cells(moc) => {
+              output.write_smoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges())
+            }
+          },
+          MocQtyType::Time(moc) => match moc {
+            RMocType::Ranges(moc) => output.write_tmoc_possibly_converting_to_u64(moc),
+            RMocType::Cells(moc) => {
+              output.write_tmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges())
+            }
+          },
+          MocQtyType::TimeHpx(moc) => match moc {
+            STMocType::V2(moc) => output.write_stmoc(moc),
+            STMocType::PreV2(moc) => output.write_stmoc(moc),
+          },
+          MocQtyType::Freq(moc) => match moc {
+            RMocType::Ranges(moc) => output.write_fmoc_possibly_converting_to_u64(moc),
+            RMocType::Cells(moc) => {
+              output.write_fmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges())
+            }
+          },
+        },
+        MocIdxType::U64(moc) => match moc {
+          MocQtyType::Hpx(moc) => match moc {
+            RMocType::Ranges(moc) => output.write_smoc_possibly_converting_to_u64(moc),
+            RMocType::Cells(moc) => {
+              output.write_smoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges())
+            }
+          },
+          MocQtyType::Time(moc) => match moc {
+            RMocType::Ranges(moc) => output.write_tmoc_possibly_converting_to_u64(moc),
+            RMocType::Cells(moc) => {
+              output.write_tmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges())
+            }
+          },
+          MocQtyType::TimeHpx(moc) => match moc {
+            STMocType::V2(moc) => output.write_stmoc(moc),
+            STMocType::PreV2(moc) => output.write_stmoc(moc),
+          },
+          MocQtyType::Freq(moc) => match moc {
+            RMocType::Ranges(moc) => output.write_fmoc_possibly_converting_to_u64(moc),
+            RMocType::Cells(moc) => {
+              output.write_fmoc_possibly_converting_to_u64(moc.into_cell_moc_iter().ranges())
+            }
+          },
+        },
       }
-    },
+    }
     // MOC type required
-    _ => Err(String::from("Input MOC type must be specified.").into())
+    _ => Err(String::from("Input MOC type must be specified.").into()),
   }
 }
-
 
 /*
 IN THIS PREVIOUS CODE, WE LOADED DATA (FROM JSON OR ASCII) WITH A GIVEN DATATYPE u16, u32 or u64.
@@ -274,8 +286,8 @@ impl Convert {
 }
 
 pub fn exec<T: Idx, R: BufRead>(
-  mut input: R, 
-  input_fmt: InputFormat, 
+  mut input: R,
+  input_fmt: InputFormat,
   moc_type: MocType,
   output: PathBuf)
   -> Result<(), Box<dyn Error>>
