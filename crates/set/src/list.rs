@@ -1,4 +1,4 @@
-use std::{error::Error, mem::size_of, path::PathBuf};
+use std::{error::Error, mem::size_of, path::PathBuf, io::Write};
 
 use clap::Parser;
 
@@ -22,8 +22,10 @@ impl List {
     let moc_set_reader = MocSetFileReader::new(self.file)?;
     let meta_it = moc_set_reader.meta().into_iter();
     let bytes_it = moc_set_reader.index().into_iter();
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
     if self.ranges {
-      println!("id,status,depth,n_ranges,byte_start,byte_end");
+      let _ = writeln!(&mut out, "id,status,depth,n_ranges,byte_start,byte_end")?;
       for (flg_depth_id, byte_range) in meta_it.zip(bytes_it) {
         let id = flg_depth_id.identifier();
         let status = flg_depth_id.status();
@@ -35,7 +37,7 @@ impl List {
           size_of::<u64>()
         };
         let n_ranges = byte_size / (elem_byte_size << 1); // x2 since 1 range = 2 elems
-        println!(
+        let _ = writeln!(&mut out,
           "{},{},{},{},{},{}",
           id,
           status.str_value(),
@@ -43,10 +45,10 @@ impl List {
           n_ranges,
           byte_range.start,
           byte_range.end
-        );
+        )?;
       }
     } else {
-      println!("id,status,depth,n_ranges,byte_size");
+      let _ = writeln!(&mut out, "id,status,depth,n_ranges,byte_size");
       for (flg_depth_id, byte_range) in meta_it.zip(bytes_it) {
         let id = flg_depth_id.identifier();
         let status = flg_depth_id.status();
@@ -58,7 +60,7 @@ impl List {
           size_of::<u64>()
         };
         let n_ranges = byte_size / (elem_byte_size << 1); // x2 since 1 range = 2 elems
-        println!(
+        let _ = writeln!(&mut out,
           "{},{},{},{},{}",
           id,
           status.str_value(),

@@ -1,7 +1,7 @@
 use std::{
   error::Error,
   fs::File,
-  io::{BufRead, BufReader},
+  io::{BufRead, BufReader, Write},
   path::Path,
   path::PathBuf,
   str::FromStr,
@@ -83,7 +83,7 @@ pub enum Region {
   /// The given MOC (you create a moc using moc-cli and pipe it into moc-set)
   Moc {
     #[clap(value_name = "FILE")]
-    /// Path of the input MOC file (or stdin if equals "--")
+    /// Path of the input MOC file (or stdin if equals "-")
     input: PathBuf,
     #[clap(short = 'f', long = "format")]
     /// Format of the input MOC ('ascii', 'json' or 'fits') [default: guess from the file extension]
@@ -372,7 +372,9 @@ where
   let moc_set_reader = MocSetFileReader::new(file)?;
   let meta_it = moc_set_reader.meta().into_iter();
   let bytes_it = moc_set_reader.index().into_iter();
-  println!("id");
+  let stdout = std::io::stdout();
+  let mut out = stdout.lock();
+  let _ = writeln!(&mut out, "id");
   for (flg_depth_id, byte_range) in meta_it.zip(bytes_it) {
     let id = flg_depth_id.identifier();
     let status = flg_depth_id.status();
@@ -381,12 +383,12 @@ where
       if depth <= Hpx::<u32>::MAX_DEPTH {
         let ranges = moc_set_reader.ranges::<u32>(byte_range);
         if f(&ranges) {
-          println!("{}", id);
+          let _ = writeln!(&mut out, "{}", id);
         }
       } else {
         let ranges = moc_set_reader.ranges::<u64>(byte_range);
         if d(&ranges) {
-          println!("{}", id);
+          let _ = writeln!(&mut out, "{}", id);
         }
       }
     }
@@ -407,7 +409,9 @@ where
   let moc_set_reader = MocSetFileReader::new(file)?;
   let meta_it = moc_set_reader.meta().into_iter();
   let bytes_it = moc_set_reader.index().into_iter();
-  println!("id,moc_coverage");
+  let stdout = std::io::stdout();
+  let mut out = stdout.lock();
+  let _ = writeln!(&mut out, "id,moc_coverage");
   for (flg_depth_id, byte_range) in meta_it.zip(bytes_it) {
     let id = flg_depth_id.identifier();
     let status = flg_depth_id.status();
@@ -417,13 +421,13 @@ where
         let ranges = moc_set_reader.ranges::<u32>(byte_range);
         if f(&ranges) {
           let borrowed_moc_ranges = BorrowedMocRanges::<'_, u32, Hpx<u32>>::from(ranges);
-          println!("{},{:.6e}", id, borrowed_moc_ranges.coverage_percentage());
+          let _ = writeln!(&mut out, "{},{:.6e}", id, borrowed_moc_ranges.coverage_percentage());
         }
       } else {
         let ranges = moc_set_reader.ranges::<u64>(byte_range);
         if d(&ranges) {
           let borrowed_moc_ranges = BorrowedMocRanges::<'_, u64, Hpx<u64>>::from(ranges);
-          println!("{},{:.6e}", id, borrowed_moc_ranges.coverage_percentage());
+          let _ = writeln!(&mut out, "{},{:.6e}", id, borrowed_moc_ranges.coverage_percentage());
         }
       }
     }

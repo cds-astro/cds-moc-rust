@@ -35,7 +35,7 @@ pub mod union;
 /// Size of one element of the meta array.
 /// Each element is made of:
 /// * 1 byte  storing the flags
-/// * 2 byte  storing the MOC depth
+/// * 1 byte  storing the MOC depth
 /// * 6 bytes storing the identifer
 /// /// ```rust
 /// use moc_set::{META_ELEM_BYTE_SIZE,};
@@ -556,7 +556,7 @@ impl MocSetFileIOHelper {
 
   /// Size in bytes of the Index part
   pub fn index_byte_size(&self) -> usize {
-    let res = (self.n128 as usize) << 10;
+    let res = (self.n128 as usize) << 10; // <+> n128 * 1024
     debug_assert_eq!(res, self.n_index_elements() * META_ELEM_BYTE_SIZE);
     res
   }
