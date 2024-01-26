@@ -110,4 +110,5 @@ opt-level = 3
 lto = true    # Optimize at the link stage (may remove dead code)
 codegen-units = 1
 panic = "abort"
+strip = "debuginfo"
 
