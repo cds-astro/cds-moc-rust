@@ -162,7 +162,8 @@ where
 /// * `strict`: (sub-)cells overlapping the `cumul_from` or `cumul_to` values are not added
 /// * `no_split`: cells overlapping the `cumul_from` or `cumul_to` values are not recursively split
 /// * `reverse_decent`: perform the recursive decent from the highest cell number to the lowest (to be compatible with Aladin)
-pub fn valued_cells_to_moc_with_opt<'a, T, V>(
+#[allow(clippy::too_many_arguments)]
+pub fn valued_cells_to_moc_with_opt<T, V>(
   max_depth: u8,
   mut uniq_val_dens: Vec<(T, V, V)>, // uniq, value, value_density
   cumul_from: V,

@@ -41,9 +41,11 @@ where
   I2: RangeMOCIterator<T, Qty = Q>,
 {
   DisjointLeftFirst {
+    #[allow(clippy::type_complexity)]
     it: Chain<Chain<IntoIter<Range<T>>, I1>, Chain<IntoIter<Range<T>>, I2>>,
   },
   DisjointRightFirst {
+    #[allow(clippy::type_complexity)]
     it: Chain<Chain<IntoIter<Range<T>>, I2>, Chain<IntoIter<Range<T>>, I1>>,
   },
   Regular {

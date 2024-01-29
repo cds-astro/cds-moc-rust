@@ -88,9 +88,12 @@ impl CompoundVisitor for Stc2Moc {
 
   fn visit_circle(&mut self, circle: &CircleParams) -> Result<Self::Value, Self::Error> {
     // Get params
-    let lon_deg = circle.center().get(0).ok_or_else(|| Stc2MocError::Custom {
-      msg: String::from("Empty circle longitude"),
-    })?;
+    let lon_deg = circle
+      .center()
+      .first()
+      .ok_or_else(|| Stc2MocError::Custom {
+        msg: String::from("Empty circle longitude"),
+      })?;
     let lat_deg = circle.center().get(1).ok_or_else(|| Stc2MocError::Custom {
       msg: String::from("Empty circle latitude"),
     })?;
@@ -118,7 +121,7 @@ impl CompoundVisitor for Stc2Moc {
     // Get params
     let lon_deg = ellipse
       .center()
-      .get(0)
+      .first()
       .ok_or_else(|| Stc2MocError::Custom {
         msg: String::from("Empty ellipse longitude"),
       })?;
@@ -173,19 +176,22 @@ impl CompoundVisitor for Stc2Moc {
 
   fn visit_box(&mut self, skybox: &BoxParams) -> Result<Self::Value, Self::Error> {
     // Get params
-    let lon_deg = skybox.center().get(0).ok_or_else(|| Stc2MocError::Custom {
-      msg: String::from("Empty ellipse longitude"),
-    })?;
+    let lon_deg = skybox
+      .center()
+      .first()
+      .ok_or_else(|| Stc2MocError::Custom {
+        msg: String::from("Empty ellipse longitude"),
+      })?;
     let lat_deg = skybox.center().get(1).ok_or_else(|| Stc2MocError::Custom {
       msg: String::from("Empty ellipse latitude"),
     })?;
-    let mut a_deg = skybox.bsize().get(0).ok_or_else(|| Stc2MocError::Custom {
+    let mut a_deg = skybox.bsize().first().ok_or_else(|| Stc2MocError::Custom {
       msg: String::from("Empty bsize on latitude"),
     })?;
-    let mut b_deg = skybox.bsize().get(0).ok_or_else(|| Stc2MocError::Custom {
+    let mut b_deg = skybox.bsize().first().ok_or_else(|| Stc2MocError::Custom {
       msg: String::from("Empty bsize on longitude"),
     })?;
-    let mut pa_deg = skybox.bsize().get(0).copied().unwrap_or(90.0);
+    let mut pa_deg = skybox.bsize().first().copied().unwrap_or(90.0);
     if a_deg < b_deg {
       std::mem::swap(&mut b_deg, &mut a_deg);
       pa_deg = 90.0 - pa_deg;
@@ -344,7 +350,7 @@ impl SpaceVisitor for Stc2Moc {
       .zip(corners.iter().cloned().skip(1).step_by(2));
     if let Some(((ra_min, dec_min), (ra_max, dec_max))) = corners_it.next() {
       let mut bmoc = zone_coverage(depth, ra_min, dec_min, ra_max, dec_max);
-      while let Some(((ra_min, dec_min), (ra_max, dec_max))) = corners_it.next() {
+      for ((ra_min, dec_min), (ra_max, dec_max)) in corners_it {
         bmoc = bmoc.or(&zone_coverage(depth, ra_min, dec_min, ra_max, dec_max));
       }
       Ok(bmoc.into())

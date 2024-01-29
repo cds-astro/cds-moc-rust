@@ -41,7 +41,7 @@ impl<T: Idx, Q: MocQty<T>> FixedDepthMocBuilder<T, Q> {
   }
 
   pub fn into_moc(mut self) -> RangeMOC<T, Q> {
-    (&mut self).drain_buffer();
+    self.drain_buffer();
     let depth = self.depth;
     self
       .moc

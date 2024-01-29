@@ -30,7 +30,6 @@ where
   // Create n_depth strings (1 per depth)
   let depth_max = it.depth_max();
   let mut s_by_depth: Vec<String> = (0..=depth_max)
-    .into_iter()
     .map(|i| format!("{}  \"{}\": [", line_prefix, i))
     .collect();
   // Fill them
@@ -181,7 +180,6 @@ where
       // First reserve the exact number of cells, summing the len of all arrays
       let mut cells: Vec<Cell<T>> = Vec::with_capacity(
         (0..=Q::MAX_DEPTH)
-          .into_iter()
           .filter_map(|d| match map.get(&d.to_string()) {
             Some(Array(vec)) => Some(vec.len()),
             _ => None,

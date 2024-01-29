@@ -69,6 +69,7 @@ use crate::qty::Hpx;
 /// # Info
 ///   Supports gz input stream
 ///
+#[allow(clippy::too_many_arguments)]
 pub fn from_fits_skymap<R: Read + Seek>(
   mut reader: BufReader<R>,
   skip_value_le_this: f64,
@@ -105,6 +106,7 @@ pub fn from_fits_skymap<R: Read + Seek>(
   }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn from_fits_skymap_internal<R: BufRead>(
   mut reader: R,
   skip_value_le_this: f64,
@@ -293,6 +295,7 @@ fn from_fits_skymap_internal<R: BufRead>(
   Ok(RangeMOC::new(depth_max, ranges))
 }
 
+#[allow(clippy::type_complexity)]
 fn load_from_nested<R, F>(
   mut reader: R,
   read_f64: F,
@@ -386,6 +389,7 @@ where
   Ok((uniq_val_dens, cumul_skipped))
 }
 
+#[allow(clippy::type_complexity)]
 fn load_from_ring<R, F>(
   mut reader: R,
   read_f64: F,

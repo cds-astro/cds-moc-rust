@@ -149,7 +149,7 @@ impl<T: Idx> Ranges<T> {
   /// Internally sorts the input vector and ensures there is no overlapping (or consecutive) ranges.
   pub fn new_from(mut data: Vec<Range<T>>) -> Self {
     #[cfg(not(target_arch = "wasm32"))]
-    (&mut data).par_sort_unstable_by(|left, right| left.start.cmp(&right.start));
+    data.par_sort_unstable_by(|left, right| left.start.cmp(&right.start));
     #[cfg(target_arch = "wasm32")]
     (&mut data).sort_unstable_by(|left, right| left.start.cmp(&right.start));
     Self::new_from_sorted(data)
@@ -161,7 +161,7 @@ impl<T: Idx> Ranges<T> {
     assert_eq!(offset, 0);
     unsafe {
       std::slice::from_raw_parts(
-        (&self.0).as_ptr() as *const u8,
+        self.0.as_ptr() as *const u8,
         (self.0.len() << 1) * std::mem::size_of::<T>(),
       )
     }
@@ -444,7 +444,7 @@ impl<'a, T: Idx> SNORanges<'a, T> for BorrowedRanges<'a, T> {
     let mut i = 0;
     let mut j = 0;
 
-    let mut result = Vec::with_capacity((ll + rl) as usize);
+    let mut result = Vec::with_capacity(ll + rl);
 
     while i < ll || j < rl {
       let (in_l, in_r, c) = if i == ll {
@@ -704,7 +704,7 @@ impl<'a, T: Idx> SNORanges<'a, T> for BorrowedRanges<'a, T> {
 
   fn complement_with_upper_bound(&self, upper_bound_exclusive: T) -> Self::OwnedRanges {
     let ranges = &self.0;
-    let mut result = Vec::<Range<T>>::with_capacity((ranges.len() + 1) as usize);
+    let mut result = Vec::<Range<T>>::with_capacity(ranges.len() + 1);
 
     if self.is_empty() {
       result.push(T::zero()..upper_bound_exclusive);

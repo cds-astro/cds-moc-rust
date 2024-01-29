@@ -276,17 +276,15 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangesAndFixedDepthCellsSTMocBu
     );
     if let Some((r, h)) = self.buff.last_mut() {
       // Easy merge if needed
-      if *h == idx_2 {
-        if !(range_1.end < r.start || r.end < range_1.start) {
-          // Intersection
-          if range_1.start < r.start {
-            r.start = range_1.start;
-          }
-          if r.end < range_1.end {
-            r.end = range_1.end;
-          }
-          return;
-        } // else no intersection
+      if *h == idx_2 && !(range_1.end < r.start || r.end < range_1.start) {
+        // Intersection
+        if range_1.start < r.start {
+          r.start = range_1.start;
+        }
+        if r.end < range_1.end {
+          r.end = range_1.end;
+        }
+        return;
       }
     }
     self.buff.push((range_1, idx_2));

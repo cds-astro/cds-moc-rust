@@ -94,7 +94,7 @@ where
 {
   // Create n_depth strings (1 per depth)
   let d_max = it.depth_max() as usize;
-  let mut s_by_depth: Vec<String> = (0..=d_max).into_iter().map(|i| format!("{}/", i)).collect();
+  let mut s_by_depth: Vec<String> = (0..=d_max).map(|i| format!("{}/", i)).collect();
   // Fill them
   for e in it {
     let (d, s) = match e {

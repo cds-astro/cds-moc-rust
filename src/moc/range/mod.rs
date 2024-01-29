@@ -174,9 +174,9 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   }
 
   /// Flatten the MOC returning an (ordered) iterator of cells at the MOC depth_max depth.
-  pub fn flatten_to_fixed_depth_cells<'a>(
-    &'a self,
-  ) -> DepthMaxCellsFromRanges<T, Q, RangeRefMocIter<'a, T, Q>> {
+  pub fn flatten_to_fixed_depth_cells(
+    &self,
+  ) -> DepthMaxCellsFromRanges<T, Q, RangeRefMocIter<'_, T, Q>> {
     DepthMaxCellsFromRanges::new(self.into_range_moc_iter())
   }
 
@@ -464,7 +464,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     &self,
     include_indirect_neighbours: bool,
   ) -> Vec<CellMOC<T, Hpx<T>>> {
-    let convert = |cell_moc| Some(cell_moc);
+    let convert = Some;
     if include_indirect_neighbours {
       self.split_into_joint_mocs_gen(external_edge, convert)
     } else {
@@ -512,8 +512,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
       let first_mut: &mut T = elems.first_mut().unwrap(); // unwrap ok since we tested empty just before
       *first_mut |= T::one();
       stack.push((*first_mut) >> 1); // Put the value without the bit flag
-      while !stack.is_empty() {
-        let zuniq = stack.pop().unwrap(); // Unwrap ok since the loop ensures the stack is not empty
+      while let Some(zuniq) = stack.pop() {
         let Cell { depth, idx } = Cell::<T>::from_zuniq::<Hpx<T>>(zuniq);
         let mut stack_changed = false;
         for neig in fn_neighbours(depth, idx.to_u64(), self.depth_max - depth).iter() {
@@ -785,7 +784,7 @@ impl RangeMOC<u64, Hpx<u64>> {
         Ok(moc.convert::<u64, Hpx<u64>>().into_range_moc())
       }
       MocIdxType::U64(MocQtyType::Hpx(MocType::Ranges(moc))) => Ok(moc.into_range_moc()),
-      _ => Err(format!("Unsupported type in FITS file").into()),
+      _ => Err(String::from("Unsupported type in FITS file").into()),
     }
   }
 

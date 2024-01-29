@@ -93,7 +93,7 @@ where
     self.moc_1_head.is_none()
   }
 
-  fn to_range_moc2_elem(mut self) -> RangeMOC2Elem<T, Q, U, R> {
+  fn into_range_moc2_elem(mut self) -> RangeMOC2Elem<T, Q, U, R> {
     let depth1 = self.moc_1_it.depth_max();
     let init_capacity = self.moc_1_it.size_hint().1.map(|up| 1 + up).unwrap_or(64);
     let mut ranges1: Vec<Range<T>> = Vec::with_capacity(init_capacity);
@@ -110,7 +110,7 @@ where
   }
 
   fn push_all(&mut self, buff: &mut Vec<Range<T>>) {
-    buff.push(std::mem::replace(&mut self.moc_1_head, None).unwrap());
+    buff.push(self.moc_1_head.take().unwrap());
     for range in &mut self.moc_1_it {
       buff.push(range);
     }
@@ -228,7 +228,7 @@ where
     self.moc_1_elems.push(elem)
   }
 
-  fn to_moc2_elem(self) -> RangeMOC2Elem<T, Q, U, R> {
+  fn into_moc2_elem(self) -> RangeMOC2Elem<T, Q, U, R> {
     debug_assert!(!self.moc_1_elems.is_empty());
     let moc_1 = RangeMOC::new(
       self.moc_1_depth,
@@ -452,14 +452,14 @@ where
           return self
             .moc2_builder
             .take()
-            .map(|moc2_builder| moc2_builder.to_moc2_elem())
+            .map(|moc2_builder| moc2_builder.into_moc2_elem())
         }
         (Some(curr_moc2_left), None) => {
           match self.moc2_builder.take() {
             None => {
               // No more element in the right MOC2, simply iterate over the left MOC2
               let prev_moc2_left = self.next_left().unwrap();
-              return Some(prev_moc2_left.to_range_moc2_elem());
+              return Some(prev_moc2_left.into_range_moc2_elem());
             }
             Some(mut moc2_builder) => {
               // use moc2_builder_ref.moc_2_org to possibly avoid the MOC inclusion test?
@@ -468,7 +468,7 @@ where
                 self.next_left().unwrap();
                 // The next left_moc_2 will be different, so return instead of break.
               }
-              return Some(moc2_builder.to_moc2_elem());
+              return Some(moc2_builder.into_moc2_elem());
             }
           }
         }
@@ -477,7 +477,7 @@ where
             None => {
               // No more element in the left MOC2, simply iterate over the right MOC2
               let prev_moc2_right = self.next_right().unwrap();
-              return Some(prev_moc2_right.to_range_moc2_elem());
+              return Some(prev_moc2_right.into_range_moc2_elem());
             }
             Some(mut moc2_builder) => {
               // use moc2_builder_ref.moc_2_org to possibly avoid the MOC inclusion test?
@@ -486,7 +486,7 @@ where
                 self.next_right().unwrap();
                 // The next right_moc_2 will be different, so return instead of break.
               }
-              return Some(moc2_builder.to_moc2_elem());
+              return Some(moc2_builder.into_moc2_elem());
             }
           }
         }
@@ -522,11 +522,11 @@ where
                           &mut moc2_builder.moc_1_elems,
                         );
                         if curr_moc2_right.moc1_it_is_depleted() {
-                          return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                          return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                         } // else continue the loop
                       } else if l.start <= r.start {
                         // L--xx  (L--LR--R or L--R--xx )
-                        return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                        return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                       } else {
                         // R--L--xx
                         debug_assert!(r.start < l.start);
@@ -548,7 +548,7 @@ where
                             &mut moc2_builder.moc_1_elems,
                           );
                           if !curr_moc2_left.moc1_it_is_depleted() {
-                            return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                            return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                           } else {
                             moc2_builder.moc_2_org = MOCOrg::Right;
                             // check if nex_left_moc_1_head intersects  current right_moc_1_head
@@ -558,7 +558,7 @@ where
                           let range = r.start..l.start;
                           r.start = l.start;
                           moc2_builder.push(range);
-                          return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                          return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                         }
                       }
                     }
@@ -570,11 +570,11 @@ where
                           &mut moc2_builder.moc_1_elems,
                         );
                         if curr_moc2_left.moc1_it_is_depleted() {
-                          return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                          return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                         } // else continue the loop
                       } else if r.start <= l.start {
                         // R--xx  (R--RL--L or R--L--xx )
-                        return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                        return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                       } else {
                         // L--R--xx
                         debug_assert!(l.start < r.start);
@@ -596,7 +596,7 @@ where
                             &mut moc2_builder.moc_1_elems,
                           );
                           if !curr_moc2_right.moc1_it_is_depleted() {
-                            return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                            return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                           } else {
                             moc2_builder.moc_2_org = MOCOrg::Left;
                             // check if nex_right_moc_1_head intersects  current left_moc_1_head
@@ -606,7 +606,7 @@ where
                           let range = l.start..r.start;
                           l.start = r.start;
                           moc2_builder.push(range);
-                          return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                          return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                         }
                       }
                     }
@@ -638,7 +638,7 @@ where
                         if l.end <= r.start || r.end <= l.start {
                           // L--L R--R or R--R L--L => no overlap
                           // No overlap and we already checked that both moc_2 are different
-                          return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                          return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                         } else {
                           // Ranges overlap, need to compute the union and check whether right_moc_2
                           //   included or not in left_moc_2
@@ -649,7 +649,7 @@ where
                             MOCUnion::from(&curr_moc2_left.moc_2, &curr_moc2_right.moc_2);
                           if r.start < l.start {
                             // R--L--xx
-                            return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                            return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                           } else {
                             // L--R--xx
                             match moc_2_union.utype {
@@ -666,14 +666,14 @@ where
                                   debug_assert!(matches!(was_depleted, WasDepleted::Right));
                                   break;
                                 } else {
-                                  return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                                  return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                                 } // else
                               }
                               _ => {
                                 let range = l.start..r.start;
                                 l.start = r.start;
                                 moc2_builder.moc_1_elems.push(range);
-                                return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                                return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                               }
                             }
                           }
@@ -688,7 +688,7 @@ where
                       debug_assert!(l.end > r.start); // No case L--LR--R
                       if r.start <= l.start {
                         // R--x
-                        return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                        return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                       } else {
                         // L--R--xx
                         // Check whether Left included in Right or Right included in left
@@ -710,7 +710,7 @@ where
                               &mut moc2_builder.moc_1_elems,
                             );
                             if !curr_moc2_right.moc1_it_is_depleted() {
-                              return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                              return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                             } // else
                               // check if nex_right_moc_1_head intersects  current left_moc_1_head
                               // AND next_right_moc_2 also included in current left_moc_2
@@ -719,7 +719,7 @@ where
                             let range = l.start..r.start;
                             l.start = r.start;
                             moc2_builder.moc_1_elems.push(range);
-                            return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                            return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                           }
                         }
                       }
@@ -750,7 +750,7 @@ where
                         if l.end <= r.start || r.end <= l.start {
                           // L--L R--R or R--R L--L => no overlap
                           // No overlap and we already checked that both moc_2 are different
-                          return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                          return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                         } else {
                           // Ranges overlap, need to compute the union and check whether right_moc_2
                           //   included or not in left_moc_2
@@ -761,7 +761,7 @@ where
                             MOCUnion::from(&curr_moc2_left.moc_2, &curr_moc2_right.moc_2);
                           if l.start < r.start {
                             // L--R--xx
-                            return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                            return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                           } else {
                             // R--L--xx
                             /*let range = r.start..l.start;
@@ -776,7 +776,7 @@ where
                                   &mut moc2_builder.moc_1_elems,
                                 );
                                 if !curr_moc2_left.moc1_it_is_depleted() {
-                                  return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                                  return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                                 } // else
                                   // check if nex_left_moc_1_head intersects  current right_moc_1_head
                                   // AND next_left_moc_2 also included in current right_moc_2
@@ -785,7 +785,7 @@ where
                                 let range = r.start..l.start;
                                 r.start = l.start;
                                 moc2_builder.moc_1_elems.push(range);
-                                return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                                return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                               }
                             }
                           }
@@ -801,7 +801,7 @@ where
                       debug_assert!(r.end > l.start); // No case R--RL--L
                       if l.start <= r.start {
                         // L--x
-                        return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                        return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                       } else {
                         // R--L--xx
                         // Check whether Left included in Right or Right included in left
@@ -823,7 +823,7 @@ where
                               &mut moc2_builder.moc_1_elems,
                             );
                             if !curr_moc2_left.moc1_it_is_depleted() {
-                              return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                              return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                             } // else
                               // check if nex_left_moc_1_head intersects  current right_moc_1_head
                               // AND next_left_moc_2 also included in current right_moc_2
@@ -832,7 +832,7 @@ where
                             let range = r.start..l.start;
                             r.start = l.start;
                             moc2_builder.moc_1_elems.push(range);
-                            return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                            return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                           }
                         }
                       }
@@ -853,7 +853,7 @@ where
                         moc2_builder.moc_2_org = MOCOrg::Left;
                         was_depleted = WasDepleted::Right;
                       } else {
-                        return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                        return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                       }
                     }
                     Ordering::Greater => {
@@ -865,7 +865,7 @@ where
                         moc2_builder.moc_2_org = MOCOrg::Right;
                         was_depleted = WasDepleted::Left;
                       } else {
-                        return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                        return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                       }
                     }
                     Ordering::Equal => {
@@ -883,11 +883,11 @@ where
                         if !curr_moc2_left.moc1_it_is_depleted()
                           || !curr_moc2_right.moc1_it_is_depleted()
                         {
-                          return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                          return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                         } // else iterate
                       } else {
                         self.curr_moc_2_union = Some(moc_2_union);
-                        return self.moc2_builder.take().map(|b| b.to_moc2_elem());
+                        return self.moc2_builder.take().map(|b| b.into_moc2_elem());
                       }
                     }
                   }
