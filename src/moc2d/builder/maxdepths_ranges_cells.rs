@@ -56,6 +56,7 @@ impl<'a, T: Idx, U: Idx> Ord for SweepLineEvent<'a, T, U> {
   }
 }
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<'a, T: Idx, U: Idx> PartialOrd for SweepLineEvent<'a, T, U> {
   // if start == end, we consider the End to be lower than Start (because End is exclusive while
   // start is inclusive and we need to remove ended ranges before adding starting ranges)

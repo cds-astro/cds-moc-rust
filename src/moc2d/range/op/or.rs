@@ -985,6 +985,7 @@ where
                     }
                   };
                   // Perform the union
+                  #[allow(clippy::comparison_chain)]
                   if l.start == r.start {
                     // LR--xx Perform the union !!!
                     match l.end.cmp(&r.end) {
