@@ -25,7 +25,7 @@ impl List {
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
     if self.ranges {
-      let _ = writeln!(&mut out, "id,status,depth,n_ranges,byte_start,byte_end")?;
+      let _ = writeln!(&mut out, "id,status,depth,n_ranges,byte_start,byte_end");
       for (flg_depth_id, byte_range) in meta_it.zip(bytes_it) {
         let id = flg_depth_id.identifier();
         let status = flg_depth_id.status();
@@ -46,7 +46,7 @@ impl List {
           n_ranges,
           byte_range.start,
           byte_range.end
-        )?;
+        );
       }
     } else {
       let _ = writeln!(&mut out, "id,status,depth,n_ranges,byte_size");

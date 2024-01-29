@@ -486,6 +486,7 @@ pub(crate) fn append_moc<T: Idx>(
   append_moc_bytes(flag, id, depth, moc_bytes, from_byte, meta, index, data)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn append_moc_bytes(
   flag: StatusFlag,
   id: u64,
@@ -617,7 +618,7 @@ impl MocSetFileIOHelper {
 }
 
 pub(crate) fn from_fits_file(path: PathBuf) -> Result<MocIdxType<BufReader<File>>, Box<dyn Error>> {
-  let file = File::open(&path)?;
+  let file = File::open(path)?;
   let reader = BufReader::new(file);
   from_fits_ivoa(reader).map_err(|e| e.into())
 }
