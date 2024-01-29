@@ -110,7 +110,10 @@ Install from using `cargo`:
 ```bash
 cargo install --path crates/set
 ```
-
+or
+```
+RUSTFLAGS='-C target-cpu=native' cargo install --path crates/set
+```
 
 ## Usage
 

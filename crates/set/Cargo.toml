@@ -26,6 +26,7 @@ cdshealpix = "0.6.7"
 memmap = { package = "memmap2", version = "0.5" }
 clap = { version = "4.4", features = ["derive"] }
 byteorder = "1"
+rayon = "1.8.1"
 
 [package.metadata.deb]
 maintainer = "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"

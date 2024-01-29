@@ -1,5 +1,22 @@
 # `moc-set` Change Log
 
+## 0.8.2
+
+Released 2024-01-29
+
+### Added
+
+* naive parallelism in 'mocset query':
+  we expect poor performances on HDD with cold cache but better ones with 
+  SSDs with cold cache (parallel reading).
+  Performances does not seems to improve a lot so far on a single MVNe SSD.
+
+### Bug correction
+
+* No more 'panic' info showing-up on stderr when piping output in commands
+  endding the process before full write, such as 'head'.
+
+
 ## 0.8.1
 
 Released 2023-12-20
