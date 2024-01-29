@@ -189,7 +189,7 @@ pub(crate) fn exec<R: BufRead>(
                 .into_range_moc(),
             ),
           },
-          _ => Err(String::from("Input MOC type must be SMOC.").into()),
+          _ => Err(String::from("Input MOC type must be SMOC.")),
         },
         MocIdxType::U32(moc) => match moc {
           MocQtyType::Hpx(moc) => match moc {
@@ -202,14 +202,14 @@ pub(crate) fn exec<R: BufRead>(
                 .into_range_moc(),
             ),
           },
-          _ => Err(String::from("Input MOC type must be SMOC.").into()),
+          _ => Err(String::from("Input MOC type must be SMOC.")),
         },
         MocIdxType::U64(moc) => match moc {
           MocQtyType::Hpx(moc) => match moc {
             MocType::Ranges(moc) => Ok(moc.into_range_moc()),
             MocType::Cells(moc) => Ok(moc.into_cell_moc_iter().ranges().into_range_moc()),
           },
-          _ => Err(String::from("Input MOC type must be SMOC.").into()),
+          _ => Err(String::from("Input MOC type must be SMOC.")),
         },
       }
     }

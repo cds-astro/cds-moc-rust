@@ -94,7 +94,7 @@ impl DataType {
 }
 
 pub fn from_fits_file(path: PathBuf) -> Result<MocIdxType<BufReader<File>>, Box<dyn Error>> {
-  let file = File::open(&path)?;
+  let file = File::open(path)?;
   let reader = BufReader::new(file);
   from_fits_ivoa(reader).map_err(|e| e.into())
 }

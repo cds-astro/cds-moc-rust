@@ -154,5 +154,5 @@ fn calendar2f(y: i16, m: u8, d: u8) -> (u32, i16) {
   let g = y + 4716 - (12 - h) / 12;
   let f = ((h + 11) % 12) as i32;
   let e = ((1461 * g as i32) >> 2) + d as i32 - 1402;
-  ((e + (153 * f + 2) / 5) as u32, g as i16)
+  ((e + (153 * f + 2) / 5) as u32, g)
 }

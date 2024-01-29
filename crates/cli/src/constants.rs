@@ -46,7 +46,7 @@ fn print_hpx_info() {
     "depth", "nside", "ncells", "cellSize"
   );
   for depth in 0..=Hpx::<u64>::MAX_DEPTH {
-    let ncells = Hpx::<u64>::n_cells(depth as u8);
+    let ncells = Hpx::<u64>::n_cells(depth);
     let area_rad2 = (4.0 * std::f64::consts::PI) / (ncells as f64);
     let side_deg = area_rad2.sqrt().to_degrees();
     if side_deg < 1.0 / MAS {
@@ -104,7 +104,7 @@ fn print_time_info() {
   println!("Layers info:");
   println!("{:>5} {:>20}", "depth", "ncells");
   for depth in 0..=Time::<u64>::MAX_DEPTH {
-    println!("   {:2} {:20}", depth, Time::<u64>::n_cells(depth as u8));
+    println!("   {:2} {:20}", depth, Time::<u64>::n_cells(depth));
   }
 }
 
@@ -119,10 +119,6 @@ fn print_freq_info() {
   println!("Layers info:");
   println!("{:>5} {:>20}", "depth", "ncells");
   for depth in 0..=Frequency::<u64>::MAX_DEPTH {
-    println!(
-      "   {:2} {:20}",
-      depth,
-      Frequency::<u64>::n_cells(depth as u8)
-    );
+    println!("   {:2} {:20}", depth, Frequency::<u64>::n_cells(depth));
   }
 }

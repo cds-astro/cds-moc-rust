@@ -42,8 +42,7 @@ impl FromStr for Vertices {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     let list: Vec<f64> = s
-      .replace('(', "")
-      .replace(')', "")
+      .replace(['(', ')'], "")
       .split(',')
       .map(|t| str::parse::<f64>(t.trim()))
       .collect::<Result<Vec<f64>, _>>()?;
@@ -963,7 +962,7 @@ impl From {
           let line = line?;
           let (tmin, tmax) = line
             .trim()
-            .split_once(&separator)
+            .split_once(separator)
             .ok_or_else(|| String::from("split on space failed."))?;
           let tmin = time.parse(tmin)?;
           let tmax = time.parse(tmax)?;
@@ -1178,7 +1177,7 @@ impl From {
           let line = line?;
           let (fmin, fmax) = line
             .trim()
-            .split_once(&separator)
+            .split_once(separator)
             .ok_or_else(|| String::from("split on space failed."))?;
           let fmin = fmin.parse::<f64>()?;
           let fmax = fmax.parse::<f64>()?;
@@ -1213,10 +1212,9 @@ impl From {
             .into_range_moc_iter(),
           )
         }
-      }
-      // ST-MOC from t-moc + s-moc (we can then create a complex ST-MOC by union of elementary ST-MOCs)
-      // - e.g. multiple observation of the same area of the sky
-      // - XMM ST-MOC (from list of observations)?
+      } // ST-MOC from t-moc + s-moc (we can then create a complex ST-MOC by union of elementary ST-MOCs)
+        // - e.g. multiple observation of the same area of the sky
+        // - XMM ST-MOC (from list of observations)?
     }
   }
 }
