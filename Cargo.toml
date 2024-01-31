@@ -1,6 +1,3 @@
-# Nightly feature :o/
-#cargo-features = ["strip"]
-
 [package]
 name = "moc"
 version = "0.12.1"
@@ -19,7 +16,7 @@ keywords = ["healpix", "moc"]
 documentation = "https://docs.rs/moc"
 homepage = "https://github.com/cds-astro/cds-moc-rust/"
 repository = "https://github.com/cds-astro/cds-moc-rust/"
-edition = "2018"
+edition = "2021"
 exclude = [
   "resources",
 ]
@@ -41,10 +38,6 @@ exclude = ["crates/wasm"]
 # - cargo deb --target x86_64-unknown-linux-musl
 # It tries to compile crates/wasm but failed because of
 # crate-type = ["cdylib"] in wasm Cargo.toml
-#members = [
-#  "crates/cli",
-#  "crates/wasm",
-#]
 
 
 [dependencies]
@@ -62,7 +55,6 @@ slab = { version = "0.4", optional = true }
 stc-s = "0.1"
 thiserror = "1.0" # For STC-S (quick-error should be replaced by thiserror everywhere)
 
-
 [dev-dependencies]
 rand = "0.8.3"
 criterion = "0.5"
@@ -70,8 +62,6 @@ criterion = "0.5"
 [features]
 default = []
 storage = ["dep:slab"]
-
-
 
 
 [[bench]]
@@ -102,11 +92,8 @@ harness = false
 [profile.bench]
 opt-level = 3
 
-
-
 # See opti here: https://github.com/johnthagen/min-sized-rust
 [profile.release]
-# strip = true  # Automatically strip symbols from the binary (nightly feature :o/ ).
 lto = true    # Optimize at the link stage (may remove dead code)
 codegen-units = 1
 panic = "abort"

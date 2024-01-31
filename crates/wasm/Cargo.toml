@@ -1,6 +1,6 @@
 [package]
 name = "moc-wasm"
-version = "0.8.1"
+version = "0.8.2"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = """
 WASM library to create and manipulate HEALPix
@@ -27,7 +27,7 @@ serde = { version = "1.0.80", features = ["derive"] }
 wasm-bindgen = { version = "0.2.78", features = ["serde-serialize"]  }
 wasm-bindgen-futures = "0.4.28"
 js-sys = "0.3.52"
-unreachable = "0.1" # Added for wasm size optimization, see  https://rustwasm.github.io/book/reference/code-size.html
+unreachable = "1.0.0" # Added for wasm size optimization, see  https://rustwasm.github.io/book/reference/code-size.html
 console_error_panic_hook = "0.1.7"
 
 [dev-dependencies]

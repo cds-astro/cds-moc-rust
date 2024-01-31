@@ -51,7 +51,7 @@ pub struct Query {
   /// Print in output the sky fraction (in '[0.0, 1.0]') covered by each selected MOC
   print_coverage: bool,
   #[clap(short = 'p', long = "parallel")]
-  /// Switch on multi-threading, with 'parallel' threads
+  /// Switch on multi-threading, with 'parallel' threads (made for SSD, not HDD)
   parallel: Option<u16>,
   #[clap(subcommand)]
   /// Sky region that overlap (or is included in) the select MOCs

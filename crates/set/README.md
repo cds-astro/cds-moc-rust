@@ -1,6 +1,6 @@
 # moc-set
 
-A command-line tool to build, update and query a persistent set of
+A command-line tool to build, update and query a **persistent** set of
 Multi-Order Coverages maps (MOCs), see [this IVOA standard](https://ivoa.net/documents/MOC).
 
 ## About
@@ -120,24 +120,24 @@ RUSTFLAGS='-C target-cpu=native' cargo install --path crates/set
 Exec `mocset --help` to get the help message:
 ```
 > mocset --help
-...
-USAGE:
-    mocset <SUBCOMMAND>
+Command-line tool to build, update and query a persistent set of HEALPix Multi-Order Coverages maps (MOCs)
 
-OPTIONS:
-    -h, --help       Print help information
-    -V, --version    Print version information
+Usage: mocset <COMMAND>
 
-SUBCOMMANDS:
-    append       Append the given MOCs to an existing mocset
-    chgstatus    Change the status flag of the given MOCs identifiers (valid, deprecated,
-                     removed)
-    extract      Extracts a MOC from the given moc-set
-    help         Print this message or the help of the given subcommand(s)
-    list         Provide the list of the MOCs in the mocset and the associated flags
-    make         Make a new mocset
-    purge        Purge the mocset removing physically the MOCs flagged as 'removed'
-    query        Query the mocset
+Commands:
+  make       Make a new mocset
+  append     Append the given MOCs to an existing mocset
+  chgstatus  Change the status flag of the given MOCs identifiers (valid, deprecated, removed)
+  purge      Purge the mocset removing physically the MOCs flagged as 'removed'
+  list       Provide the list of the MOCs in the mocset and the associated flags
+  query      Query the mocset
+  union      Union of all MOCs in the moc-set matching a given region
+  extract    Extracts a MOC from the given moc-set
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 
 ### MOC set creation
@@ -174,25 +174,18 @@ The total number of MOCs that can be stored in the file equals `n128 * 128 - 1 (
 See the help message for more details:
 ```
 > mocset make --help
-...
 Make a new mocset
 
-USAGE:
-    mocset make [OPTIONS] <OUTPUT>
+Usage: mocset make [OPTIONS] <FILE>
 
-ARGS:
-    <OUTPUT>    Output file, storing the MOC set
+Arguments:
+  <FILE>  Output file, storing the MOC set
 
-OPTIONS:
-    -d, --delimiter <SEPARATOR>       Delimiter used to separate the moc identifier from the moc
-                                      path [default: " "]
-    -h, --help                        Print help information
-    -l, --moc-list <MOC_LIST_PATH>    Input file containing the 'moc_id moc_path' list (default:
-                                      read from stdin) 'moc_id' must be a positive integer smaller
-                                      than 281_474_976_710_655 (can be stored on 6 bytes). Use a
-                                      negative value to flag as deprecated
-    -n, --n128 <N128>                 n x 128 - 1 = number of MOCs that can be stored in this moc
-                                      set [default: 1]
+Options:
+  -l, --moc-list <FILE>        Input file containing the 'moc_id moc_path' list (default: read from stdin) 'moc_id' must be a positive integer smaller than 281_474_976_710_655 (can be stored on 6 bytes). Use a negative value to flag as deprecated
+  -d, --delimiter <SEPARATOR>  Delimiter used to separate the moc identifier from the moc path [default: " "]
+  -n, --n128 <N128>            n x 128 - 1 = number of MOCs that can be stored in this moc set [default: 1]
+  -h, --help                   Print help
 ```
 
 ### List the content of a MOC set
@@ -216,18 +209,16 @@ id,status,depth,n_ranges,byte_size
 See the help message:
 ```
 > mocset list --help
-... 
 Provide the list of the MOCs in the mocset and the associated flags
 
-USAGE:
-    mocset list [OPTIONS] <FILE>
+Usage: mocset list [OPTIONS] <FILE>
 
-ARGS:
-    <FILE>    The moc-set to be read
+Arguments:
+  <FILE>  The moc-set to be read
 
-OPTIONS:
-    -h, --help      Print help information
-    -r, --ranges    Print byte ranges instead of byte_size
+Options:
+  -r, --ranges  Print byte ranges instead of byte_size
+  -h, --help    Print help
 ```
 
 
@@ -236,25 +227,24 @@ OPTIONS:
 See the help to get the different query modes:
 ```
 > mocset query --help
-...
-USAGE:
-    mocset query [OPTIONS] <FILE> <SUBCOMMAND>
+Query the mocset
 
-ARGS:
-    <FILE>    The moc-set to be read
+Usage: mocset query [OPTIONS] <FILE> <COMMAND>
 
-OPTIONS:
-    -c, --print-coverage    Print in output the sky fraction (in '[0.0, 1.0]') covered by each
-                            selected MOC
-    -d, --add-deprecated    Also selects MOCs flagged as deprecated
-    -h, --help              Print help information
+Commands:
+  pos   Single position
+  cone  A cone, i.e. a position with a small area around (approximated by a MOC)
+  moc   The given MOC (you create a moc using moc-cli and pipe it into moc-set)
+  help  Print this message or the help of the given subcommand(s)
 
-SUBCOMMANDS:
-    cone    A cone, i.e. a position with a small area around (approximated by a MOC)
-    help    Print this message or the help of the given subcommand(s)
-    moc     The given MOC (you create a moc using moc-cli and pipe it into moc-set)
-    pos     Single position
+Arguments:
+  <FILE>  The moc-set to be read
 
+Options:
+  -d, --add-deprecated       Also selects MOCs flagged as deprecated
+  -c, --print-coverage       Print in output the sky fraction (in '[0.0, 1.0]') covered by each selected MOC
+  -p, --parallel <PARALLEL>  Switch on multi-threading, with 'parallel' threads (made for SSD, not HDD)
+  -h, --help                 Print help
 ```
 
 #### Query for a single position
@@ -270,18 +260,16 @@ The result is the list of the identifier of the MOC covering the input position 
 See the full help:
 ```
 > mocset query pos --help
-...
 Single position
 
-USAGE:
-    mocset query <FILE> pos <LON_DEG> <LAT_DEG>
+Usage: mocset query <FILE> pos <LON_DEG> <LAT_DEG>
 
-ARGS:
-    <LON_DEG>    Longitude of the cone center (in degrees)
-    <LAT_DEG>    Latitude of the cone center (in degrees)
+Arguments:
+  <LON_DEG>  Longitude of the cone center (in degrees)
+  <LAT_DEG>  Latitude of the cone center (in degrees)
 
-OPTIONS:
-    -h, --help    Print help information
+Options:
+  -h, --help  Print help
 ```
 
 
@@ -308,23 +296,19 @@ containing 1 to `9x4^n` values.
 See the help:
 ```
 > mocset query cone --help
-...
 A cone, i.e. a position with a small area around (approximated by a MOC)
 
-USAGE:
-    mocset query <FILE> cone [OPTIONS] <LON_DEG> <LAT_DEG> <R_ARCSEC>
+Usage: mocset query <FILE> cone [OPTIONS] <LON_DEG> <LAT_DEG> <R_ARCSEC>
 
-ARGS:
-    <LON_DEG>     Longitude of the cone center (in degrees)
-    <LAT_DEG>     Latitude of the cone center (in degrees)
-    <R_ARCSEC>    Radius of the cone (in arcseconds)
+Arguments:
+  <LON_DEG>   Longitude of the cone center (in degrees)
+  <LAT_DEG>   Latitude of the cone center (in degrees)
+  <R_ARCSEC>  Radius of the cone (in arcseconds)
 
-OPTIONS:
-    -h, --help                Print help information
-    -i, --included            Returns MOCs containing the whole cone MOC (instead of overlapping
-                              only)
-    -p, --precision <PREC>    MOC precision; 0: depth 'd' at which the cone is overlapped by 1 to
-                              max 9 cells; 1: depth 'd' + 1; n: depth 'd' + n [default: 2]
+Options:
+  -p, --precision <PREC>  MOC precision; 0: depth 'd' at which the cone is overlapped by 1 to max 9 cells; 1: depth 'd' + 1; n: depth 'd' + n [default: 2]
+  -i, --included          Returns MOCs containing the whole cone MOC (instead of overlapping only)
+  -h, --help              Print help
 ```
 
 #### Query for a MOC
@@ -369,22 +353,53 @@ id
 See the help
 ```
 > mocset query moc --help
-...
 The given MOC (you create a moc using moc-cli and pipe it into moc-set)
 
-USAGE:
-    mocset query <FILE> moc [OPTIONS] <INPUT>
+Usage: mocset query <FILE> moc [OPTIONS] <FILE>
 
-ARGS:
-    <INPUT>    Path of the input MOC file (or stdin if equals "-")
+Arguments:
+  <FILE>  Path of the input MOC file (or stdin if equals "-")
 
-OPTIONS:
-    -f, --format <INPUT_FMT>    Format of the input MOC ('ascii', 'json' or 'fits') [default: guess
-                                from the file extension]
-    -h, --help                  Print help information
-    -i, --included              Returns MOCs containing the whole given MOC (instead of overlapping)
-
+Options:
+  -f, --format <INPUT_FMT>  Format of the input MOC ('ascii', 'json' or 'fits') [default: guess from the file extension]
+  -i, --included            Returns MOCs containing the whole given MOC (instead of overlapping)
+  -h, --help                Print help
 ```
+
+### Query from a STC-S region
+
+You can query from a STC-S region using `moc-cli`:
+```bash
+echo "Intersection ICRS (
+    Polygon 272.536719 -19.461249 272.542612 -19.476380 272.537389 -19.491509 272.540192 -19.499823
+            272.535455 -19.505218 272.528024 -19.505216 272.523437 -19.500298 272.514082 -19.503376 
+            272.502271 -19.500966 272.488647 -19.490390  272.481932 -19.490913 272.476737 -19.486589 
+            272.487633 -19.455645 272.500386 -19.444996 272.503003 -19.437557 272.512303 -19.432436 
+            272.514132 -19.423973 272.522103 -19.421523 272.524511 -19.413250 272.541021 -19.400024 
+            272.566264 -19.397500 272.564202 -19.389111 272.569055 -19.383210 272.588186 -19.386539 
+            272.593376 -19.381832 272.596327 -19.370541 272.624911 -19.358915 272.629256 -19.347842 
+            272.642277 -19.341020 272.651322 -19.330424 272.653174 -19.325079 272.648903 -19.313708 
+            272.639616 -19.311098 272.638128 -19.303083 272.632705 -19.299839 272.627971 -19.289408 
+            272.628226 -19.276293 272.633750 -19.270590 272.615109 -19.241810 272.614704 -19.221196 
+            272.618224 -19.215572 272.630809 -19.209945 272.633540 -19.198681 272.640711 -19.195292 
+            272.643028 -19.186751 272.651477 -19.182729 272.649821 -19.174859 272.656782 -19.169272 
+            272.658933 -19.161883 272.678012 -19.159481 272.689173 -19.176982 272.689395 -19.183512 
+            272.678006 -19.204016 272.671112 -19.206598 272.664854 -19.203523 272.662760 -19.211156 
+            272.654435 -19.214434 272.652969 -19.222085 272.656724 -19.242136 272.650071 -19.265092
+            272.652868 -19.274296 272.660871 -19.249462 272.670041 -19.247807 272.675533 -19.254935 
+            272.673291 -19.273917 272.668710 -19.279245 272.671460 -19.287043 272.667507 -19.293933
+            272.669261 -19.300601 272.663969 -19.307130 272.672626 -19.308954 272.675225 -19.316490
+            272.657188 -19.349105 272.657638 -19.367455 272.662447 -19.372035 272.662232 -19.378566
+            272.652479 -19.386871 272.645819 -19.387933 272.642279 -19.398277 272.629282 -19.402739
+            272.621487 -19.398197 272.611782 -19.405716 272.603367 -19.404667 272.586162 -19.422703
+            272.561792 -19.420008 272.555815 -19.413012 272.546500 -19.415611 272.537427 -19.424213
+            272.533081 -19.441402 
+    Not (Polygon 272.511081 -19.487278 272.515300 -19.486595 272.517029 -19.471442 
+                 272.511714 -19.458837 272.506430 -19.459001 272.496401 -19.474322 272.504821 -19.484924)
+    Not (Polygon 272.630446 -19.234210 272.637274 -19.248542 272.638942 -19.231476 272.630868 -19.226364)
+)" | moc from stcs 14 - ascii | mocset query mocset.bin moc - --format ascii
+```
+
 
 #### Generic parameter
 
@@ -443,58 +458,48 @@ Example of usage of `purge`:
 Help messages:
 ```
 > mocset chgstatus --help
-... 
 Change the status flag of the given MOCs identifiers (valid, deprecated, removed)
 
-USAGE:
-    mocset chgstatus <FILE> <ID> <NEW_STATUS>
+Usage: mocset chgstatus <FILE> <NEW_STATUS> [IDS]...
 
-ARGS:
-    <FILE>          The moc-set to be updated
-    <ID>            Identifier of the MOC we want to modify the flag
-    <NEW_STATUS>    New status flag to be set
+Arguments:
+  <FILE>        The moc-set to be updated
+  <NEW_STATUS>  New status flag to be set
+  [IDS]...      Comma separated list of identifiers of the MOCs we want to modify the flag
 
-OPTIONS:
-    -h, --help    Print help information
+Options:
+  -h, --help  Print help
 ```
 
 ```
 > mocset append --help
-...
 Append the given MOCs to an existing mocset
 
-USAGE:
-    mocset append <FILE> <ID> <MOC_PATH>
+Usage: mocset append <FILE> <ID> <MOC_PATH>
 
-ARGS:
-    <FILE>        The moc-set to be updated
-    <ID>          Identifier of the MOC we want to append. 'moc_id' must be a positive integer
-                  smaller than 281_474_976_710_655 (can be stored on 6 bytes). Use a negative
-                  value to flag as deprecated
-    <MOC_PATH>    Path of the MOC to be append
+Arguments:
+  <FILE>      The moc-set to be updated
+  <ID>        Identifier of the MOC we want to append. 'moc_id' must be a positive integer smaller than 281_474_976_710_655 (can be stored on 6 bytes). Use a negative value to flag as deprecated
+  <MOC_PATH>  Path of the MOC to be append
 
-OPTIONS:
-    -h, --help    Print help information
+Options:
+  -h, --help  Print help
+
 ```
 
 
 ```
 > mocset purge --help
-...
 Purge the mocset removing physically the MOCs flagged as 'removed'
 
-USAGE:
-    mocset purge [OPTIONS] <FILE>
+Usage: mocset purge [OPTIONS] <FILE>
 
-ARGS:
-    <FILE>    The moc-set file to be purge
+Arguments:
+  <FILE>  The moc-set file to be purge
 
-OPTIONS:
-    -h, --help           Print help information
-    -n, --n128 <N128>    n x 128 - 1 = number of MOCs that can be stored in this purged moc set, if
-                         larger than the current value
-
-
+Options:
+  -n, --n128 <N128>  n x 128 - 1 = number of MOCs that can be stored in this purged moc set, if larger than the current value
+  -h, --help         Print help
 ```
 
 # Implementation information
@@ -629,21 +634,9 @@ by the new one.
 The `purge` operation uses a write lock.
 
 
-## ToDo list
-
-* [ ] Create compact MOCs in which ranges of a single element (at the moc max_order) are replaced by a single value
-      with a flag on the 2 LSB telling if the value id
-    + 0: a single cell
-    + 1: a range starting value
-    + 2: a range ending value
-
-
 ## Recall
 
 * Drop linux disk cache, in root mode: `sync; echo 3 > /proc/sys/vm/drop_caches`
 * Build for being compatible with a large range of systems, avoiding the GLIBC version error
   (see [this post](https://stackoverflow.com/questions/63724484/build-and-bind-against-older-libc-version)):
 > cargo build --target x86_64-unknown-linux-musl
-
-
-

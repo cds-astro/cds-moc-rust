@@ -1,5 +1,12 @@
 # `moc-cli` Change Log
 
+## 0.8.2
+
+Released 2024-01-31
+
+* Add `strip = "debuginfo"` in main `Cargo.toml` to reduce the size of the generated exec file.
+
+
 ## 0.8.1
 
 Released 2023-12-20

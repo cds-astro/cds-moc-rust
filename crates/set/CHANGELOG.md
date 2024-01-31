@@ -2,14 +2,15 @@
 
 ## 0.8.2
 
-Released 2024-01-29
+Released 2024-01-31
 
 ### Added
 
-* naive parallelism in 'mocset query':
+* Naive parallelism in 'mocset query':
   we expect poor performances on HDD with cold cache but better ones with 
   SSDs with cold cache (parallel reading).
-  Performances does not seems to improve a lot so far on a single MVNe SSD.
+  Performances does not seem to improve a lot so far on a single MVNe SSD (x2 factor).
+* `strip = "debuginfo"` in main `Cargo.toml` to reduce the size of the generated exec file.
 
 ### Bug correction
 
