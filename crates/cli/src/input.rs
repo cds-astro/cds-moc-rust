@@ -38,10 +38,10 @@ impl FromStr for InputFormat {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
-      "ascii" => Ok(InputFormat::Ascii),
-      "json" => Ok(InputFormat::Json),
-      "fits" => Ok(InputFormat::Fits),
-      "stream" => Ok(InputFormat::Stream),
+      "ascii" => Ok(Self::Ascii),
+      "json" => Ok(Self::Json),
+      "fits" => Ok(Self::Fits),
+      "stream" => Ok(Self::Stream),
       _ => Err(format!(
         "Unrecognized format '{}'. Expected: 'ascii, 'json', 'fits' or 'stream'",
         s
@@ -49,17 +49,18 @@ impl FromStr for InputFormat {
     }
   }
 }
-
-/// Guess the file format from the extension.
-pub fn fmt_from_extension(path: &Path) -> Result<InputFormat, String> {
-  match path.extension().and_then(|e| e.to_str()) {
-    Some("fits") => Ok(InputFormat::Fits),
-    Some("json") => Ok(InputFormat::Json),
-    Some("ascii") | Some("txt") => Ok(InputFormat::Ascii),
-    Some("stream") => Ok(InputFormat::Stream),
-    _ => Err(String::from(
-      "Unable to guess the MOC format from the file extension, see options.",
-    )),
+impl InputFormat {
+  /// Guess the file format from the given path extension.
+  pub fn from_extension(path: &Path) -> Result<Self, String> {
+    match path.extension().and_then(|e| e.to_str()) {
+      Some("fits") => Ok(Self::Fits),
+      Some("json") => Ok(Self::Json),
+      Some("ascii") | Some("txt") => Ok(Self::Ascii),
+      Some("stream") => Ok(Self::Stream),
+      _ => Err(String::from(
+        "Unable to guess the MOC format from the file extension, see options.",
+      )),
+    }
   }
 }
 

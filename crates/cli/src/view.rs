@@ -30,7 +30,7 @@ use moclib::{
   qty::Hpx,
 };
 
-use crate::input::{fmt_from_extension, InputFormat};
+use crate::input::InputFormat;
 
 #[derive(Debug)]
 pub struct Bound(RangeInclusive<f64>);
@@ -131,7 +131,7 @@ impl View {
     } else {
       let input_fmt = match self.input_fmt {
         Some(input_fmt) => Ok(input_fmt),
-        None => fmt_from_extension(&path),
+        None => InputFormat::from_extension(&path),
       }?;
       let f = File::open(path)?;
       exec(

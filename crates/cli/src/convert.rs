@@ -1,23 +1,28 @@
-use std::error::Error;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{
+  error::Error,
+  fs::File,
+  io::{BufRead, BufReader},
+  path::PathBuf,
+  str::FromStr,
+};
 
 use structopt::StructOpt;
 
-use moclib::deser::ascii::{from_ascii_ivoa, from_ascii_stream, moc2d_from_ascii_ivoa};
-use moclib::deser::fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType as RMocType, STMocType};
-use moclib::deser::json::{cellmoc2d_from_json_aladin, from_json_aladin};
-use moclib::qty::{Frequency, Hpx, Time};
-
-use moclib::moc::{
-  CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIntoIterator, CellOrCellRangeMOCIterator,
+use moclib::{
+  deser::{
+    ascii::{from_ascii_ivoa, from_ascii_stream, moc2d_from_ascii_ivoa},
+    fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType as RMocType, STMocType},
+    json::{cellmoc2d_from_json_aladin, from_json_aladin},
+  },
+  moc::{
+    CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIntoIterator,
+    CellOrCellRangeMOCIterator,
+  },
+  moc2d::{CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator, RangeMOC2IntoIterator},
+  qty::{Frequency, Hpx, Time},
 };
-use moclib::moc2d::{CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator, RangeMOC2IntoIterator};
 
-use super::input::{fmt_from_extension, InputFormat};
-use super::output::OutputFormat;
+use super::{input::InputFormat, output::OutputFormat};
 
 #[derive(Debug)]
 pub enum MocType {
@@ -77,7 +82,7 @@ impl Convert {
     } else {
       let input_fmt = match self.input_fmt {
         Some(input_fmt) => Ok(input_fmt),
-        None => fmt_from_extension(&path),
+        None => InputFormat::from_extension(&path),
       }?;
       let f = File::open(path)?;
       exec(BufReader::new(f), input_fmt, self.moc_type, self.output)

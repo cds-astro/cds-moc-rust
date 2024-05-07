@@ -23,10 +23,7 @@ use moclib::{
   qty::{Frequency, Time},
 };
 
-use super::{
-  input::{fmt_from_extension, InputFormat},
-  N_MICROSEC_IN_DAY,
-};
+use super::{input::InputFormat, N_MICROSEC_IN_DAY};
 
 #[derive(Debug)]
 pub enum MocType {
@@ -82,7 +79,7 @@ impl HumanPrint {
     } else {
       let input_fmt = match self.input_fmt {
         Some(input_fmt) => Ok(input_fmt),
-        None => fmt_from_extension(&path),
+        None => InputFormat::from_extension(&path),
       }?;
       let f = File::open(path)?;
       exec(BufReader::new(f), input_fmt, self.moc_type, !self.no_header)

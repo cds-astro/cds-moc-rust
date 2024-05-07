@@ -1,23 +1,27 @@
-use std::error::Error;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::PathBuf;
+use std::{error::Error, fs::File, io::BufReader, path::PathBuf};
 
 use structopt::StructOpt;
 
-use moclib::deser::fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType, STMocType};
-use moclib::elemset::range::MocRanges;
-use moclib::hpxranges2d::TimeSpaceMoc;
-use moclib::idx::Idx;
-use moclib::moc::{
-  range::{RangeMOC, RangeMocIter},
-  CellMOCIntoIterator, CellMOCIterator, RangeMOCIntoIterator, RangeMOCIterator,
+use moclib::{
+  deser::fits::{
+    from_fits_ivoa, multiordermap::sum_from_fits_multiordermap, MocIdxType, MocQtyType, MocType,
+    STMocType,
+  },
+  elemset::range::MocRanges,
+  hpxranges2d::TimeSpaceMoc,
+  idx::Idx,
+  moc::{
+    range::{RangeMOC, RangeMocIter},
+    CellMOCIntoIterator, CellMOCIterator, RangeMOCIntoIterator, RangeMOCIterator,
+  },
+  moc2d::{range::RangeMOC2Elem, RangeMOC2Iterator},
+  qty::{Frequency, Hpx, MocQty, Time},
 };
-use moclib::moc2d::{range::RangeMOC2Elem, RangeMOC2Iterator};
-use moclib::qty::{Frequency, Hpx, MocQty, Time};
 
-use crate::input::ReducedInputFormat;
-use crate::output::OutputFormat;
+use crate::{
+  input::{self, ReducedInputFormat},
+  output::OutputFormat,
+};
 
 #[derive(StructOpt, Debug)]
 pub enum Op {
@@ -97,9 +101,19 @@ pub enum Op {
   #[structopt(name = "sfold")]
   /// Returns the union of the T-MOCs associated to S-MOCs intersecting the given S-MOC. Left: S-MOC, right: ST-MOC, res: T-MOC.
   SpaceFold(Op2Args),
-  // Add (?):
-  // * moc contains (exit code=0 + output="true", else exit code=1 + output="false")
-  // * moc overlaps
+
+  #[structopt(name = "momsum")]
+  /// Returns the sum of the values of the given Multi-Order Map which are in the given MOC.
+  MultiOrderMapSum {
+    #[structopt(parse(from_os_str))]
+    /// Input Multi-Order healpix Map FITS file in which the value is a density of probability.
+    mom: PathBuf,
+    #[structopt(parse(from_os_str))]
+    /// Input MOC FITS file.
+    moc: PathBuf,
+  }, // Add (?):
+     // * moc contains (exit code=0 + output="true", else exit code=1 + output="false")
+     // * moc overlaps
 }
 
 impl Op {
@@ -131,6 +145,26 @@ impl Op {
       Op::Minus(op) => op.exec(Op2::Minus),
       Op::TimeFold(op) => op.exec(Op2::TimeFold),
       Op::SpaceFold(op) => op.exec(Op2::SpaceFold),
+      Op::MultiOrderMapSum { mom, moc } => input::from_fits_file(moc).and_then(|moc| {
+        let moc = match moc {
+          MocIdxType::U16(moc) => match moc {
+            MocQtyType::Hpx(moc) => moc.collect_to_u64::<Hpx<u64>>(),
+            _ => return Err("Input MOC is not a S-MOC!".to_string().into()),
+          },
+          MocIdxType::U32(moc) => match moc {
+            MocQtyType::Hpx(moc) => moc.collect_to_u64::<Hpx<u64>>(),
+            _ => return Err("Input MOC is not a S-MOC!".to_string().into()),
+          },
+          MocIdxType::U64(moc) => match moc {
+            MocQtyType::Hpx(moc) => moc.collect(),
+            _ => return Err("Input MOC is not a S-MOC!".to_string().into()),
+          },
+        };
+        let f = File::open(mom)?;
+        let sum = sum_from_fits_multiordermap(BufReader::new(f), &moc)?;
+        println!("{}", sum);
+        Ok(())
+      }),
     }
   }
 }
