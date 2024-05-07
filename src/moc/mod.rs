@@ -263,14 +263,14 @@ pub trait RangeMOCIterator<T: Idx>: Sized + MOCProperties + Iterator<Item = Rang
   }
 
   fn coverage_percentage(self) -> f64 {
-    let rsum = self.range_sum();
-    let tot = Self::Qty::upper_bound_exclusive();
+    let mut rsum = self.range_sum();
+    let mut tot = Self::Qty::upper_bound_exclusive();
     if T::N_BITS > 52 {
       // 52 = n mantissa bits in a f64
       // Divide by the same power of 2, dropping the LSBs
       let shift = (T::N_BITS - 52) as u32;
-      rsum.unsigned_shr(shift);
-      tot.unsigned_shr(shift);
+      rsum = rsum.unsigned_shr(shift);
+      tot = tot.unsigned_shr(shift);
     }
     rsum.cast_to_f64() / tot.cast_to_f64()
   }

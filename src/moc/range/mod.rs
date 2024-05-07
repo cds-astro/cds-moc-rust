@@ -195,6 +195,25 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     self.ranges.contains_range(&range.0)
   }
 
+  /// Returns the fraction of the given cell covered by this MOC.
+  /// So:
+  /// * if the given cell if fully covered, the result is 1.0.
+  /// * if half of the given cell is covered, the result is 0.5.
+  /// * if the given cell is **not** covered, the result is 0.0.
+  pub fn cell_fraction(&self, depth: u8, idx: T) -> f64 {
+    let range = MocRange::<T, Q>::from((depth, idx));
+    self.range_fraction(&range)
+  }
+
+  /// Returns the fraction of the given range `x` covered by this (`self`) MOC.
+  /// So:
+  /// * if the given range `x` if fully covered, the result is 1.0.
+  /// * if half of the given range `x` is covered, the result is 0.5.
+  /// * if the given range is **not** covered, the result is 0.0.
+  pub fn range_fraction(&self, x: &MocRange<T, Q>) -> f64 {
+    self.ranges.range_fraction(&x.0)
+  }
+
   pub fn append_fixed_depth_cells<I: Iterator<Item = T>>(
     self,
     depth: u8,
@@ -418,7 +437,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
     )))
   }
 
-  /// Fill the possible holes in MOC whoch are smaller than the given `sky_fraction` (in `[0, 1])
+  /// Fill the possible holes in MOC which are smaller than the given `sky_fraction` (in `[0, 1])
   /// This operation may be an heavy operation, here the algorithm we use:
   /// * perform a `split_into_joint_mocs` operation on the moc `complement`
   /// * remove the sub-mocs covering more than the given sky fraction

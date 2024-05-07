@@ -24,6 +24,7 @@ use crate::elemset::{
   range::MocRanges,
 };
 use crate::idx::Idx;
+use crate::moc::range::op::convert::convert_to_u64;
 use crate::moc::{
   cell::CellMOC,
   range::{RangeMOC, RangeMocIter},
@@ -101,6 +102,15 @@ impl<T: Idx, Q: MocQty<T>, R: BufRead> MocType<T, Q, R> {
     match self {
       MocType::Ranges(ranges) => ranges.into_range_moc(),
       MocType::Cells(cells) => cells.into_cell_moc_iter().ranges().into_range_moc(),
+    }
+  }
+  /// WARNING: you have to be sure that 'P' is the same qty as 'Q'!!
+  pub fn collect_to_u64<P: MocQty<u64>>(self) -> RangeMOC<u64, P> {
+    match self {
+      MocType::Ranges(ranges) => convert_to_u64::<T, Q, _, P>(ranges).into_range_moc(),
+      MocType::Cells(cells) => {
+        convert_to_u64::<T, Q, _, P>(cells.into_cell_moc_iter().ranges()).into_range_moc()
+      }
     }
   }
 }

@@ -152,7 +152,7 @@ fn from_fits_skymap_internal<R: BufRead>(
     // TODO: ALSO SUPPORT B or 1B and TTYPE = M (for MASK)!!
     Err(FitsError::UnexpectedValue(
       String::from("TFORM1"),
-      String::from("'D', '1D', 'E', '1E' or '1024E'"),
+      String::from("['D', '1D', 'E', '1E' or '1024E']"),
       String::from(tform1),
     ))
   }?;

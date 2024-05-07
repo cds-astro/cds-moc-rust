@@ -329,7 +329,7 @@ impl SpaceVisitor for Stc2Moc {
     self,
     interval: &PositionInterval,
   ) -> Result<Self::Value, Self::Error> {
-    // We use compound visitor onyl to check interval parameters
+    // We use compound visitor only to check interval parameters
     self.new_compound_visitor(&interval.pre, &interval.post)?;
     let depth = self.depth;
     let corners = interval

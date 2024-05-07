@@ -25,6 +25,8 @@ pub mod mocranges2d;
 
 pub mod deser;
 
+pub mod mom;
+
 #[cfg(feature = "storage")]
 pub mod storage;
 pub mod utils;

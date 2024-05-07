@@ -1,4 +1,15 @@
-use crate::moc::{CellMOCIntoIterator, CellMOCIterator, RangeMOCIntoIterator, RangeMOCIterator};
+use std::{
+  fs::File,
+  io::{BufReader, Cursor},
+  path::Path,
+};
+
+use crate::{
+  deser::fits::multiordermap::sum_from_fits_multiordermap,
+  moc::{CellMOCIntoIterator, CellMOCIterator, RangeMOCIntoIterator, RangeMOCIterator},
+  mom::{HpxMOMIterator, HpxMomIter},
+  qty::Hpx,
+};
 
 use super::{
   common::{InternalMoc, FMOC, SMOC, STMOC, TMOC},
@@ -239,5 +250,48 @@ pub(crate) fn op1_1st_axis_max(index: usize) -> Result<Option<u64>, String> {
       InternalMoc::Frequency(moc) => moc.last_index(),
       InternalMoc::TimeSpace(stmoc) => stmoc.max_index_left(),
     })
+  })
+}
+
+pub(crate) fn op1_mom_sum<I>(index: usize, it: I) -> Result<f64, String>
+where
+  I: Sized + Iterator<Item = (u64, f64)>,
+{
+  store::exec_on_one_readonly_moc(index, move |moc| match moc {
+    InternalMoc::Space(moc) => {
+      let mom_it = HpxMomIter::<u64, Hpx<u64>, f64, _>::new(it);
+      Ok(mom_it.sum_values_in_hpxmoc(&moc))
+    }
+    InternalMoc::Time(_) => Err(String::from("MOM Sum not implemented for T-MOCs.")),
+    InternalMoc::Frequency(_) => Err(String::from("MOM Sum not implemented for F-MOCs.")),
+    InternalMoc::TimeSpace(_) => Err(String::from("MOM Sum not implemented for ST-MOCs.")),
+  })
+}
+
+pub(crate) fn op1_mom_sum_from_path<P: AsRef<Path>>(
+  index: usize,
+  mom_path: P,
+) -> Result<f64, String> {
+  store::exec_on_one_readonly_moc(index, move |moc| match moc {
+    InternalMoc::Space(moc) => {
+      let file = File::open(&mom_path).map_err(|e| e.to_string())?;
+      let reader = BufReader::new(file);
+      sum_from_fits_multiordermap(reader, &moc).map_err(|e| e.to_string())
+    }
+    InternalMoc::Time(_) => Err(String::from("MOM Sum not implemented for T-MOCs.")),
+    InternalMoc::Frequency(_) => Err(String::from("MOM Sum not implemented for F-MOCs.")),
+    InternalMoc::TimeSpace(_) => Err(String::from("MOM Sum not implemented for ST-MOCs.")),
+  })
+}
+
+pub(crate) fn op1_mom_sum_from_data(index: usize, mom_data: &[u8]) -> Result<f64, String> {
+  store::exec_on_one_readonly_moc(index, move |moc| match moc {
+    InternalMoc::Space(moc) => {
+      sum_from_fits_multiordermap(BufReader::new(Cursor::new(mom_data)), &moc)
+        .map_err(|e| e.to_string())
+    }
+    InternalMoc::Time(_) => Err(String::from("MOM Sum not implemented for T-MOCs.")),
+    InternalMoc::Frequency(_) => Err(String::from("MOM Sum not implemented for F-MOCs.")),
+    InternalMoc::TimeSpace(_) => Err(String::from("MOM Sum not implemented for ST-MOCs.")),
   })
 }

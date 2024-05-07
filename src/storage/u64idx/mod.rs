@@ -22,6 +22,7 @@ use rayon::iter::{
   IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 
+use crate::storage::u64idx::op1::{op1_mom_sum, op1_mom_sum_from_data, op1_mom_sum_from_path};
 use crate::{
   deser::{
     ascii::{from_ascii_ivoa, moc2d_from_ascii_ivoa},
@@ -1795,6 +1796,47 @@ impl U64MocStore {
   /// Count the number of joint S-MOC splitting ("direct") the given disjoint S-MOC.
   pub fn split_indirect_count(&self, index: usize) -> Result<u32, String> {
     op1_count_split(index, true)
+  }
+
+  /// Sum the value of the given multi-order map which are in the given MOC.
+  /// Remark: we have no information and cannot make any guess on the order if te `UNIQ` cell
+  /// in the iterator.
+  /// # Params
+  /// * `index`: index pf the S-MOC in the storage
+  /// * `mom_it`: iterator on non-overlapping `(uniq, value)` pairs.
+  pub fn multiordermap_sum_in_moc<I>(&self, index: usize, mom_it: I) -> Result<f64, String>
+  where
+    I: Sized + Iterator<Item = (u64, f64)>,
+  {
+    op1_mom_sum(index, mom_it)
+  }
+
+  /// Sum the value of the multi-order map in the given path which are in the given MOC.
+  /// Remark: we have no information and cannot make any guess on the order if te `UNIQ` cell
+  /// in the iterator.
+  /// # Params
+  /// * `index`: index pf the S-MOC in the storage
+  /// * `mom_path`: path of the MOM FITS file.
+  pub fn multiordermap_sum_in_moc_from_path<P: AsRef<Path>>(
+    &self,
+    index: usize,
+    mom_path: P,
+  ) -> Result<f64, String> {
+    op1_mom_sum_from_path(index, mom_path)
+  }
+
+  /// Sum the value of the multi-order map in the given FITS data which are in the given MOC.
+  /// Remark: we have no information and cannot make any guess on the order if te `UNIQ` cell
+  /// in the iterator.
+  /// # Params
+  /// * `index`: index pf the S-MOC in the storage
+  /// * `data`: raw FITS file containing the MOM
+  pub fn multiordermap_sum_in_moc_from_data(
+    &self,
+    index: usize,
+    mom_data: &[u8],
+  ) -> Result<f64, String> {
+    op1_mom_sum_from_data(index, mom_data)
   }
 
   pub fn degrade(&self, index: usize, new_depth: u8) -> Result<usize, String> {

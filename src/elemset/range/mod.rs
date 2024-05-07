@@ -95,6 +95,9 @@ impl<'a, T: Idx, Q: MocQty<T>> SNORanges<'a, T> for MocRanges<T, Q> {
     self.0.contains_range(x)
   }
 
+  fn range_fraction(&self, x: &Range<T>) -> f64 {
+    self.0.range_fraction(x)
+  }
   fn intersects(&self, rhs: &Self) -> bool {
     self.0.intersects(&rhs.0)
   }
@@ -290,6 +293,10 @@ impl<'a, T: Idx, Q: MocQty<T>> SNORanges<'a, T> for BorrowedMocRanges<'a, T, Q> 
 
   fn contains_range(&self, x: &Range<T>) -> bool {
     self.0.contains_range(x)
+  }
+
+  fn range_fraction(&self, x: &Range<T>) -> f64 {
+    self.0.range_fraction(x)
   }
 
   fn intersects(&self, rhs: &Self) -> bool {

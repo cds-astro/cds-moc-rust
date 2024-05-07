@@ -1,15 +1,15 @@
 //! Very generic ranges operations
 
-use std::cmp;
-use std::cmp::Ordering;
-use std::collections::VecDeque;
-use std::mem;
-use std::ops::{Index, Range};
-use std::ptr::slice_from_raw_parts;
-use std::slice::Iter;
+use std::{
+  cmp::{self, Ordering},
+  collections::VecDeque,
+  mem,
+  ops::{Index, Range},
+  ptr::slice_from_raw_parts,
+  slice::Iter,
+};
 
 use num::{Integer, One, PrimInt, Zero};
-
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 #[cfg(not(target_arch = "wasm32"))]
@@ -55,6 +55,13 @@ pub trait SNORanges<'a, T: Idx>: Sized {
       .map(|r| x.start >= r.start && x.end <= r.end)
       .any(|a| a)
   }
+
+  /// Returns the fraction of the given range `x` covered by this (`self`) set of ranges.
+  /// So:
+  /// * if the given range `x` if fully covered, the result is 1.0.
+  /// * if half of the given range `x` is covered, the result is 0.5.
+  /// * if the given range is **not** covered, the result is 0.0.
+  fn range_fraction(&self, x: &Range<T>) -> f64;
 
   fn contains(&self, rhs: &'a Self) -> bool {
     // TODO: implement a more efficient algo, avoiding to re-explore the sub-part of self
@@ -225,6 +232,10 @@ impl<'a, T: Idx> SNORanges<'a, T> for Ranges<T> {
     BorrowedRanges(&self.0).contains_range(x)
   }
 
+  fn range_fraction(&self, x: &Range<T>) -> f64 {
+    BorrowedRanges(&self.0).range_fraction(x)
+  }
+
   fn intersects(&self, rhs: &Self) -> bool {
     BorrowedRanges(&self.0).intersects(&BorrowedRanges(&rhs.0))
   }
@@ -370,8 +381,61 @@ impl<'a, T: Idx> SNORanges<'a, T> for BorrowedRanges<'a, T> {
     }
   }
 
+  // The MOC **MUST BE** consistent!
+  /// Warning: if the order difference is larger that 26, the result may be approximate (52 bit
+  /// in a f64 mantissa!)
+  fn range_fraction(&self, x: &Range<T>) -> f64 {
+    let mut width = T::zero();
+    let ranges = self.0;
+    if ranges.is_empty() || x.end <= ranges[0].start || ranges[ranges.len() - 1].end <= x.start {
+      // quick rejection test
+      0.0
+    } else {
+      // Find the starting range
+      let i = match ranges.binary_search_by(|range| range.start.cmp(&x.start)) {
+        Ok(i) => i,
+        Err(i) => {
+          if i > 0 && ranges[i - 1].end > x.start {
+            i - 1
+          } else {
+            i
+          }
+        }
+      };
+      // Iterate from the starting element
+      for range in ranges[i..].iter() {
+        if x.end <= range.start {
+          // |--x--| |--range--|
+          break;
+        } else {
+          let start = range.start.max(x.start);
+          let end = range.end.min(x.end);
+          width += end - start;
+        }
+      }
+      // Compute fraction
+      let mut tot = x.end - x.start;
+      if width == T::zero() {
+        0.0
+      } else if width == tot {
+        1.0
+      } else {
+        // Deal with numerical precision...
+        if tot.unsigned_shr(52) > T::zero() {
+          // 52 = n mantissa bits in a f64
+          // Divide by the same power of 2, dropping the LSBs
+          // Shift chosen so that 'tot' leading 1 is lower than 1^52
+          let shift = T::N_BITS as u32 - tot.unsigned_shr(52).leading_zeros();
+          width = width.unsigned_shr(shift);
+          tot = tot.unsigned_shr(shift);
+        }
+        width.cast_to_f64() / tot.cast_to_f64()
+      }
+    }
+  }
+
   fn intersects(&self, rhs: &Self) -> bool {
-    // Quickly adaptedd from "intersection", we may find a better option
+    // Quickly adapted from "intersection", we may find a better option
     let l = &self.0;
     let r = &rhs.0;
     // Quick rejection test
@@ -623,7 +687,7 @@ impl<'a, T: Idx> SNORanges<'a, T> for BorrowedRanges<'a, T> {
   }
 
   fn intersection(&self, other: &Self) -> Self::OwnedRanges {
-    // utils.flatten()/unfallten()
+    // utils.flatten()/unflaten()
     let l = &self.0;
     let r = &other.0;
     // Quick rejection test
