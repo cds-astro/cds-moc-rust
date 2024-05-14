@@ -124,9 +124,10 @@ impl U64MocStore {
     store::add(moc)
   }
 
-  /*pub fn insert_stmoc(&self, moc: STMOC) -> Result<usize, String> {
+  pub fn new_empty_stmoc(&self, depth_time: u8, depth_space: u8) -> Result<usize, String> {
+    let moc = STMOC::new_empty(depth_time, depth_space);
     store::add(moc)
-  }*/
+  }
 
   /// Copy the moc at the given index
   pub fn copy(&self, index: usize) -> Result<(), String> {

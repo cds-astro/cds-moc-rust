@@ -266,6 +266,10 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2<T, Q, U, R> {
 }
 
 impl RangeMOC2<u64, Time<u64>, u64, Hpx<u64>> {
+  pub fn new_empty(depth_time: u8, depth_hpx: u8) -> Self {
+    Self::new(depth_time, depth_hpx, Default::default())
+  }
+
   pub fn from_time_and_coos<I: Iterator<Item = (u64, f64, f64)>>(
     depth_time: u8,
     depth_hpx: u8,

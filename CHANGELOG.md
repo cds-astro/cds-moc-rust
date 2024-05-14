@@ -1,5 +1,14 @@
 # `moc` Change Log
 
+## 0.14.0
+
+Released 2024-XX-XX
+
+### Added
+
+* `U64MocStore.new_empty_stmoc`
+
+
 ## 0.13.0
 
 Released 2024-05-14
