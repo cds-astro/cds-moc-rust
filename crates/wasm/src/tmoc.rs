@@ -1,19 +1,15 @@
-
 use std::{
-  sync::{Once, RwLock},
   collections::HashMap,
   str::from_utf8,
+  sync::{Once, RwLock},
 };
 
-use wasm_bindgen::{
-  JsValue,
-  prelude::*
-};
 use js_sys::Array;
+use wasm_bindgen::{prelude::*, JsValue};
 
 use moclib::storage::u64idx::U64MocStore;
 
-use crate::{MocQType, IsMOC, IsOneDimMOC, from_url};
+use crate::{from_url, IsMOC, IsOneDimMOC, MocQType};
 
 /// Function used only once to init the store.
 static MOC_STORE_INIT: Once = Once::new();
@@ -32,20 +28,16 @@ pub(crate) fn get_store() -> &'static RwLock<HashMap<String, TMOC>> {
         MOC_STORE = Some(RwLock::new(HashMap::new()));
       });
     }
-    match &MOC_STORE {
-      Some(v) => v,
-      None => unreachable!(),
-    }
+    MOC_STORE.as_ref().unwrap()
   }
 }
 
 #[wasm_bindgen]
 pub struct TMOC {
-  store_index: usize
+  store_index: usize,
 }
 
 impl IsMOC for TMOC {
-
   fn from_store_index(store_index: usize) -> Self {
     Self { store_index }
   }
@@ -59,7 +51,9 @@ impl IsMOC for TMOC {
   }
 
   fn add_to_store(name: &str, moc: Self) -> Result<(), JsValue> {
-    let mut store = get_store().write().map_err(|_| JsValue::from_str("Write lock poisoned"))?;
+    let mut store = get_store()
+      .write()
+      .map_err(|_| JsValue::from_str("Write lock poisoned"))?;
     (*store).insert(String::from(name), moc);
     Ok(())
   }
@@ -84,46 +78,46 @@ impl IsMOC for TMOC {
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
-
 }
 
-
 impl IsOneDimMOC for TMOC {
-
   fn depth(&self) -> Result<u8, JsValue> {
     U64MocStore::get_global_store()
       .get_tmoc_depth(self.storage_index())
       .map_err(|e| e.into())
   }
-
 }
-
 
 #[wasm_bindgen]
 impl TMOC {
-
   #[wasm_bindgen(js_name = "listMocsLoadedFromLocalFile", catch)]
   /// Returns the MOCs identifiers (names) currently in the store (MOCs loaded from local files)
   pub fn list_mocs_loaded_from_local_file() -> Result<Array, JsValue> {
     Ok(
-      get_store().read().map_err(|_| JsValue::from_str("Read lock poisoned"))?
+      get_store()
+        .read()
+        .map_err(|_| JsValue::from_str("Read lock poisoned"))?
         .iter()
         .map(|(key, _)| JsValue::from_str(key))
-        .collect::<Array>()
+        .collect::<Array>(),
     )
-
   }
 
   #[wasm_bindgen(js_name = "getMocLoadedFromLocalFile", catch)]
   /// Get (and remove from the store) the MOC of given name loaded from a local file.
   pub fn get_moc_loaded_from_local_file(name: &str) -> Result<TMOC, JsValue> {
-    let mut store = get_store().write().map_err(|_| JsValue::from_str("Write lock poisoned"))?;
+    let mut store = get_store()
+      .write()
+      .map_err(|_| JsValue::from_str("Write lock poisoned"))?;
     match (*store).remove(name) {
       Some(moc) => Ok(moc),
-      None => Err(JsValue::from_str(&format!("No MOC named '{}' found in store", name))),
+      None => Err(JsValue::from_str(&format!(
+        "No MOC named '{}' found in store",
+        name
+      ))),
     }
   }
-  
+
   #[wasm_bindgen(js_name = "newEmpty", catch)]
   /// Creates a new empty T-MOC of given depth.
   pub fn new_empty(depth: u8) -> Result<TMOC, JsValue> {
@@ -149,7 +143,7 @@ impl TMOC {
   pub fn from_local_file() -> Result<(), JsValue> {
     <Self as IsMOC>::from_local_file()
   }
-  
+
   #[wasm_bindgen(js_name = "fromAscii", catch)]
   /// Create a MOC from its ASCII serialization
   ///
@@ -165,11 +159,13 @@ impl TMOC {
   pub async fn from_ascii_url(url: String) -> Result<TMOC, JsValue> {
     const ERR: &str = "File content is not valid UTF-8.";
     from_url(
-      url, "text/plain",
-      Box::new(|data| Self::from_ascii(from_utf8(data).unwrap_or(ERR)) )
-    ).await
+      url,
+      "text/plain",
+      Box::new(|data| Self::from_ascii(from_utf8(data).unwrap_or(ERR))),
+    )
+    .await
   }
-  
+
   #[wasm_bindgen(js_name = "fromJson", catch)]
   /// Create a MOC from its JSON serialization
   ///
@@ -185,9 +181,11 @@ impl TMOC {
   pub async fn from_json_url(url: String) -> Result<TMOC, JsValue> {
     const ERR: &str = "File content is not valid UTF-8.";
     from_url(
-      url, "application/json",
-      Box::new(|data| Self::from_json(from_utf8(data).unwrap_or(ERR)) )
-    ).await
+      url,
+      "application/json",
+      Box::new(|data| Self::from_json(from_utf8(data).unwrap_or(ERR))),
+    )
+    .await
   }
 
   #[wasm_bindgen(js_name = "fromFits", catch)]
@@ -210,14 +208,16 @@ impl TMOC {
   ///   * `application/fits` (default value)
   ///   * `application/fits, application/octet-stream`
   #[wasm_bindgen(js_name = "fromFitsUrl")]
-  pub async fn from_fits_url(url: String, accept_mime_types: Option<String>) -> Result<TMOC, JsValue> {
+  pub async fn from_fits_url(
+    url: String,
+    accept_mime_types: Option<String>,
+  ) -> Result<TMOC, JsValue> {
     match accept_mime_types {
-      None =>             from_url(url, "application/fits", Box::new(Self::from_fits)).await,
+      None => from_url(url, "application/fits", Box::new(Self::from_fits)).await,
       Some(mime_types) => from_url(url, &mime_types, Box::new(Self::from_fits)).await,
     }
   }
-  
-  
+
   // IsOneDimMOC methods (put here because wasm_bindgen does not export trait methods)
 
   #[wasm_bindgen(js_name = "getDepth", catch)]
@@ -227,7 +227,7 @@ impl TMOC {
   }
 
   #[wasm_bindgen(js_name = "coveragePercentage", catch)]
-  pub fn coverage_percentage(&self) -> Result<f64, JsValue>  {
+  pub fn coverage_percentage(&self) -> Result<f64, JsValue> {
     IsOneDimMOC::coverage_percentage(self)
   }
   #[wasm_bindgen(js_name = "nRanges", catch)]
@@ -294,7 +294,7 @@ impl TMOC {
   /// The other approach is to use a couple of `f64`: one for the integer part of the JD, the
   /// other for the fractional part of the JD.
   /// We will add such a method later if required by users.
-  pub fn from_decimal_jd(depth: u8, jd: Box<[f64]>) ->  Result<TMOC, JsValue> {
+  pub fn from_decimal_jd(depth: u8, jd: Box<[f64]>) -> Result<TMOC, JsValue> {
     U64MocStore::get_global_store()
       .from_decimal_jd_values(depth, jd.into_iter().cloned())
       .map(Self::from_store_index)
@@ -316,8 +316,10 @@ impl TMOC {
   /// The other approach is to use a couple of `f64`: one for the integer part of the JD, the
   /// other for the fractional part of the JD.
   /// We will add such a method later if required by users.
-  pub fn from_decimal_jd_range(depth: u8, jd_ranges: Box<[f64]>) ->  Result<TMOC, JsValue> {
-    let jd_ranges_iter = jd_ranges.iter().step_by(2)
+  pub fn from_decimal_jd_range(depth: u8, jd_ranges: Box<[f64]>) -> Result<TMOC, JsValue> {
+    let jd_ranges_iter = jd_ranges
+      .iter()
+      .step_by(2)
       .zip(jd_ranges.iter().skip(1).step_by(2))
       .map(|(jd_min, jd_max)| *jd_min..*jd_max);
     U64MocStore::get_global_store()
@@ -337,11 +339,10 @@ impl TMOC {
   /// # Remarks
   /// The size of the returned boolean (u8) array his the same as the size of the input array.
   #[wasm_bindgen(js_name = "filterJDs", catch)]
-  pub fn filter_time(&self, jds: Box<[f64]>) ->  Result<Box<[u8]>, JsValue> {
+  pub fn filter_time(&self, jds: Box<[f64]>) -> Result<Box<[u8]>, JsValue> {
     U64MocStore::get_global_store()
       .filter_time_approx(self.storage_index(), jds.into_iter().cloned(), |b| b as u8)
       .map(|v| v.into_boxed_slice())
       .map_err(|e| e.into())
   }
-
 }

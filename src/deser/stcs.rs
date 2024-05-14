@@ -476,7 +476,10 @@ pub fn stcs2moc(
 
 #[cfg(test)]
 mod tests {
-  use crate::{moc::range::RangeMOC, qty::Hpx};
+  use crate::{
+    moc::range::{CellSelection, RangeMOC},
+    qty::Hpx,
+  };
 
   use super::stcs2moc;
 
@@ -489,6 +492,7 @@ mod tests {
       0.4_f64.to_radians(),
       10,
       2,
+      CellSelection::All,
     );
     assert_eq!(moc1, moc2)
   }

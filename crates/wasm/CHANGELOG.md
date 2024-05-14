@@ -1,5 +1,12 @@
 # `moc-wasm` Change Log
 
+## 0.9.0
+
+Released 2024-05-14
+
+* Bump cdshealpix to 0.6.8
+* remove `static ref` because of [this rust issue](https://github.com/rust-lang/rust/issues/114447)
+
 ## 0.8.2
 
 Released 2024-01-31

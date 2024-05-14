@@ -2,7 +2,7 @@ use std::{
   convert::{TryFrom, TryInto},
   error::Error,
   fs::File,
-  io::BufReader,
+  io::{BufReader, BufWriter},
   marker::PhantomData,
   num::TryFromIntError,
   ops::Range,
@@ -24,7 +24,7 @@ use healpix::{
 use crate::{
   deser::{
     ascii::AsciiError,
-    fits::{from_fits_ivoa, MocIdxType, MocQtyType, MocType},
+    fits::{error::FitsError, from_fits_ivoa, keywords, MocIdxType, MocQtyType, MocType},
   },
   elem::{cell::Cell, range::MocRange},
   elemset::{
@@ -61,6 +61,54 @@ pub mod op;
 pub struct CellAndEdges<T: Idx> {
   pub uniq: T,
   pub edges: OrdinalSet,
+}
+
+/// Enumeration used to select cells returned by a BMOC.
+#[derive(Debug, Copy, Clone)]
+pub enum CellSelection {
+  /// All cells of the BMOC.
+  All,
+  /// Cells of the BMOC having flag `full_in` set to `true`.
+  Inside,
+  /// Cells of the BMOC having flag `full_in` set to `false`.
+  Border,
+}
+impl CellSelection {
+  pub fn to_ranges(&self, bmoc: BMOC) -> Vec<Range<u64>> {
+    let shift = Hpx::<u64>::shift_from_depth_max(bmoc.get_depth_max());
+    match self {
+      Self::All => {
+        let mut ranges = bmoc.to_ranges();
+        for range in ranges.iter_mut() {
+          range.start <<= shift;
+          range.end <<= shift;
+        }
+        ranges.to_vec()
+      }
+      Self::Inside => bmoc
+        .to_flagged_ranges()
+        .into_iter()
+        .filter_map(|(range, is_full)| {
+          if is_full {
+            Some(range.start << shift..range.end << shift)
+          } else {
+            None
+          }
+        })
+        .collect(),
+      Self::Border => bmoc
+        .to_flagged_ranges()
+        .into_iter()
+        .filter_map(|(range, is_full)| {
+          if !is_full {
+            Some(range.start << shift..range.end << shift)
+          } else {
+            None
+          }
+        })
+        .collect(),
+    }
+  }
 }
 
 /// A MOC made of (ordered and non-overlaping) ranges.
@@ -290,6 +338,21 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   /*pub fn to_cells_iter(&self) -> CellMOCIteratorFromRanges<T, Q, Self> {
     CellMOCIteratorFromRanges::new(self)
   }*/
+
+  pub fn to_fits_file_ivoa<P: AsRef<Path>>(
+    &self,
+    moc_id: Option<String>,
+    moc_type: Option<keywords::MocType>,
+    path: P,
+  ) -> Result<(), FitsError> {
+    File::create(path.as_ref())
+      .map_err(FitsError::Io)
+      .and_then(|file| {
+        self
+          .into_range_moc_iter()
+          .to_fits_ivoa(moc_id, moc_type, BufWriter::new(file))
+      })
+  }
 }
 impl<T: Idx, Q: MocQty<T>> HasMaxDepth for RangeMOC<T, Q> {
   fn depth_max(&self) -> u8 {
@@ -316,6 +379,17 @@ impl From<BMOC> for RangeMOC<u64, Hpx<u64>> {
     RangeMOC::new(
       bmoc.get_depth_max(),
       MocRanges::new_unchecked(ranges.to_vec()),
+    )
+  }
+}
+
+impl From<(BMOC, CellSelection)> for RangeMOC<u64, Hpx<u64>> {
+  fn from(param: (BMOC, CellSelection)) -> Self {
+    let (bmoc, selection) = param;
+    // TODO: add a debug_assert! checking that the result is sorted!
+    RangeMOC::new(
+      bmoc.get_depth_max(),
+      MocRanges::new_unchecked(selection.to_ranges(bmoc)),
     )
   }
 }
@@ -829,16 +903,21 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// - `depth`: the MOC depth
   /// - `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
+  /// - `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Panics
   /// If this layer depth + `delta_depth` > the max depth (i.e. 29)
-  pub fn from_cone(lon: f64, lat: f64, radius: f64, depth: u8, delta_depth: u8) -> Self {
-    Self::from(cone_coverage_approx_custom(
-      depth,
-      delta_depth,
-      lon,
-      lat,
-      radius,
+  pub fn from_cone(
+    lon: f64,
+    lat: f64,
+    radius: f64,
+    depth: u8,
+    delta_depth: u8,
+    selection: CellSelection,
+  ) -> Self {
+    Self::from((
+      cone_coverage_approx_custom(depth, delta_depth, lon, lat, radius),
+      selection,
     ))
   }
 
@@ -851,6 +930,7 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// - `depth`: the MOC depth
   /// - `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
+  /// - `selection`: select BMOC cells to keep in the MOC
   /// - `Iterator of (lon, lat, radius)`, in (radians, radians, radians)
   ///
   /// # Panics
@@ -858,13 +938,12 @@ impl RangeMOC<u64, Hpx<u64>> {
   pub fn from_large_cones<I: Iterator<Item = (f64, f64, f64)>>(
     depth: u8,
     delta_depth: u8,
+    selection: CellSelection,
     coo_it: I,
   ) -> Self {
-    /*kway_or_it(
-      coo_it.map(|(lon, lat, radius)| Self::from_cone(lon, lat, radius, depth, delta_depth).into_range_moc_iter())
-    )*/
-    let it =
-      coo_it.map(move |(lon, lat, radius)| Self::from_cone(lon, lat, radius, depth, delta_depth));
+    let it = coo_it.map(move |(lon, lat, radius)| {
+      Self::from_cone(lon, lat, radius, depth, delta_depth, selection)
+    });
     kway_or(Box::new(it))
   }
 
@@ -910,6 +989,7 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// - `depth`: the MOC depth
   /// - `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
+  /// - `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Panics
   /// - if the semi-major axis is > PI/2
@@ -922,15 +1002,11 @@ impl RangeMOC<u64, Hpx<u64>> {
     pa: f64,
     depth: u8,
     delta_depth: u8,
+    selection: CellSelection,
   ) -> Self {
-    Self::from(elliptical_cone_coverage_custom(
-      depth,
-      delta_depth,
-      lon,
-      lat,
-      a,
-      b,
-      pa,
+    Self::from((
+      elliptical_cone_coverage_custom(depth, delta_depth, lon, lat, a, b, pa),
+      selection,
     ))
   }
 
@@ -942,6 +1018,7 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// - `depth`: the MOC depth
   /// - `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
+  /// - `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Panics
   /// * If this layer depth + `delta_depth` > the max depth (i.e. 29)
@@ -953,14 +1030,11 @@ impl RangeMOC<u64, Hpx<u64>> {
     radius_ext: f64,
     depth: u8,
     delta_depth: u8,
+    selection: CellSelection,
   ) -> Self {
-    Self::from(ring_coverage_approx_custom(
-      depth,
-      delta_depth,
-      lon,
-      lat,
-      radius_int,
-      radius_ext,
+    Self::from((
+      ring_coverage_approx_custom(depth, delta_depth, lon, lat, radius_int, radius_ext),
+      selection,
     ))
   }
 
@@ -971,14 +1045,23 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// - `b` the semi-minor axis of the box (half the box height), in radians
   /// - `pa` the position angle (i.e. the angle between the north and the semi-major axis, east-of-north), in radians
   /// - `depth`: the MOC depth
+  /// - `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Panics
   /// - if `a` not in `]0, pi/2]`
   /// - if `b` not in `]0, a]`
   /// - if `pa` not in `[0, pi[`
   ///
-  pub fn from_box(lon: f64, lat: f64, a: f64, b: f64, pa: f64, depth: u8) -> Self {
-    Self::from(box_coverage(depth, lon, lat, a, b, pa))
+  pub fn from_box(
+    lon: f64,
+    lat: f64,
+    a: f64,
+    b: f64,
+    pa: f64,
+    depth: u8,
+    selection: CellSelection,
+  ) -> Self {
+    Self::from((box_coverage(depth, lon, lat, a, b, pa), selection))
   }
 
   /// # Input
@@ -986,17 +1069,26 @@ impl RangeMOC<u64, Hpx<u64>> {
   ///              `[(lon, lat), (lon, lat), ..., (lon, lat)]`
   /// - `complement` boolean used to get the complement of the polygon returned by default
   /// - `depth`: the MOC depth
-  pub fn from_polygon(vertices: &[(f64, f64)], complement: bool, depth: u8) -> Self {
-    Self::from(if !complement {
-      polygon_coverage(depth, vertices, true)
-    } else {
-      custom_polygon_coverage(
-        depth,
-        vertices,
-        &ContainsSouthPoleMethod::DefaultComplement,
-        true,
-      )
-    })
+  /// - `selection`: select BMOC cells to keep in the MOC
+  pub fn from_polygon(
+    vertices: &[(f64, f64)],
+    complement: bool,
+    depth: u8,
+    selection: CellSelection,
+  ) -> Self {
+    Self::from((
+      if !complement {
+        polygon_coverage(depth, vertices, true)
+      } else {
+        custom_polygon_coverage(
+          depth,
+          vertices,
+          &ContainsSouthPoleMethod::DefaultComplement,
+          true,
+        )
+      },
+      selection,
+    ))
   }
 
   /// # Input
@@ -1004,15 +1096,17 @@ impl RangeMOC<u64, Hpx<u64>> {
   ///              `[(lon, lat), (lon, lat), ..., (lon, lat)]`
   /// - `control_point` the control point that must be inside the polygon, in radians
   /// - `depth`: the MOC depth
+  /// - `selection`: select BMOC cells to keep in the MOC
   pub fn from_polygon_with_control_point(
     vertices: &[(f64, f64)],
     control_point: (f64, f64),
     depth: u8,
+    selection: CellSelection,
   ) -> Self {
     let coo = Coo3D::from_sph_coo(control_point.0, control_point.1);
     let method = ContainsSouthPoleMethod::ControlPointIn(coo);
     let bmoc = custom_polygon_coverage(depth, vertices, &method, true);
-    Self::from(bmoc)
+    Self::from((bmoc, selection))
   }
 
   /// # Input
@@ -1021,6 +1115,7 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// - `lon_max` the longitude of the upper left corner, in radians
   /// - `lat_max` the latitude of the upper left corner, in radians
   /// - `depth`: the MOC depth
+  /// - `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Remark
   /// - If `lon_min > lon_max` then we consider that the zone crosses the primary meridian.
@@ -1030,8 +1125,18 @@ impl RangeMOC<u64, Hpx<u64>> {
   /// * if `lon_min` or `lon_max` not in `[0, 2\pi[`
   /// * if `lat_min` or `lat_max` not in `[-\pi/2, \pi/2[`
   /// * `lat_min >= lat_max`.
-  pub fn from_zone(lon_min: f64, lat_min: f64, lon_max: f64, lat_max: f64, depth: u8) -> Self {
-    Self::from(zone_coverage(depth, lon_min, lat_min, lon_max, lat_max))
+  pub fn from_zone(
+    lon_min: f64,
+    lat_min: f64,
+    lon_max: f64,
+    lat_max: f64,
+    depth: u8,
+    selection: CellSelection,
+  ) -> Self {
+    Self::from((
+      zone_coverage(depth, lon_min, lat_min, lon_max, lat_max),
+      selection,
+    ))
   }
 }
 
@@ -1359,7 +1464,7 @@ mod tests {
       (2.4394176374317205, -0.5545388864809319),
       (2.444623710270669, -0.8678251267471937),
     ];
-    let moc = RangeMOC::<u64, Hpx<u64>>::from_polygon(&vertices, false, 2);
+    let moc = RangeMOC::<u64, Hpx<u64>>::from_polygon(&vertices, false, 2, CellSelection::All);
     // println!("{:?}",moc.flatten_to_fixed_depth_cells().collect::<Vec<u64>>());
     // draw moc 2/32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 48, 49, 50, 51, 56, 57, 58, 64, 72, 73, 74, 75, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 134, 136, 137, 138, 139, 144, 145, 146, 147, 148, 149, 150, 151, 152, 156, 157, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191
     for (lon, lat) in vertices {
@@ -1405,5 +1510,35 @@ mod tests {
       .collect::<Vec<CellAndEdges<u64>>>();
 
     assert!(true)
+  }
+
+  #[test]
+  fn test_from_cone() {
+    let lon = 13.158329_f64.to_radians();
+    let lat = -72.80028_f64.to_radians();
+    let radius = 5.64323_f64.to_radians();
+    let depth = 6;
+    let delta_depth = 5;
+
+    // draw red circle(13.158329 -72.80028  5.64323deg)
+
+    let moc_1 = RangeMOC::from_cone(lon, lat, radius, depth, delta_depth, CellSelection::All);
+    //moc_1.to_fits_file_ivoa(None, None, "moc_cone.fits").unwrap();
+    /*let moc_2 = moc_1.not();
+    moc_2
+    .to_fits_file_ivoa(None, None, "moc_cone_not.fits")
+    .unwrap();*/
+
+    let moc_3 = RangeMOC::from_cone(lon, lat, radius, depth, delta_depth, CellSelection::Inside);
+    /*moc_3
+    .to_fits_file_ivoa(None, None, "moc_cone_inside.fits")
+    .unwrap();*/
+
+    let moc_4 = RangeMOC::from_cone(lon, lat, radius, depth, delta_depth, CellSelection::Border);
+    /*moc_4
+    .to_fits_file_ivoa(None, None, "moc_cone_border.fits")
+    .unwrap();*/
+
+    assert_eq!(moc_1, moc_3.or(&moc_4))
   }
 }

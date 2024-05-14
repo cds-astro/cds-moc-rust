@@ -22,7 +22,6 @@ use rayon::iter::{
   IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 
-use crate::storage::u64idx::op1::{op1_mom_sum, op1_mom_sum_from_data, op1_mom_sum_from_path};
 use crate::{
   deser::{
     ascii::{from_ascii_ivoa, moc2d_from_ascii_ivoa},
@@ -38,13 +37,15 @@ use crate::{
   hpxranges2d::TimeSpaceMoc,
   idx::Idx,
   moc::{
-    range::RangeMOC, CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIntoIterator,
+    range::{CellSelection, RangeMOC},
+    CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIntoIterator,
     CellOrCellRangeMOCIterator, RangeMOCIterator,
   },
   moc2d::{
     CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator, RangeMOC2IntoIterator, RangeMOC2Iterator,
   },
   qty::{Frequency, Hpx, MocQty, Time},
+  storage::u64idx::op1::{op1_mom_sum, op1_mom_sum_from_data, op1_mom_sum_from_path},
 };
 
 pub mod common;
@@ -858,6 +859,7 @@ impl U64MocStore {
   /// * `depth`: the MOC depth
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
+  /// * `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Output
   /// - The index in the storage
@@ -868,6 +870,7 @@ impl U64MocStore {
     radius_deg: f64,
     depth: u8,
     delta_depth: u8,
+    selection: CellSelection,
   ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon = lon_deg2rad(lon_deg)?;
@@ -875,7 +878,7 @@ impl U64MocStore {
     let r = radius_deg.to_radians();
     if (0.0..=PI).contains(&r) {
       let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
-      let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_cone(lon, lat, r, depth, dd);
+      let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_cone(lon, lat, r, depth, dd, selection);
       store::add(moc)
     } else {
       Err(String::from("Cone radius must be in [0, pi["))
@@ -892,6 +895,7 @@ impl U64MocStore {
   /// * `depth`: the MOC depth
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
+  /// * `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Output
   /// - The index in the storage
@@ -903,6 +907,7 @@ impl U64MocStore {
     external_radius_deg: f64,
     depth: u8,
     delta_depth: u8,
+    selection: CellSelection,
   ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon = lon_deg2rad(lon_deg)?;
@@ -919,7 +924,8 @@ impl U64MocStore {
       ))
     } else {
       let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
-      let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_ring(lon, lat, r_int, r_ext, depth, dd);
+      let moc: RangeMOC<u64, Hpx<u64>> =
+        RangeMOC::from_ring(lon, lat, r_int, r_ext, depth, dd, selection);
       store::add(moc)
     }
   }
@@ -935,6 +941,7 @@ impl U64MocStore {
   /// * `depth`: the MOC depth
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small).
+  /// * `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Output
   /// - The index in the storage
@@ -947,6 +954,7 @@ impl U64MocStore {
     pa_deg: f64,
     depth: u8,
     delta_depth: u8,
+    selection: CellSelection,
   ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon = lon_deg2rad(lon_deg)?;
@@ -963,7 +971,7 @@ impl U64MocStore {
     } else {
       let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
       let moc: RangeMOC<u64, Hpx<u64>> =
-        RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth, dd);
+        RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth, dd, selection);
       store::add(moc)
     }
   }
@@ -976,6 +984,7 @@ impl U64MocStore {
   /// * `lon_deg_max` the longitude of the upper left corner, in degrees
   /// * `lat_deg_max` the latitude of the upper left corner, in degrees
   /// * `depth`: the MOC depth
+  /// * `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Output
   /// - The index in the storage
@@ -990,6 +999,7 @@ impl U64MocStore {
     lon_deg_max: f64,
     lat_deg_max: f64,
     depth: u8,
+    selection: CellSelection,
   ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon_min = lon_deg2rad(lon_deg_min)?;
@@ -997,7 +1007,7 @@ impl U64MocStore {
     let lon_max = lon_deg2rad(lon_deg_max)?;
     let lat_max = lat_deg2rad(lat_deg_max)?;
     let moc: RangeMOC<u64, Hpx<u64>> =
-      RangeMOC::from_zone(lon_min, lat_min, lon_max, lat_max, depth);
+      RangeMOC::from_zone(lon_min, lat_min, lon_max, lat_max, depth, selection);
     store::add(moc)
   }
 
@@ -1010,6 +1020,7 @@ impl U64MocStore {
   /// * `b_deg` the semi-minor axis of the box (half the box height), in degrees
   /// * `pa_deg` the position angle (i.e. the angle between the north and the semi-major axis, east-of-north), in degrees
   /// * `depth`: the MOC depth
+  /// * `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Output
   /// - The index in the storage
@@ -1021,6 +1032,7 @@ impl U64MocStore {
     b_deg: f64,
     pa_deg: f64,
     depth: u8,
+    selection: CellSelection,
   ) -> Result<usize, String> {
     check_depth::<Hpx<u64>>(depth)?;
     let lon = lon_deg2rad(lon_deg)?;
@@ -1035,7 +1047,7 @@ impl U64MocStore {
     } else if pa < 0.0 || PI <= pa {
       Err(String::from("Position angle must be in [0, pi["))
     } else {
-      let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_box(lon, lat, a, b, pa, depth);
+      let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_box(lon, lat, a, b, pa, depth, selection);
       store::add(moc)
     }
   }
@@ -1046,6 +1058,7 @@ impl U64MocStore {
   /// * `vertices`: vertices coordinates, in degrees
   /// * `complement`: reverse the default inside/outside of the polygon
   /// * `depth`: MOC maximum depth in `[0, 29]`
+  /// * `selection`: select BMOC cells to keep in the MOC
   ///
   /// # Output
   /// - The index in the storage
@@ -1054,6 +1067,7 @@ impl U64MocStore {
     vertices_it: T,
     complement: bool,
     depth: u8,
+    selection: CellSelection,
   ) -> Result<usize, String>
   where
     T: Iterator<Item = (f64, f64)>,
@@ -1066,7 +1080,8 @@ impl U64MocStore {
         Ok((lon, lat))
       })
       .collect::<Result<Vec<(f64, f64)>, String>>()?;
-    let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_polygon(&vertices, complement, depth);
+    let moc: RangeMOC<u64, Hpx<u64>> =
+      RangeMOC::from_polygon(&vertices, complement, depth, selection);
     store::add(moc)
   }
 
@@ -1137,7 +1152,8 @@ impl U64MocStore {
   /// # Params
   /// * `depth`: MOC maximum depth in `[0, 29]`
   /// * `delta_depth` the difference between the MOC depth and the depth at which the computations
-  ///   are made (should remain quite small).  
+  ///   are made (should remain quite small).
+  /// * `selection`: select BMOC cells to keep in the MOC
   /// * `coos_and_radius_deg`: list of coordinates and radii in degrees `((lon, lat), rad)`
   ///
   /// # Output
@@ -1146,6 +1162,7 @@ impl U64MocStore {
     &self,
     depth: u8,
     delta_depth: u8,
+    selection: CellSelection,
     coos_and_radius_deg: T,
   ) -> Result<usize, String>
   where
@@ -1161,7 +1178,7 @@ impl U64MocStore {
         _ => None,
       }
     });
-    let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_large_cones(depth, dd, coos_rad);
+    let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_large_cones(depth, dd, selection, coos_rad);
     store::add(moc)
   }
 

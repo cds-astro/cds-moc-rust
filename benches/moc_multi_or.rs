@@ -1,7 +1,4 @@
-use std::error::Error;
-use std::fs;
-use std::num::ParseFloatError;
-use std::path::PathBuf;
+use std::{error::Error, fs, num::ParseFloatError, path::PathBuf};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
@@ -9,7 +6,7 @@ use moc::{
   elemset::range::MocRanges,
   idx::Idx,
   moc::{
-    range::{op::or::or, RangeMOC},
+    range::{op::or::or, CellSelection, RangeMOC},
     RangeMOCIntoIterator, RangeMOCIterator,
   },
   qty::{Hpx, MocQty},
@@ -592,7 +589,7 @@ fn create_cones_mocs() -> Vec<RangeMOC<u64, Hpx<u64>>> {
       let lon = lon_deg.to_radians();
       let lat = lat_deg.to_radians();
       let radius = radius.to_radians();
-      RangeMOC::from_cone(lon, lat, radius, 12, 2)
+      RangeMOC::from_cone(lon, lat, radius, 12, 2, CellSelection::All)
     })
     .collect()
 }
@@ -622,7 +619,7 @@ fn create_polygones_mocs() -> Vec<RangeMOC<u64, Hpx<u64>>> {
         })
         .collect::<Result<Vec<(f64, f64)>, Box<dyn Error>>>()
         .unwrap();
-      RangeMOC::from_polygon(&vertices, false, 12)
+      RangeMOC::from_polygon(&vertices, false, 12, CellSelection::All)
     })
     .collect()
 }

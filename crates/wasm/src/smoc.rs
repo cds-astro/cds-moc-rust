@@ -1,23 +1,15 @@
-
 use std::{
-  sync::{Once, RwLock},
   collections::HashMap,
   str::from_utf8,
+  sync::{Once, RwLock},
 };
 
-use wasm_bindgen::{
-  JsValue,
-  prelude::*
-};
 use js_sys::Array;
+use wasm_bindgen::{prelude::*, JsValue};
 
+use moclib::{moc::range::CellSelection, qty::Hpx, storage::u64idx::U64MocStore};
 
-use moclib::{
-  qty::Hpx,
-  storage::u64idx::U64MocStore
-};
-
-use crate::{MocQType, IsMOC, IsOneDimMOC, from_url, from_local_multiordermap, from_local_skymap};
+use crate::{from_local_multiordermap, from_local_skymap, from_url, IsMOC, IsOneDimMOC, MocQType};
 
 /// Function used only once to init the store.
 static MOC_STORE_INIT: Once = Once::new();
@@ -36,22 +28,16 @@ pub(crate) fn get_store() -> &'static RwLock<HashMap<String, MOC>> {
         MOC_STORE = Some(RwLock::new(HashMap::new()));
       });
     }
-    match &MOC_STORE {
-      Some(v) => v,
-      None => unreachable!(),
-    }
+    MOC_STORE.as_ref().unwrap()
   }
 }
 
-
-
 #[wasm_bindgen]
 pub struct MOC {
-  store_index: usize
+  store_index: usize,
 }
 
 impl IsMOC for MOC {
-
   fn from_store_index(store_index: usize) -> Self {
     Self { store_index }
   }
@@ -65,11 +51,12 @@ impl IsMOC for MOC {
   }
 
   fn add_to_store(name: &str, moc: Self) -> Result<(), JsValue> {
-    let mut store = get_store().write().map_err(|_| JsValue::from_str("Write lock poisoned"))?;
+    let mut store = get_store()
+      .write()
+      .map_err(|_| JsValue::from_str("Write lock poisoned"))?;
     (*store).insert(String::from(name), moc);
     Ok(())
   }
-
 
   fn from_ascii(data: &str) -> Result<Self, JsValue> {
     U64MocStore::get_global_store()
@@ -91,45 +78,46 @@ impl IsMOC for MOC {
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
-
-
 }
 
 impl IsOneDimMOC for MOC {
-
   fn depth(&self) -> Result<u8, JsValue> {
     U64MocStore::get_global_store()
       .get_smoc_depth(self.storage_index())
       .map_err(|e| e.into())
   }
-
 }
 
 #[wasm_bindgen]
 impl MOC {
-
   #[wasm_bindgen(js_name = "listMocsLoadedFromLocalFile", catch)]
   /// Returns the MOCs identifiers (names) currently in the store (MOCs loaded from local files)
   pub fn list_mocs_loaded_from_local_file() -> Result<Array, JsValue> {
     Ok(
-      get_store().read().map_err(|_| JsValue::from_str("Read lock poisoned"))?
+      get_store()
+        .read()
+        .map_err(|_| JsValue::from_str("Read lock poisoned"))?
         .iter()
         .map(|(key, _)| JsValue::from_str(key))
-        .collect::<Array>()
+        .collect::<Array>(),
     )
-
   }
 
   #[wasm_bindgen(js_name = "getMocLoadedFromLocalFile", catch)]
   /// Get (and remove from the store) the MOC of given name loaded from a local file.
   pub fn get_moc_loaded_from_local_file(name: &str) -> Result<MOC, JsValue> {
-    let mut store = get_store().write().map_err(|_| JsValue::from_str("Write lock poisoned"))?;
+    let mut store = get_store()
+      .write()
+      .map_err(|_| JsValue::from_str("Write lock poisoned"))?;
     match (*store).remove(name) {
       Some(moc) => Ok(moc),
-      None => Err(JsValue::from_str(&format!("No MOC named '{}' found in store", name))),
+      None => Err(JsValue::from_str(&format!(
+        "No MOC named '{}' found in store",
+        name
+      ))),
     }
   }
-  
+
   #[wasm_bindgen(js_name = "newEmpty", catch)]
   /// Creates a new empty MOC of given depth.
   pub fn new_empty(depth: u8) -> Result<MOC, JsValue> {
@@ -164,19 +152,20 @@ impl MOC {
   pub fn from_ascii(data: &str) -> Result<MOC, JsValue> {
     IsMOC::from_ascii(data)
   }
-  
+
   #[wasm_bindgen(js_name = "fromAsciiUrl", catch)]
   /// WARNING: if this is not working, check e.g. with `wget -v -S ${url}` the the content type is
   /// `Content-Type: text/plain`.
   pub async fn from_ascii_url(url: String) -> Result<MOC, JsValue> {
     const ERR: &str = "File content is not valid UTF-8.";
     from_url(
-      url, "text/plain",
-      Box::new(|data| Self::from_ascii(from_utf8(data).unwrap_or(ERR)) )
-    ).await
+      url,
+      "text/plain",
+      Box::new(|data| Self::from_ascii(from_utf8(data).unwrap_or(ERR))),
+    )
+    .await
   }
-  
-  
+
   #[wasm_bindgen(js_name = "fromJson", catch)]
   /// Create a MOC from its JSON serialization
   ///
@@ -192,12 +181,13 @@ impl MOC {
   pub async fn from_json_url(url: String) -> Result<MOC, JsValue> {
     const ERR: &str = "File content is not valid UTF-8.";
     from_url(
-      url, "application/json",
-      Box::new(|data| Self::from_json(from_utf8(data).unwrap_or(ERR)) )
-    ).await
+      url,
+      "application/json",
+      Box::new(|data| Self::from_json(from_utf8(data).unwrap_or(ERR))),
+    )
+    .await
   }
-  
-  
+
   #[wasm_bindgen(js_name = "fromFits", catch)]
   /// Create a MOC from its FITS serialization
   ///
@@ -218,9 +208,12 @@ impl MOC {
   ///   * `application/fits` (default value)
   ///   * `application/fits, application/octet-stream`
   #[wasm_bindgen(js_name = "fromFitsUrl")]
-  pub async fn from_fits_url(url: String, accept_mime_types: Option<String>) -> Result<MOC, JsValue> {
+  pub async fn from_fits_url(
+    url: String,
+    accept_mime_types: Option<String>,
+  ) -> Result<MOC, JsValue> {
     match accept_mime_types {
-      None =>             from_url(url, "application/fits", Box::new(Self::from_fits)).await,
+      None => from_url(url, "application/fits", Box::new(Self::from_fits)).await,
       Some(mime_types) => from_url(url, &mime_types, Box::new(Self::from_fits)).await,
     }
   }
@@ -287,7 +280,7 @@ impl MOC {
     IsOneDimMOC::depth(self)
   }
   #[wasm_bindgen(js_name = "coveragePercentage", catch)]
-  pub fn coverage_percentage(&self) -> Result<f64, JsValue>  {
+  pub fn coverage_percentage(&self) -> Result<f64, JsValue> {
     IsOneDimMOC::coverage_percentage(self)
   }
   #[wasm_bindgen(js_name = "nRanges", catch)]
@@ -339,7 +332,6 @@ impl MOC {
     IsOneDimMOC::difference(self, rhs)
   }
 
-
   // Specific methods
 
   // - from local file
@@ -361,7 +353,14 @@ impl MOC {
     split: bool,
     revese_recursive_descent: bool,
   ) -> Result<(), JsValue> {
-    from_local_multiordermap(from_threshold, to_threshold, asc, not_strict, split, revese_recursive_descent)
+    from_local_multiordermap(
+      from_threshold,
+      to_threshold,
+      asc,
+      not_strict,
+      split,
+      revese_recursive_descent,
+    )
   }
 
   #[wasm_bindgen(js_name = "fromLocalSkymap", catch)]
@@ -382,9 +381,16 @@ impl MOC {
     split: bool,
     revese_recursive_descent: bool,
   ) -> Result<(), JsValue> {
-    from_local_skymap(skip_values_le, from_threshold, to_threshold, asc, not_strict, split, revese_recursive_descent)
+    from_local_skymap(
+      skip_values_le,
+      from_threshold,
+      to_threshold,
+      asc,
+      not_strict,
+      split,
+      revese_recursive_descent,
+    )
   }
-
 
   // - specific creation methods
 
@@ -399,9 +405,22 @@ impl MOC {
   /// * `delta_depth` - the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small, default = 2).
   ///
-  pub fn from_cone(depth: u8, lon_deg: f64, lat_deg: f64, radius_deg: f64, delta_depth: Option<u8>) ->  Result<MOC, JsValue> {
+  pub fn from_cone(
+    depth: u8,
+    lon_deg: f64,
+    lat_deg: f64,
+    radius_deg: f64,
+    delta_depth: Option<u8>,
+  ) -> Result<MOC, JsValue> {
     U64MocStore::get_global_store()
-      .from_cone(lon_deg, lat_deg, radius_deg, depth, delta_depth.unwrap_or(2))
+      .from_cone(
+        lon_deg,
+        lat_deg,
+        radius_deg,
+        depth,
+        delta_depth.unwrap_or(2),
+        CellSelection::All,
+      )
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -415,7 +434,7 @@ impl MOC {
   /// * `delta_depth` - the difference between the MOC depth and the depth at which the computations
   ///   are made (should remain quite small, default = 2).
   ///
-  pub fn from_stcs(depth: u8, ascii_stcs: &str, delta_depth: Option<u8>) ->  Result<MOC, JsValue> {
+  pub fn from_stcs(depth: u8, ascii_stcs: &str, delta_depth: Option<u8>) -> Result<MOC, JsValue> {
     U64MocStore::get_global_store()
       .from_stcs(depth, delta_depth.unwrap_or(2), ascii_stcs)
       .map(Self::from_store_index)
@@ -440,10 +459,18 @@ impl MOC {
     lat_deg: f64,
     internal_radius_deg: f64,
     external_radius_deg: f64,
-    delta_depth: Option<u8>
-  ) ->  Result<MOC, JsValue> {
+    delta_depth: Option<u8>,
+  ) -> Result<MOC, JsValue> {
     U64MocStore::get_global_store()
-      .from_ring(lon_deg, lat_deg, internal_radius_deg, external_radius_deg, depth, delta_depth.unwrap_or(2))
+      .from_ring(
+        lon_deg,
+        lat_deg,
+        internal_radius_deg,
+        external_radius_deg,
+        depth,
+        delta_depth.unwrap_or(2),
+        CellSelection::All,
+      )
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -463,12 +490,24 @@ impl MOC {
   ///
   pub fn from_elliptical_cone(
     depth: u8,
-    lon_deg: f64, lat_deg: f64,
-    a_deg: f64, b_deg: f64, pa_deg: f64,
-    delta_depth: Option<u8>
-  ) ->  Result<MOC, JsValue> {
+    lon_deg: f64,
+    lat_deg: f64,
+    a_deg: f64,
+    b_deg: f64,
+    pa_deg: f64,
+    delta_depth: Option<u8>,
+  ) -> Result<MOC, JsValue> {
     U64MocStore::get_global_store()
-      .from_elliptical_cone(lon_deg, lat_deg, a_deg, b_deg, pa_deg, depth, delta_depth.unwrap_or(2))
+      .from_elliptical_cone(
+        lon_deg,
+        lat_deg,
+        a_deg,
+        b_deg,
+        pa_deg,
+        depth,
+        delta_depth.unwrap_or(2),
+        CellSelection::All,
+      )
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -488,11 +527,20 @@ impl MOC {
   /// - The north pole is included only if `lon_min == 0 && lat_max == pi/2`
   pub fn from_zone(
     depth: u8,
-    lon_deg_min: f64, lat_deg_min: f64,
-    lon_deg_max: f64, lat_deg_max: f64
-  ) ->  Result<MOC, JsValue> {
+    lon_deg_min: f64,
+    lat_deg_min: f64,
+    lon_deg_max: f64,
+    lat_deg_max: f64,
+  ) -> Result<MOC, JsValue> {
     U64MocStore::get_global_store()
-      .from_zone(lon_deg_min, lat_deg_min, lon_deg_max, lat_deg_max, depth)
+      .from_zone(
+        lon_deg_min,
+        lat_deg_min,
+        lon_deg_max,
+        lat_deg_max,
+        depth,
+        CellSelection::All,
+      )
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -510,11 +558,22 @@ impl MOC {
   ///
   pub fn from_box(
     depth: u8,
-    lon_deg: f64, lat_deg: f64,
-    a_deg: f64, b_deg: f64, pa_deg: f64
-  ) ->  Result<MOC, JsValue> {
+    lon_deg: f64,
+    lat_deg: f64,
+    a_deg: f64,
+    b_deg: f64,
+    pa_deg: f64,
+  ) -> Result<MOC, JsValue> {
     U64MocStore::get_global_store()
-      .from_box(lon_deg, lat_deg, a_deg, b_deg, pa_deg, depth)
+      .from_box(
+        lon_deg,
+        lat_deg,
+        a_deg,
+        b_deg,
+        pa_deg,
+        depth,
+        CellSelection::All,
+      )
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -529,13 +588,15 @@ impl MOC {
   pub fn from_polygon(
     depth: u8,
     vertices_deg: Box<[f64]>,
-    complement: bool
-  ) ->  Result<MOC, JsValue> {
-    let vertices_iter = vertices_deg.iter().step_by(2)
+    complement: bool,
+  ) -> Result<MOC, JsValue> {
+    let vertices_iter = vertices_deg
+      .iter()
+      .step_by(2)
       .zip(vertices_deg.iter().skip(1).step_by(2))
       .map(|(lon_deg, lat_deg)| (*lon_deg, *lat_deg));
     U64MocStore::get_global_store()
-      .from_polygon(vertices_iter, complement, depth)
+      .from_polygon(vertices_iter, complement, depth, CellSelection::All)
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -546,11 +607,10 @@ impl MOC {
   /// # Arguments
   /// * `depth` - MOC maximum depth in `[0, 29]`
   /// * `coos_deg` - list of coordinates in degrees `[lon_1, lat_1, lon_2, lat_2, ..., lon_n, lat_n]`
-  pub fn from_coo(
-    depth: u8,
-    coos_deg: Box<[f64]>,
-  ) ->  Result<MOC, JsValue> {
-    let coo_iter = coos_deg.iter().step_by(2)
+  pub fn from_coo(depth: u8, coos_deg: Box<[f64]>) -> Result<MOC, JsValue> {
+    let coo_iter = coos_deg
+      .iter()
+      .step_by(2)
       .zip(coos_deg.iter().skip(1).step_by(2))
       .map(|(lon_deg, lat_deg)| (*lon_deg, *lat_deg));
     U64MocStore::get_global_store()
@@ -569,19 +629,21 @@ impl MOC {
   ///   are made (should remain quite small).
   /// * `coos_and_radius_deg` - list of coordinates and radii in degrees ``[lon_1, lat_1, rad_1, lon_2, lat_2, rad_2, ..., lon_n, lat_n, rad_n]``
   pub fn from_small_cones(
-    depth: u8, delta_depth: u8,
+    depth: u8,
+    delta_depth: u8,
     coos_and_radius_deg: Box<[f64]>,
-  ) ->  Result<MOC, JsValue> {
-    let coos_rad_iter = coos_and_radius_deg.iter().step_by(3).zip(
-      coos_and_radius_deg.iter().skip(1).step_by(3)).zip(
-      coos_and_radius_deg.iter().skip(2).step_by(3)
-    ).map(|((lon_deg, lat_deg), radius_deg)| ((*lon_deg, *lat_deg), *radius_deg));
+  ) -> Result<MOC, JsValue> {
+    let coos_rad_iter = coos_and_radius_deg
+      .iter()
+      .step_by(3)
+      .zip(coos_and_radius_deg.iter().skip(1).step_by(3))
+      .zip(coos_and_radius_deg.iter().skip(2).step_by(3))
+      .map(|((lon_deg, lat_deg), radius_deg)| ((*lon_deg, *lat_deg), *radius_deg));
     U64MocStore::get_global_store()
       .from_small_cones(depth, delta_depth, coos_rad_iter)
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
-
 
   #[wasm_bindgen(js_name = "fromLargeCones", catch)]
   /// Create a new MOC from the given list of cone centers and radii
@@ -594,15 +656,18 @@ impl MOC {
   /// * `coos_and_radius_deg` - list of coordinates and radii in degrees
   ///   `[lon_1, lat_1, rad_1, lon_2, lat_2, rad_2, ..., lon_n, lat_n, rad_n]`
   pub fn from_large_cones(
-    depth: u8, delta_depth: u8,
+    depth: u8,
+    delta_depth: u8,
     coos_and_radius_deg: Box<[f64]>,
-  ) ->  Result<MOC, JsValue> {
-    let coos_rad_iter = coos_and_radius_deg.iter().step_by(3).zip(
-      coos_and_radius_deg.iter().skip(1).step_by(3)).zip(
-      coos_and_radius_deg.iter().skip(2).step_by(3)
-    ).map(|((lon_deg, lat_deg), radius_deg)| ((*lon_deg, *lat_deg), *radius_deg));
+  ) -> Result<MOC, JsValue> {
+    let coos_rad_iter = coos_and_radius_deg
+      .iter()
+      .step_by(3)
+      .zip(coos_and_radius_deg.iter().skip(1).step_by(3))
+      .zip(coos_and_radius_deg.iter().skip(2).step_by(3))
+      .map(|((lon_deg, lat_deg), radius_deg)| ((*lon_deg, *lat_deg), *radius_deg));
     U64MocStore::get_global_store()
-      .from_large_cones(depth, delta_depth, coos_rad_iter)
+      .from_large_cones(depth, delta_depth, CellSelection::All, coos_rad_iter)
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -634,15 +699,28 @@ impl MOC {
     values: Box<[f64]>,
   ) -> Result<MOC, JsValue> {
     let depth = depth.max(
-      uniqs.iter()
+      uniqs
+        .iter()
         .map(|uniq| Hpx::<u64>::from_uniq_hpx(*uniq as u64).0)
         .max()
-        .unwrap_or(depth)
+        .unwrap_or(depth),
     );
-    let uniq_vals = uniqs.into_iter().zip(values.into_iter())
+    let uniq_vals = uniqs
+      .into_iter()
+      .zip(values.into_iter())
       .map(|(u, v)| (*u as u64, *v));
     U64MocStore::get_global_store()
-      .from_valued_cells(depth, density, from_threshold, to_threshold, asc, not_strict, split, revese_recursive_descent, uniq_vals)
+      .from_valued_cells(
+        depth,
+        density,
+        from_threshold,
+        to_threshold,
+        asc,
+        not_strict,
+        split,
+        revese_recursive_descent,
+        uniq_vals,
+      )
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -667,7 +745,15 @@ impl MOC {
     revese_recursive_descent: bool,
   ) -> Result<MOC, JsValue> {
     U64MocStore::get_global_store()
-      .from_multiordermap_fits_file_content(data, from_threshold, to_threshold, asc, not_strict, split, revese_recursive_descent)
+      .from_multiordermap_fits_file_content(
+        data,
+        from_threshold,
+        to_threshold,
+        asc,
+        not_strict,
+        split,
+        revese_recursive_descent,
+      )
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -692,12 +778,21 @@ impl MOC {
     not_strict: bool,
     split: bool,
     revese_recursive_descent: bool,
-    accept_mime_types: Option<String>
-  ) -> Result<MOC, JsValue>
-  {
-    let func = move |data: &[u8]| MOC::from_multiordermap_fits_file(data, from_threshold, to_threshold, asc, not_strict, split, revese_recursive_descent);
+    accept_mime_types: Option<String>,
+  ) -> Result<MOC, JsValue> {
+    let func = move |data: &[u8]| {
+      MOC::from_multiordermap_fits_file(
+        data,
+        from_threshold,
+        to_threshold,
+        asc,
+        not_strict,
+        split,
+        revese_recursive_descent,
+      )
+    };
     match accept_mime_types {
-      None =>             from_url(url, "application/fits", Box::new(func)).await,
+      None => from_url(url, "application/fits", Box::new(func)).await,
       Some(mime_types) => from_url(url, &mime_types, Box::new(func)).await,
     }
   }
@@ -724,7 +819,16 @@ impl MOC {
     revese_recursive_descent: bool,
   ) -> Result<MOC, JsValue> {
     U64MocStore::get_global_store()
-      .from_skymap_fits_file_content(data, skip_values_le, from_threshold, to_threshold, asc, not_strict, split, revese_recursive_descent)
+      .from_skymap_fits_file_content(
+        data,
+        skip_values_le,
+        from_threshold,
+        to_threshold,
+        asc,
+        not_strict,
+        split,
+        revese_recursive_descent,
+      )
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -750,12 +854,22 @@ impl MOC {
     not_strict: bool,
     split: bool,
     revese_recursive_descent: bool,
-    accept_mime_types: Option<String>
-  ) -> Result<MOC, JsValue>
-  {
-    let func = move |data: &[u8]| Self::from_skymap_fits_file(data, skip_values_le, from_threshold, to_threshold, asc, not_strict, split, revese_recursive_descent);
+    accept_mime_types: Option<String>,
+  ) -> Result<MOC, JsValue> {
+    let func = move |data: &[u8]| {
+      Self::from_skymap_fits_file(
+        data,
+        skip_values_le,
+        from_threshold,
+        to_threshold,
+        asc,
+        not_strict,
+        split,
+        revese_recursive_descent,
+      )
+    };
     match accept_mime_types {
-      None =>             from_url(url, "application/fits", Box::new(func)).await,
+      None => from_url(url, "application/fits", Box::new(func)).await,
       Some(mime_types) => from_url(url, &mime_types, Box::new(func)).await,
     }
   }
@@ -772,8 +886,10 @@ impl MOC {
   /// # Remarks
   /// The size of the returned boolean (u8) array his half the size of the input array
   /// (since the later contains pairs of coordinates).
-  pub fn filter_pos(&self, coos_deg: Box<[f64]>) ->  Result<Box<[u8]>, JsValue> {
-    let coo_iter = coos_deg.iter().step_by(2)
+  pub fn filter_pos(&self, coos_deg: Box<[f64]>) -> Result<Box<[u8]>, JsValue> {
+    let coo_iter = coos_deg
+      .iter()
+      .step_by(2)
       .zip(coos_deg.iter().skip(1).step_by(2))
       .map(|(lon_deg, lat_deg)| (*lon_deg, *lat_deg));
     U64MocStore::get_global_store()
@@ -791,11 +907,12 @@ impl MOC {
   pub fn split(&self) -> Result<Box<[JsValue]>, JsValue> {
     U64MocStore::get_global_store()
       .split(self.storage_index())
-      .map(|v| v.into_iter()
-        .map(|i| Self::from_store_index(i).into())
-        .collect::<Vec<JsValue>>()
-        .into_boxed_slice()
-      )
+      .map(|v| {
+        v.into_iter()
+          .map(|i| Self::from_store_index(i).into())
+          .collect::<Vec<JsValue>>()
+          .into_boxed_slice()
+      })
       .map_err(|e| e.into())
   }
 
@@ -815,11 +932,12 @@ impl MOC {
   pub fn split_indirect(&self) -> Result<Box<[JsValue]>, JsValue> {
     U64MocStore::get_global_store()
       .split_indirect(self.storage_index())
-      .map(|v| v.into_iter()
-        .map(|i| Self::from_store_index(i).into())
-        .collect::<Vec<JsValue>>()
-        .into_boxed_slice()
-      )
+      .map(|v| {
+        v.into_iter()
+          .map(|i| Self::from_store_index(i).into())
+          .collect::<Vec<JsValue>>()
+          .into_boxed_slice()
+      })
       .map_err(|e| e.into())
   }
 
@@ -858,7 +976,7 @@ impl MOC {
       .map_err(|e| e.into())
   }
 
-  #[wasm_bindgen(js_name = "internalBorder",catch)]
+  #[wasm_bindgen(js_name = "internalBorder", catch)]
   /// Returns the internal border made of depth max cells.
   pub fn int_border(&self) -> Result<MOC, JsValue> {
     U64MocStore::get_global_store()
@@ -866,5 +984,4 @@ impl MOC {
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
-
 }

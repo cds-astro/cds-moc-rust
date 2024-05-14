@@ -24,7 +24,7 @@ test = false
 moclib = { package = "moc", path = "../.." }
 num = "0.4"
 structopt = "0.3"
-healpix = { package = "cdshealpix", version = "0.6.7" }
+healpix = { package = "cdshealpix", version = "0.6.8" }
 mapproj = "0.3.0"
 rayon = "1.5.1"
 time = { version = "0.3.3", features = ["parsing"] }

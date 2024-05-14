@@ -1,25 +1,15 @@
-
 use std::{
-  sync::{Once, RwLock},
   collections::HashMap,
   str::from_utf8,
+  sync::{Once, RwLock},
 };
 
-use wasm_bindgen::{
-  JsValue,
-  prelude::*
-};
 use js_sys::Array;
+use wasm_bindgen::{prelude::*, JsValue};
 
 use moclib::storage::u64idx::U64MocStore;
 
-use crate::{
-  MocQType, IsMOC,
-  smoc::MOC,
-  tmoc::TMOC,
-  from_url
-};
-
+use crate::{from_url, smoc::MOC, tmoc::TMOC, IsMOC, MocQType};
 
 /// Function used only once to init the store.
 static MOC_STORE_INIT: Once = Once::new();
@@ -38,20 +28,16 @@ pub(crate) fn get_store() -> &'static RwLock<HashMap<String, STMOC>> {
         MOC_STORE = Some(RwLock::new(HashMap::new()));
       });
     }
-    match &MOC_STORE {
-      Some(v) => v,
-      None => unreachable!(),
-    }
+    MOC_STORE.as_ref().unwrap()
   }
 }
 
 #[wasm_bindgen]
 pub struct STMOC {
-  store_index: usize
+  store_index: usize,
 }
 
 impl IsMOC for STMOC {
-
   fn from_store_index(store_index: usize) -> Self {
     Self { store_index }
   }
@@ -65,7 +51,9 @@ impl IsMOC for STMOC {
   }
 
   fn add_to_store(name: &str, moc: Self) -> Result<(), JsValue> {
-    let mut store = get_store().write().map_err(|_| JsValue::from_str("Write lock poisoned"))?;
+    let mut store = get_store()
+      .write()
+      .map_err(|_| JsValue::from_str("Write lock poisoned"))?;
     (*store).insert(String::from(name), moc);
     Ok(())
   }
@@ -90,34 +78,38 @@ impl IsMOC for STMOC {
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
-
 }
 
 #[wasm_bindgen]
 impl STMOC {
-
   #[wasm_bindgen(js_name = "listMocsLoadedFromLocalFile", catch)]
   /// Returns the MOCs identifiers (names) currently in the store (MOCs loaded from local files)
   pub fn list_mocs_loaded_from_local_file() -> Result<Array, JsValue> {
     Ok(
-      get_store().read().map_err(|_| JsValue::from_str("Read lock poisoned"))?
+      get_store()
+        .read()
+        .map_err(|_| JsValue::from_str("Read lock poisoned"))?
         .iter()
         .map(|(key, _)| JsValue::from_str(key))
-        .collect::<Array>()
+        .collect::<Array>(),
     )
-
   }
 
   #[wasm_bindgen(js_name = "getMocLoadedFromLocalFile", catch)]
   /// Get (and remove from the store) the MOC of given name loaded from a local file.
   pub fn get_moc_loaded_from_local_file(name: &str) -> Result<STMOC, JsValue> {
-    let mut store = get_store().write().map_err(|_| JsValue::from_str("Write lock poisoned"))?;
+    let mut store = get_store()
+      .write()
+      .map_err(|_| JsValue::from_str("Write lock poisoned"))?;
     match (*store).remove(name) {
       Some(moc) => Ok(moc),
-      None => Err(JsValue::from_str(&format!("No MOC named '{}' found in store", name))),
+      None => Err(JsValue::from_str(&format!(
+        "No MOC named '{}' found in store",
+        name
+      ))),
     }
   }
-  
+
   #[wasm_bindgen(catch)]
   pub fn depth_time(&self) -> Result<u8, JsValue> {
     U64MocStore::get_global_store()
@@ -150,7 +142,7 @@ impl STMOC {
   pub fn from_local_file() -> Result<(), JsValue> {
     <Self as IsMOC>::from_local_file()
   }
-  
+
   #[wasm_bindgen(js_name = "fromAscii", catch)]
   /// Create a MOC from its ASCII serialization
   ///
@@ -166,11 +158,13 @@ impl STMOC {
   pub async fn from_ascii_url(url: String) -> Result<STMOC, JsValue> {
     const ERR: &str = "File content is not valid UTF-8.";
     from_url(
-      url, "text/plain",
-      Box::new(|data| Self::from_ascii(from_utf8(data).unwrap_or(ERR)) )
-    ).await
+      url,
+      "text/plain",
+      Box::new(|data| Self::from_ascii(from_utf8(data).unwrap_or(ERR))),
+    )
+    .await
   }
-  
+
   #[wasm_bindgen(js_name = "fromJson", catch)]
   /// Create a MOC from its JSON serialization
   ///
@@ -186,11 +180,13 @@ impl STMOC {
   pub async fn from_json_url(url: String) -> Result<STMOC, JsValue> {
     const ERR: &str = "File content is not valid UTF-8.";
     from_url(
-      url, "application/json",
-      Box::new(|data| Self::from_json(from_utf8(data).unwrap_or(ERR)) )
-    ).await
+      url,
+      "application/json",
+      Box::new(|data| Self::from_json(from_utf8(data).unwrap_or(ERR))),
+    )
+    .await
   }
-  
+
   #[wasm_bindgen(js_name = "fromFits", catch)]
   /// Create a MOC from its FITS serialization
   ///
@@ -211,14 +207,15 @@ impl STMOC {
   ///   * `application/fits` (default value)
   ///   * `application/fits, application/octet-stream`
   #[wasm_bindgen(js_name = "fromFitsUrl")]
-  pub async fn from_fits_url(url: String, accept_mime_types: Option<String>) -> Result<STMOC, JsValue> {
+  pub async fn from_fits_url(
+    url: String,
+    accept_mime_types: Option<String>,
+  ) -> Result<STMOC, JsValue> {
     match accept_mime_types {
-      None =>             from_url(url, "application/fits", Box::new(Self::from_fits)).await,
+      None => from_url(url, "application/fits", Box::new(Self::from_fits)).await,
       Some(mime_types) => from_url(url, &mime_types, Box::new(Self::from_fits)).await,
     }
   }
-
-
 
   /// Returns the union of the S-MOCs associated to T-MOCs intersecting the given T-MOC.
   #[wasm_bindgen(js_name = "timeFold", catch)]
@@ -237,6 +234,4 @@ impl STMOC {
       .map(TMOC::from_store_index)
       .map_err(|e| e.into())
   }
-
 }
-

@@ -1,10 +1,12 @@
-use std::error::Error;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::num::ParseFloatError;
-use std::ops::Range;
-use std::path::PathBuf;
-use std::str::{self, FromStr};
+use std::{
+  error::Error,
+  fs::File,
+  io::{BufRead, BufReader},
+  num::ParseFloatError,
+  ops::Range,
+  path::PathBuf,
+  str::{self, FromStr},
+};
 
 use structopt::StructOpt;
 
@@ -18,7 +20,7 @@ use moclib::{
   elem::valuedcell::valued_cells_to_moc_with_opt,
   elemset::range::HpxRanges,
   moc::{
-    range::{op::multi_op::kway_or, RangeMOC},
+    range::{op::multi_op::kway_or, CellSelection, RangeMOC},
     RangeMOCIntoIterator,
   },
   moc2d::{range::RangeMOC2, RangeMOC2IntoIterator},
@@ -403,7 +405,7 @@ impl From {
         r_deg,
         out,
       } => {
-        let moc = cone2moc(depth, lon_deg, lat_deg, r_deg)?;
+        let moc = cone2moc(depth, lon_deg, lat_deg, r_deg, CellSelection::All)?;
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       }
       From::MultiCone {
@@ -447,7 +449,12 @@ impl From {
           if small {
             RangeMOC::from_small_cones(depth, 2, stdin.lock().lines().filter_map(line2cone), None)
           } else {
-            RangeMOC::from_large_cones(depth, 2, stdin.lock().lines().filter_map(line2cone))
+            RangeMOC::from_large_cones(
+              depth,
+              2,
+              CellSelection::All,
+              stdin.lock().lines().filter_map(line2cone),
+            )
           }
         } else {
           let f = File::open(input)?;
@@ -455,7 +462,12 @@ impl From {
           if small {
             RangeMOC::from_small_cones(depth, 2, reader.lines().filter_map(line2cone), None)
           } else {
-            RangeMOC::from_large_cones(depth, 2, reader.lines().filter_map(line2cone))
+            RangeMOC::from_large_cones(
+              depth,
+              2,
+              CellSelection::All,
+              reader.lines().filter_map(line2cone),
+            )
           }
         };
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
@@ -468,7 +480,14 @@ impl From {
         r_ext_deg,
         out,
       } => {
-        let moc = ring2moc(depth, lon_deg, lat_deg, r_int_deg, r_ext_deg)?;
+        let moc = ring2moc(
+          depth,
+          lon_deg,
+          lat_deg,
+          r_int_deg,
+          r_ext_deg,
+          CellSelection::All,
+        )?;
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       }
       From::EllipticalCone {
@@ -480,7 +499,15 @@ impl From {
         pa_deg,
         out,
       } => {
-        let moc = ellipse2moc(depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)?;
+        let moc = ellipse2moc(
+          depth,
+          lon_deg,
+          lat_deg,
+          a_deg,
+          b_deg,
+          pa_deg,
+          CellSelection::All,
+        )?;
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       }
       From::Zone {
@@ -491,7 +518,14 @@ impl From {
         lat_deg_max,
         out,
       } => {
-        let moc = zone2moc(depth, lon_deg_min, lat_deg_min, lon_deg_max, lat_deg_max)?;
+        let moc = zone2moc(
+          depth,
+          lon_deg_min,
+          lat_deg_min,
+          lon_deg_max,
+          lat_deg_max,
+          CellSelection::All,
+        )?;
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       }
       From::Box {
@@ -503,7 +537,15 @@ impl From {
         pa_deg,
         out,
       } => {
-        let moc = box2moc(depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)?;
+        let moc = box2moc(
+          depth,
+          lon_deg,
+          lat_deg,
+          a_deg,
+          b_deg,
+          pa_deg,
+          CellSelection::All,
+        )?;
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       }
       From::Polygon {
@@ -521,7 +563,8 @@ impl From {
             Ok((lon, lat))
           })
           .collect::<Result<Vec<(f64, f64)>, Box<dyn Error>>>()?;
-        let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_polygon(&vertices, complement, depth);
+        let moc: RangeMOC<u64, Hpx<u64>> =
+          RangeMOC::from_polygon(&vertices, complement, depth, CellSelection::All);
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       }
       From::MultiRegion {
@@ -556,7 +599,7 @@ impl From {
               let lon_deg = params[0].parse::<f64>()?;
               let lat_deg = params[1].parse::<f64>()?;
               let radius_deg = params[2].parse::<f64>()?;
-              cone2moc(depth, lon_deg, lat_deg, radius_deg)
+              cone2moc(depth, lon_deg, lat_deg, radius_deg, CellSelection::All)
             }
             "ellipse" | "ELLIPSE" => {
               // center_lon_deg,center_lat_deg,semi_maj_axis_deg,semi_min_axis_deg,position_angle_deg
@@ -574,7 +617,15 @@ impl From {
               let a_deg = params[2].parse::<f64>()?;
               let b_deg = params[3].parse::<f64>()?;
               let pa_deg = params[4].parse::<f64>()?;
-              ellipse2moc(depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)
+              ellipse2moc(
+                depth,
+                lon_deg,
+                lat_deg,
+                a_deg,
+                b_deg,
+                pa_deg,
+                CellSelection::All,
+              )
             }
             "ring" | "RING" => {
               // center_lon_deg,center_lat_deg,internal_radius_deg,external_radius_deg
@@ -585,7 +636,14 @@ impl From {
               let lat_deg = params[1].parse::<f64>()?;
               let r_int_deg = params[2].parse::<f64>()?;
               let r_ext_deg = params[3].parse::<f64>()?;
-              ring2moc(depth, lon_deg, lat_deg, r_int_deg, r_ext_deg)
+              ring2moc(
+                depth,
+                lon_deg,
+                lat_deg,
+                r_int_deg,
+                r_ext_deg,
+                CellSelection::All,
+              )
             }
             "box" | "BOX" => {
               // center_lon_deg,center_lat_deg,semi_maj_axis_deg,semi_min_axis_deg,position_angle_deg
@@ -603,7 +661,15 @@ impl From {
               let a_deg = params[2].parse::<f64>()?;
               let b_deg = params[3].parse::<f64>()?;
               let pa_deg = params[4].parse::<f64>()?;
-              box2moc(depth, lon_deg, lat_deg, a_deg, b_deg, pa_deg)
+              box2moc(
+                depth,
+                lon_deg,
+                lat_deg,
+                a_deg,
+                b_deg,
+                pa_deg,
+                CellSelection::All,
+              )
             }
             "zone" | "ZONE" => {
               // lon_min_deg,lat_min_deg,lon_max_deg,lat_max_deg
@@ -614,7 +680,14 @@ impl From {
               let lat_min_deg = params[1].parse::<f64>()?;
               let lon_max_deg = params[2].parse::<f64>()?;
               let lat_max_deg = params[3].parse::<f64>()?;
-              zone2moc(depth, lon_min_deg, lat_min_deg, lon_max_deg, lat_max_deg)
+              zone2moc(
+                depth,
+                lon_min_deg,
+                lat_min_deg,
+                lon_max_deg,
+                lat_max_deg,
+                CellSelection::All,
+              )
             }
             "polygon" | "POLYGON" => {
               //,vertex_lon_deg_1,vertex_lat_deg_1,vertex_lon_deg_2,vertex_lat_deg_2,...,vertex_lon_deg_n,vertex_lat_deg_n,
@@ -642,7 +715,12 @@ impl From {
                   Ok((lon, lat))
                 })
                 .collect::<Result<Vec<(f64, f64)>, Box<dyn Error>>>()?;
-              Ok(RangeMOC::from_polygon(&vertices, complement, depth))
+              Ok(RangeMOC::from_polygon(
+                &vertices,
+                complement,
+                depth,
+                CellSelection::All,
+              ))
             }
             _ => Err(
               format!(
@@ -1245,6 +1323,7 @@ fn cone2moc(
   lon_deg: f64,
   lat_deg: f64,
   radius_deg: f64,
+  selection: CellSelection,
 ) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
   let lon = lon_deg2rad(lon_deg)?;
   let lat = lat_deg2rad(lat_deg)?;
@@ -1252,7 +1331,9 @@ fn cone2moc(
   if r <= 0.0 || PI <= r {
     Err(format!("Radius must be in ]0, pi[. Actual: {}.", r).into())
   } else {
-    Ok(RangeMOC::<u64, Hpx<u64>>::from_cone(lon, lat, r, depth, 2))
+    Ok(RangeMOC::<u64, Hpx<u64>>::from_cone(
+      lon, lat, r, depth, 2, selection,
+    ))
   }
 }
 
@@ -1263,6 +1344,7 @@ fn ellipse2moc(
   a_deg: f64,
   b_deg: f64,
   pa_deg: f64,
+  selection: CellSelection,
 ) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
   let lon = lon_deg2rad(lon_deg)?;
   let lat = lat_deg2rad(lat_deg)?;
@@ -1276,7 +1358,9 @@ fn ellipse2moc(
   } else if pa <= 0.0 || PI <= pa {
     Err(String::from("Position angle must be in [0, pi[").into())
   } else {
-    Ok(RangeMOC::from_elliptical_cone(lon, lat, a, b, pa, depth, 2))
+    Ok(RangeMOC::from_elliptical_cone(
+      lon, lat, a, b, pa, depth, 2, selection,
+    ))
   }
 }
 
@@ -1286,6 +1370,7 @@ fn ring2moc(
   lat_deg: f64,
   r_int_deg: f64,
   r_ext_deg: f64,
+  selection: CellSelection,
 ) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
   let lon = lon_deg2rad(lon_deg)?;
   let lat = lat_deg2rad(lat_deg)?;
@@ -1298,7 +1383,9 @@ fn ring2moc(
   } else if r_ext <= r_int {
     Err(String::from("External radius must be larger than the internal radius").into())
   } else {
-    Ok(RangeMOC::from_ring(lon, lat, r_int, r_ext, depth, 2))
+    Ok(RangeMOC::from_ring(
+      lon, lat, r_int, r_ext, depth, 2, selection,
+    ))
   }
 }
 
@@ -1309,6 +1396,7 @@ fn box2moc(
   a_deg: f64,
   b_deg: f64,
   pa_deg: f64,
+  selection: CellSelection,
 ) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
   let lon = lon_deg2rad(lon_deg)?;
   let lat = lat_deg2rad(lat_deg)?;
@@ -1322,7 +1410,7 @@ fn box2moc(
   } else if !(0.0..PI).contains(&pa) {
     Err(String::from("Position angle must be in [0, pi[").into())
   } else {
-    Ok(RangeMOC::from_box(lon, lat, a, b, pa, depth))
+    Ok(RangeMOC::from_box(lon, lat, a, b, pa, depth, selection))
   }
 }
 
@@ -1332,13 +1420,14 @@ fn zone2moc(
   lat_min_deg: f64,
   lon_max_deg: f64,
   lat_max_deg: f64,
+  selection: CellSelection,
 ) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
   let lon_min = lon_deg2rad(lon_min_deg)?;
   let lat_min = lat_deg2rad(lat_min_deg)?;
   let lon_max = lon_deg2rad(lon_max_deg)?;
   let lat_max = lat_deg2rad(lat_max_deg)?;
   Ok(RangeMOC::from_zone(
-    lon_min, lat_min, lon_max, lat_max, depth,
+    lon_min, lat_min, lon_max, lat_max, depth, selection,
   ))
 }
 

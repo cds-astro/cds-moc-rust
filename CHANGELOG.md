@@ -1,5 +1,19 @@
 # `moc` Change Log
 
+## 0.13.0
+
+Released 2024-05-14
+
+### Added
+
+* `CellSelection` in methods building a RangeMOC from a BMOC
+* `mutliresolution/order map (mom or mrm) sum`
+
+### Changed
+
+* Bump cdshealpix to 0.6.8
+
+
 ## 0.12.1
 
 Released 2023-12-20
@@ -8,6 +22,7 @@ Released 2023-12-20
 
 * Bugs in the stcs2moc: allky not complete + intesection error comming from cdshealpix BMOC
 * Update CDSHealpix
+
 
 ## 0.12.0
 

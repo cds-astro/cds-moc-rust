@@ -24,7 +24,7 @@ use moclib::{
   moc::{
     range::{
       op::convert::{convert_from_u64, convert_to_u64},
-      RangeMOC,
+      CellSelection, RangeMOC,
     },
     CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIntoIterator,
     CellOrCellRangeMOCIterator, RangeMOCIntoIterator, RangeMOCIterator,
@@ -177,7 +177,8 @@ impl Query {
         if r_rad <= 0.0 {
           Err(String::from("Radius must be positive").into())
         } else {
-          let moc64: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_cone(lon, lat, r_rad, depth, 2);
+          let moc64: RangeMOC<u64, Hpx<u64>> =
+            RangeMOC::from_cone(lon, lat, r_rad, depth, 2, CellSelection::All);
           let moc32: RangeMOC<u32, Hpx<u32>> =
             convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&moc64).into_range_moc_iter())
               .into_range_moc();

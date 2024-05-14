@@ -1,5 +1,13 @@
 # `moc-cli` Change Log
 
+## 0.9.0
+
+Released 2024-05-14
+
+* Add `moc op momsum`
+* Bump cdshealpix to 0.6.8
+
+
 ## 0.8.2
 
 Released 2024-01-31
