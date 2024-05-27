@@ -387,7 +387,7 @@ where
     to_ascii_ivoa(moc2_it, fold, use_range_len, &mut writer)?;
   }
   // Always write maximum depth in both dimensions
-  write!(&mut writer, "{}{}/ {}{}/", Q::PREFIX, d1, R::PREFIX, d2).map_err(AsciiError::Io)
+  write!(&mut writer, "{}{}/ {}{}/\n", Q::PREFIX, d1, R::PREFIX, d2).map_err(AsciiError::Io)
 }
 
 /// This serialization is less compact than the IVOA ASCII serialization
@@ -794,7 +794,7 @@ mod tests {
       .to_ascii_ivoa(None, false, &mut res_ascii)
       .unwrap();
     let ascii = from_utf8(res_ascii.as_ref()).unwrap();
-    let expected = "t12/ s8/";
+    let expected = "t12/ s8/\n";
     // println!("moc: {}", ascii);
     assert_eq!(ascii, expected);
 
