@@ -346,7 +346,9 @@ where
       let r: CellOrCellRangeMOC<U, R> = from_ascii_ivoa(r)?;
       depth_max_l = depth_max_l.max(l.depth_max());
       depth_max_r = depth_max_r.max(r.depth_max());
-      elems.push(CellOrCellRangeMOC2Elem::new(l, r));
+      if !l.is_empty() && !r.is_empty() {
+        elems.push(CellOrCellRangeMOC2Elem::new(l, r));
+      }
     } else {
       return Err(AsciiError::ElemNotFound(
         R::PREFIX.to_string(),
@@ -375,6 +377,8 @@ where
   L: CellOrCellRangeMOC2Iterator<T, Q, I, U, R, J, K>,
   W: Write,
 {
+  let d1 = moc2_it.depth_max_1();
+  let d2 = moc2_it.depth_max_2();
   for e in moc2_it {
     writer.write_u8(Q::PREFIX as u8)?;
     let (moc1_it, moc2_it) = e.cellcellrange_mocs_it();
@@ -382,7 +386,8 @@ where
     writer.write_u8(R::PREFIX as u8)?;
     to_ascii_ivoa(moc2_it, fold, use_range_len, &mut writer)?;
   }
-  Ok(())
+  // Always write maximum depth in both dimensions
+  write!(&mut writer, "{}{}/ {}{}/", Q::PREFIX, d1, R::PREFIX, d2).map_err(AsciiError::Io)
 }
 
 /// This serialization is less compact than the IVOA ASCII serialization
@@ -561,19 +566,24 @@ impl<T: Idx, Q: MocQty<T>, R: BufRead> CellOrCellRangeMOCIterator<T>
 
 #[cfg(test)]
 mod tests {
-  use std::str;
+  use std::str::{self, from_utf8};
 
-  use crate::deser::ascii::{
-    from_ascii_ivoa, from_ascii_stream, moc2d_from_ascii_ivoa, moc2d_to_ascii_ivoa,
+  use crate::{
+    deser::ascii::{
+      from_ascii_ivoa, from_ascii_stream, moc2d_from_ascii_ivoa, moc2d_to_ascii_ivoa,
+    },
+    elem::cell::Cell,
+    elemset::range::MocRanges,
+    moc::{
+      range::RangeMOC, CellMOCIterator, CellOrCellRangeMOCIntoIterator, CellOrCellRangeMOCIterator,
+      HasMaxDepth, RangeMOCIntoIterator, RangeMOCIterator,
+    },
+    moc2d::{
+      range::RangeMOC2, CellOrCellRangeMOC2IntoIterator, CellOrCellRangeMOC2Iterator,
+      HasTwoMaxDepth, RangeMOC2IntoIterator, RangeMOC2Iterator,
+    },
+    qty::{Hpx, Time},
   };
-  use crate::elem::cell::Cell;
-  use crate::elemset::range::MocRanges;
-  use crate::moc::{
-    range::RangeMOC, CellMOCIterator, CellOrCellRangeMOCIntoIterator, CellOrCellRangeMOCIterator,
-    HasMaxDepth, RangeMOCIntoIterator, RangeMOCIterator,
-  };
-  use crate::moc2d::CellOrCellRangeMOC2IntoIterator;
-  use crate::qty::{Hpx, Time};
 
   #[test]
   fn test_from_ascii_ivoa() {
@@ -772,5 +782,29 @@ mod tests {
     )
     .unwrap();
     println!("{}\n", str::from_utf8(&res_ascii_1).unwrap());
+  }
+
+  #[test]
+  fn test_moc2d_empty_to_ascii_ivoa() {
+    let stmoc = RangeMOC2::<u64, Time<u64>, u64, Hpx<u64>>::new_empty(12, 8);
+    let mut res_ascii = Vec::new();
+    stmoc
+      .into_range_moc2_iter()
+      .into_cellcellrange_moc2_iter()
+      .to_ascii_ivoa(None, false, &mut res_ascii)
+      .unwrap();
+    let ascii = from_utf8(res_ascii.as_ref()).unwrap();
+    let expected = "t12/ s8/";
+    // println!("moc: {}", ascii);
+    assert_eq!(ascii, expected);
+
+    let stmoc2 = moc2d_from_ascii_ivoa::<u64, Time<u64>, u64, Hpx<u64>>(expected)
+      .unwrap()
+      .into_cellcellrange_moc2_iter()
+      .into_range_moc2_iter()
+      .into_range_moc2();
+    assert!(stmoc2.is_empty());
+    assert_eq!(stmoc2.depth_max_1(), 12);
+    assert_eq!(stmoc2.depth_max_2(), 8);
   }
 }

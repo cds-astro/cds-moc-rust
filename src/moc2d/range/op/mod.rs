@@ -353,7 +353,7 @@ s7/88307-88308
  1412900-1412901 1412903 1412909 1412956 1412958-1412959 1413009 1413021 
  1413023 1413084 1413092-1413093 1415312 1415324 1415406 1415712 1415714 
  1415726 1415808-1415810 
-"#;
+t29/ s10/"#;
 
     let left_it = moc2d_from_ascii_ivoa::<u64, Time<u64>, u64, Hpx<u64>>(left)
       .unwrap()
@@ -398,7 +398,8 @@ s7/88307-88308
       &mut actual_ascii,
     )
     .unwrap();
-    // println!("{}", std::str::from_utf8(&actual_ascii).unwrap());
+    println!("{}", std::str::from_utf8(&actual_ascii).unwrap());
+    println!("{}", expected);
 
     assert_eq!(actual_ascii, expected.as_bytes());
   }

@@ -92,6 +92,8 @@ where
   L: CellMOC2Iterator<T, Q, I, U, R, J, K>,
   W: Write,
 {
+  let d1 = moc2_it.depth_max_1();
+  let d2 = moc2_it.depth_max_2();
   writer.write_all(b"[\n")?;
   let mut is_first = true;
   for e in moc2_it {
@@ -112,8 +114,18 @@ where
     to_json_aladin(moc2_it, fold, "  ", &mut writer)?;
     writer.write_all(b"\n}")?;
   }
-  writer.write_all(b"\n]\n")?;
-  Ok(())
+  if !is_first {
+    writer.write_all(b",\n")?;
+  }
+  write!(
+    &mut writer,
+    "{{ \"{}\": {{ \"{}\": [] }}, \"{}\": {{ \"{}\": [] }} }}",
+    Q::PREFIX,
+    d1,
+    R::PREFIX,
+    d2
+  )?;
+  writer.write_all(b"\n]\n")
 }
 
 /*pub fn rangemoc2d_to_json_aladin<T, Q, I, U, R, J, K, L, W>(
@@ -253,7 +265,9 @@ where
               let r: CellMOC<U, R> = from_json_aladin_internal::<U, R>(obj2)?;
               depth_max_l = depth_max_l.max(l.depth_max());
               depth_max_r = depth_max_r.max(r.depth_max());
-              elems.push(CellMOC2Elem::new(l, r));
+              if !l.is_empty() && !r.is_empty() {
+                elems.push(CellMOC2Elem::new(l, r));
+              }
             }
             _ => {
               return Err(
@@ -291,19 +305,21 @@ where
 #[cfg(test)]
 mod tests {
 
-  use std::fs;
-  use std::path::PathBuf;
+  use std::{fs, path::PathBuf, str::from_utf8};
 
-  use crate::deser::json::{
-    cellmoc2d_from_json_aladin, cellmoc2d_to_json_aladin, from_json_aladin,
+  use crate::moc2d::{HasTwoMaxDepth, RangeMOC2Iterator};
+  use crate::{
+    deser::json::{cellmoc2d_from_json_aladin, cellmoc2d_to_json_aladin, from_json_aladin},
+    elemset::range::{HpxRanges, MocRanges, TimeRanges},
+    moc::{
+      range::RangeMOC, CellMOCIntoIterator, CellMOCIterator, RangeMOCIntoIterator, RangeMOCIterator,
+    },
+    moc2d::{
+      range::{RangeMOC2, RangeMOC2Elem},
+      CellMOC2IntoIterator, CellMOC2Iterator, RangeMOC2IntoIterator,
+    },
+    qty::{Hpx, Time},
   };
-  use crate::elemset::range::{HpxRanges, MocRanges, TimeRanges};
-  use crate::moc::{
-    range::RangeMOC, CellMOCIntoIterator, CellMOCIterator, RangeMOCIntoIterator, RangeMOCIterator,
-  };
-  use crate::moc2d::range::{RangeMOC2, RangeMOC2Elem};
-  use crate::moc2d::CellMOC2IntoIterator;
-  use crate::qty::{Hpx, Time};
 
   #[test]
   fn test_fromto_json() {
@@ -401,5 +417,36 @@ mod tests {
     file.write_all(json.as_ref().as_bytes()).unwrap();
     // println!("{}\n", &json);
     */
+  }
+
+  #[test]
+  fn test_stmoc_empty_to_json() {
+    let stmoc = RangeMOC2::<u64, Time<u64>, u64, Hpx<u64>>::new_empty(12, 8);
+    let mut res_json = Vec::new();
+    stmoc
+      .into_range_moc2_iter()
+      .into_cell_moc2_iter()
+      .to_json_aladin(&None, &mut res_json)
+      .unwrap();
+    let json = from_utf8(res_json.as_ref()).unwrap();
+    // println!("moc: {}", json);
+    let expected = r#"[
+{ "t": { "12": [] }, "s": { "8": [] } }
+]
+"#;
+    assert_eq!(json, expected);
+
+    let cellmoc2 = cellmoc2d_from_json_aladin::<u64, Time<u64>, u64, Hpx<u64>>(&expected).unwrap();
+    assert_eq!(cellmoc2.depth_max_1(), 12);
+    assert_eq!(cellmoc2.depth_max_2(), 8);
+    assert_eq!(cellmoc2.n_entries(), 0);
+
+    let stmoc2 = cellmoc2
+      .into_cell_moc2_iter()
+      .into_range_moc2_iter()
+      .into_range_moc2();
+    assert!(stmoc2.is_empty());
+    assert_eq!(stmoc2.depth_max_1(), 12);
+    assert_eq!(stmoc2.depth_max_2(), 8);
   }
 }

@@ -24,6 +24,9 @@ impl<T: Idx, Q: MocQty<T>> CellOrCellRangeMOC<T, Q> {
   pub fn new(depth_max: u8, ranges: MocCellOrCellRanges<T, Q>) -> Self {
     Self { depth_max, ranges }
   }
+  pub fn is_empty(&self) -> bool {
+    self.ranges.0 .0.is_empty()
+  }
   pub fn elems(self) -> CellOrCellRanges<T> {
     self.ranges.0
   }

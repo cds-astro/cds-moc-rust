@@ -7,7 +7,18 @@ Released 2024-XX-XX
 ### Added
 
 * `U64MocStore.new_empty_stmoc`
+* `is_empty` in `CellOrCellRangeMOC` and `CellOrCellRangeMOC2`
 
+### Changed
+
+* Add max time depth and max space depth at the end of the ST-MOC ASCII representation 
+* Add max time depth and max space depth at the end of the ST-MOC JSON  representation 
+
+### Fixed
+
+* Fix the empty ASCII represention of an empty ST-MOC
+* Fix the empty JSON  represention of an empty ST-MOC
+* Empty ST-MOC loaded as... empty (instead of containing one element imade of an empty T-MOC and and emtpy S-MOC)
 
 ## 0.13.0
 

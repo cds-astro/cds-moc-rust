@@ -83,6 +83,9 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> CellOrCellRangeMOC2<T, Q, U, R>
       elems,
     }
   }
+  pub fn is_empty(&self) -> bool {
+    self.elems.is_empty()
+  }
 }
 impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> HasTwoMaxDepth
   for CellOrCellRangeMOC2<T, Q, U, R>
