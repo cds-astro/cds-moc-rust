@@ -11,8 +11,10 @@ use std::{
   vec::IntoIter,
 };
 
+/// Re-export `Ordinal` not to be out-of-sync with cdshealpix version.
+pub use healpix::compass_point::Ordinal;
 use healpix::{
-  compass_point::{MainWind, Ordinal, OrdinalSet},
+  compass_point::{MainWind, OrdinalSet},
   nested::{
     append_external_edge, bmoc::BMOC, box_coverage, cone_coverage_approx_custom,
     custom_polygon_coverage, elliptical_cone_coverage_custom, external_edge, external_edge_struct,
