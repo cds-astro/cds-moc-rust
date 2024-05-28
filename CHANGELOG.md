@@ -1,8 +1,17 @@
 # `moc` Change Log
 
+## 0.14.1
+
+Released 2024-05-28
+
+## Added
+
+* Re-export `cdshealpix::compass_point::Ordinal` in `moc::range`
+
+
 ## 0.14.0
 
-Released 2024-XX-XX
+Released 2024-05-27
 
 ### Added
 
