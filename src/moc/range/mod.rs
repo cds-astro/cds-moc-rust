@@ -12,9 +12,9 @@ use std::{
 };
 
 /// Re-export `Ordinal` not to be out-of-sync with cdshealpix version.
-pub use healpix::compass_point::Ordinal;
+pub use healpix::compass_point::{Ordinal, OrdinalMap, OrdinalSet};
 use healpix::{
-  compass_point::{MainWind, OrdinalSet},
+  compass_point::MainWind,
   nested::{
     append_external_edge, bmoc::BMOC, box_coverage, cone_coverage_approx_custom,
     custom_polygon_coverage, elliptical_cone_coverage_custom, external_edge, external_edge_struct,
@@ -63,6 +63,14 @@ pub mod op;
 pub struct CellAndEdges<T: Idx> {
   pub uniq: T,
   pub edges: OrdinalSet,
+}
+
+/// Structure made to draw MOCs in AladinLite.
+/// It contains an HEALPix cell and the list of its neighbours.
+pub struct CellAndNeighs<T: Idx> {
+  pub cell: Cell<T>,
+  /// Stores the zuniq idx of the neigs
+  pub neigs: OrdinalMap<usize>,
 }
 
 /// Enumeration used to select cells returned by a BMOC.
@@ -770,6 +778,92 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
       }
 
       CellAndEdges { uniq, edges }
+    })
+  }
+
+  /// Returns the list of cells (uniq notation) with the list of its neigs to be drawn.
+  /// As the cells are treated from bigger cells to smaller ones
+  /// only neigs indication from small cells towards bigger ones are registered
+  pub fn all_cells_with_unidirectional_neigs(&self) -> impl Iterator<Item = CellAndNeighs<T>> {
+    let zuniqs: Vec<T> = self
+      .into_range_moc_iter()
+      .cells()
+      .map(|cell| cell.zuniq::<Hpx<T>>())
+      .collect();
+    let mut uniqs: Vec<T> = zuniqs
+      .iter()
+      .cloned()
+      .map(|zuniq| Cell::from_zuniq::<Hpx<T>>(zuniq).uniq_hpx())
+      .collect();
+    uniqs.sort();
+
+    // we look only for neighbours having a depth <= the current cell depth
+    // since deeper cells have not yet been iterated over.
+    // We have already iterated on cell of depth < current cell depth
+    // and cell depth == current cell depth && idx < current idx
+    // return the zuniq idx of the bigger neig
+    let find_bigger_neig = move |depth: u8, org_idx_t: T, neig_idx_u64: u64| -> Option<usize> {
+      let neig_idx_t = T::from_u64(neig_idx_u64);
+      let neig_zuniq = Hpx::<T>::to_zuniq(depth, neig_idx_t);
+      match zuniqs.binary_search(&neig_zuniq) {
+        Ok(i) => {
+          // Neig is bigger so tag it as neig of org
+          if neig_idx_t < org_idx_t {
+            Some(i)
+          } else {
+            None
+          }
+        }
+        Err(i) => {
+          // Test index i
+          if let Some((d, h)) = zuniqs.get(i - 1).map(|zuniq| Hpx::<T>::from_zuniq(*zuniq)) {
+            if d < depth && (neig_idx_t >> ((depth - d) << 1) as usize) == h {
+              // return cell bigger than ord
+              return Some(i - 1);
+            }
+          }
+          // Test index i + 1
+          if let Some((d, h)) = zuniqs.get(i).map(|zuniq| Hpx::<T>::from_zuniq(*zuniq)) {
+            if d < depth && (neig_idx_t >> ((depth - d) << 1) as usize) == h {
+              // return cell bigger than ord
+              return Some(i);
+            }
+          }
+          // No neighbours found. There might be one but neig is smaller than org
+          None
+        }
+      }
+    };
+
+    uniqs.into_iter().map(move |uniq| {
+      let cell = Cell::from_uniq_hpx(uniq);
+      let idx = cell.idx;
+      let idx_u64 = <T as Idx>::to_u64(idx);
+      let neigs_u64 = healpix::nested::neighbours(cell.depth, idx_u64, false);
+
+      let mut neigs = OrdinalMap::new();
+      if let Some(idx_neig_u64) = neigs_u64.get(MainWind::NE) {
+        if let Some(neig_cell_idx) = find_bigger_neig(cell.depth, idx, *idx_neig_u64) {
+          neigs.put(Ordinal::NE, neig_cell_idx);
+        }
+      }
+      if let Some(idx_neig_u64) = neigs_u64.get(MainWind::SE) {
+        if let Some(neig_cell_idx) = find_bigger_neig(cell.depth, idx, *idx_neig_u64) {
+          neigs.put(Ordinal::SE, neig_cell_idx);
+        }
+      }
+      if let Some(idx_neig_u64) = neigs_u64.get(MainWind::NW) {
+        if let Some(neig_cell_idx) = find_bigger_neig(cell.depth, idx, *idx_neig_u64) {
+          neigs.put(Ordinal::NW, neig_cell_idx);
+        }
+      }
+      if let Some(idx_neig_u64) = neigs_u64.get(MainWind::SW) {
+        if let Some(neig_cell_idx) = find_bigger_neig(cell.depth, idx, *idx_neig_u64) {
+          neigs.put(Ordinal::SW, neig_cell_idx);
+        }
+      }
+
+      CellAndNeighs { cell, neigs }
     })
   }
 

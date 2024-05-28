@@ -1,5 +1,15 @@
 # `moc` Change Log
 
+## 0.14.2
+
+Released 2024-05-28
+
+## Added
+
+* Metohd 'all_cells_with_unidirectional_neigs' for AladinLite
+* Re-export `cdshealpix::compass_point::OrdinalMap` and `cdshealpix::compass_point::OrdinalSet` in `moc::range`
+
+
 ## 0.14.1
 
 Released 2024-05-28
