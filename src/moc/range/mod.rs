@@ -47,6 +47,7 @@ use crate::{
       minus::{minus, MinusRangeIter},
       multi_op::kway_or,
       or::{or, OrRangeIter},
+      overlap::{overlapped_by, OverlapRangeIter},
       xor::xor,
     },
     CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIterator, HasMaxDepth, MOCProperties,
@@ -329,6 +330,11 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     RangeMOC::new(depth_max, ranges)
   }
 
+  /// Returns an iterator over the ranges of self that are overlapping the rhs range MOC
+  pub fn overlapped_by_iter<'a>(&'a self, rhs: &'a RangeMOC<T, Q>) -> OverlappedByIter<'_, T, Q> {
+    overlapped_by(self.into_range_moc_iter(), rhs.into_range_moc_iter())
+  }
+
   // CONTAINS: union that stops at first elem found
   // OVERLAP (=!CONTAINS on the COMPLEMENT ;) )
 
@@ -427,6 +433,10 @@ pub type ExtBorderIter<'a, T> =
 /// Complex type returned by the `internal_border_iter` method.
 pub type IntBorderIter<'a, T> =
   AndRangeIter<T, Hpx<T>, RangeMocIter<T, Hpx<T>>, RangeRefMocIter<'a, T, Hpx<T>>>;
+
+/// Complex type returned by the `internal_border_iter` method.
+pub type OverlappedByIter<'a, T, Q> =
+  OverlapRangeIter<T, Q, RangeRefMocIter<'a, T, Q>, RangeRefMocIter<'a, T, Q>>;
 
 impl<T: Idx> RangeMOC<T, Hpx<T>> {
   /// Returns `true` if the given coordinates (in radians) is in the MOC

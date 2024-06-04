@@ -13,3 +13,5 @@ pub mod or; // <=> union
 pub mod xor; // <=> Aladin Difference
 
 pub mod multi_op;
+
+pub mod overlap;
