@@ -82,6 +82,7 @@ where
     self.left_it.depth_max()
   }
 }
+
 impl<T, Q, I1, I2> ZSorted for OverlapRangeIter<T, Q, I1, I2>
 where
   T: Idx,
@@ -98,6 +99,7 @@ where
   I2: RangeMOCIterator<T, Qty = Q>,
 {
 }
+
 impl<T, Q, I1, I2> MOCProperties for OverlapRangeIter<T, Q, I1, I2>
 where
   T: Idx,
@@ -106,6 +108,7 @@ where
   I2: RangeMOCIterator<T, Qty = Q>,
 {
 }
+
 impl<T, Q, I1, I2> Iterator for OverlapRangeIter<T, Q, I1, I2>
 where
   T: Idx,
