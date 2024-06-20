@@ -149,6 +149,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
       ranges: Ranges::new_unchecked(vec![range]).into(),
     }
   }
+
   /// Similar to what's Vec does: https://doc.rust-lang.org/src/core/slice/mod.rs.html#617-619
   pub fn select<'a, I>(&'a self, index: I) -> BorrowedRangeMOC<'a, T, Q>
   where
@@ -345,7 +346,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   }
 
   /// Returns an iterator over the ranges of self that are overlapping the rhs range MOC
-  pub fn overlapped_by_iter<'a>(&'a self, rhs: &'a RangeMOC<T, Q>) -> OverlappedByIter<'_, T, Q> {
+  pub fn overlapped_by_iter<'a>(&'a self, rhs: &'a RangeMOC<T, Q>) -> OverlappedByIter<'a, T, Q> {
     let l = &self.ranges.0 .0;
     let r = &rhs.ranges.0 .0;
 

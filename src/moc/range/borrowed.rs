@@ -1,8 +1,5 @@
 use std::{marker::PhantomData, ops::Range};
 
-/// Re-export `Ordinal` not to be out-of-sync with cdshealpix version.
-pub use healpix::compass_point::{Ordinal, OrdinalMap, OrdinalSet};
-
 use crate::{
   elemset::range::BorrowedMocRanges,
   idx::Idx,
