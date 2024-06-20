@@ -1,4 +1,5 @@
 use std::{
+  cmp::Ordering,
   convert::{TryFrom, TryInto},
   error::Error,
   fs::File,
@@ -7,7 +8,7 @@ use std::{
   num::TryFromIntError,
   ops::Range,
   path::Path,
-  slice,
+  slice::SliceIndex,
   vec::IntoIter,
 };
 
@@ -41,13 +42,17 @@ use crate::{
       maxdepth_range::RangeMocBuilder,
     },
     cell::CellMOC,
-    range::op::{
-      and::{and, AndRangeIter},
-      merge::merge_sorted,
-      minus::{minus, MinusRangeIter},
-      multi_op::kway_or,
-      or::{or, OrRangeIter},
-      xor::xor,
+    range::{
+      borrowed::BorrowedRangeMOC,
+      op::{
+        and::{and, AndRangeIter},
+        merge::merge_sorted,
+        minus::{minus, MinusRangeIter},
+        multi_op::kway_or,
+        or::{or, OrRangeIter},
+        overlap::{overlapped_by, OverlapRangeIter},
+        xor::xor,
+      },
     },
     CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIterator, HasMaxDepth, MOCProperties,
     NonOverlapping, RangeMOCIntoIterator, RangeMOCIterator, ZSorted,
@@ -55,7 +60,7 @@ use crate::{
   qty::{Bounded, Frequency, Hpx, MocQty, Time},
   ranges::{BorrowedRanges, Ranges, SNORanges},
 };
-
+pub mod borrowed;
 pub mod op;
 
 /// Structure made to draw MOCs in AladinLite.
@@ -144,6 +149,17 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
       ranges: Ranges::new_unchecked(vec![range]).into(),
     }
   }
+
+  /// Similar to what's Vec does: https://doc.rust-lang.org/src/core/slice/mod.rs.html#617-619
+  pub fn select<'a, I>(&'a self, index: I) -> BorrowedRangeMOC<'a, T, Q>
+  where
+    I: SliceIndex<[Range<T>], Output = [Range<T>]>,
+  {
+    let r = &self.ranges.0 .0[index];
+    let br = BorrowedRanges(r);
+    BorrowedRangeMOC::new(self.depth_max, br.into())
+  }
+
   pub fn depth_max(&self) -> u8 {
     self.depth_max
   }
@@ -329,6 +345,43 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     RangeMOC::new(depth_max, ranges)
   }
 
+  /// Returns an iterator over the ranges of self that are overlapping the rhs range MOC
+  pub fn overlapped_by_iter<'a>(&'a self, rhs: &'a RangeMOC<T, Q>) -> OverlappedByIter<'a, T, Q> {
+    let l = &self.ranges.0 .0;
+    let r = &rhs.ranges.0 .0;
+
+    // Quick rejection test
+    let (il, ir) = if l.is_empty()
+      || r.is_empty()
+      || l[0].start >= r[r.len() - 1].end
+      || l[l.len() - 1].end <= r[0].start
+    {
+      (l.len() - 1, r.len() - 1)
+    } else {
+      // Use binary search to find the starting indices
+      match l[0].start.cmp(&r[0].start) {
+        Ordering::Less => {
+          let il = match l.binary_search_by(|l_range| l_range.start.cmp(&r[0].start)) {
+            Ok(i) => i,
+            Err(i) => i - 1,
+          };
+          (il, 0)
+        }
+        Ordering::Greater => {
+          let ir = match r.binary_search_by(|r_range| r_range.start.cmp(&l[0].start)) {
+            Ok(i) => i,
+            Err(i) => i - 1,
+          };
+          (0, ir)
+        }
+        Ordering::Equal => (0, 0),
+      }
+    };
+
+    let (left, right) = (self.select(il..), rhs.select(ir..));
+    overlapped_by(left.into_range_moc_iter(), right.into_range_moc_iter())
+  }
+
   // CONTAINS: union that stops at first elem found
   // OVERLAP (=!CONTAINS on the COMPLEMENT ;) )
 
@@ -427,6 +480,10 @@ pub type ExtBorderIter<'a, T> =
 /// Complex type returned by the `internal_border_iter` method.
 pub type IntBorderIter<'a, T> =
   AndRangeIter<T, Hpx<T>, RangeMocIter<T, Hpx<T>>, RangeRefMocIter<'a, T, Hpx<T>>>;
+
+/// Complex type returned by the `internal_border_iter` method.
+pub type OverlappedByIter<'a, T, Q> =
+  OverlapRangeIter<T, Q, RangeRefMocIter<'a, T, Q>, RangeRefMocIter<'a, T, Q>>;
 
 impl<T: Idx> RangeMOC<T, Hpx<T>> {
   /// Returns `true` if the given coordinates (in radians) is in the MOC
@@ -1433,7 +1490,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOCIntoIterator<T> for RangeMOC<T, Q> {
 /// Iterator borrowing the `RangeMOC` it iterates over.
 pub struct RangeRefMocIter<'a, T: Idx, Q: MocQty<T>> {
   depth_max: u8,
-  iter: slice::Iter<'a, Range<T>>,
+  iter: std::slice::Iter<'a, Range<T>>,
   last: Option<Range<T>>,
   _qty: PhantomData<Q>,
 }
@@ -1462,6 +1519,7 @@ impl<'a, T: Idx, Q: MocQty<T>> RangeMOCIterator<T> for RangeRefMocIter<'a, T, Q>
     self.last.as_ref()
   }
 }
+
 impl<'a, T: Idx, Q: MocQty<T>> RangeMOCIntoIterator<T> for &'a RangeMOC<T, Q> {
   type Qty = Q;
   type IntoRangeMOCIter = RangeRefMocIter<'a, T, Self::Qty>;
