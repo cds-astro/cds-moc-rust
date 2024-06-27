@@ -151,7 +151,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   }
 
   /// Similar to what's Vec does: https://doc.rust-lang.org/src/core/slice/mod.rs.html#617-619
-  pub fn select<'a, I>(&'a self, index: I) -> BorrowedRangeMOC<'a, T, Q>
+  pub fn select<I>(&self, index: I) -> BorrowedRangeMOC<'_, T, Q>
   where
     I: SliceIndex<[Range<T>], Output = [Range<T>]>,
   {

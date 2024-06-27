@@ -379,7 +379,7 @@ mod tests {
       .cells()
       .to_json_aladin(Some(40), &mut sink)
       .unwrap();
-    let json = String::from_utf8_lossy(&sink);
+    // let json = String::from_utf8_lossy(&sink);
     // println!("{}\n", &json);
     assert_eq!(
       sink,
