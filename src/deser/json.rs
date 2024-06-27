@@ -66,7 +66,7 @@ where
       }
     } else if depth as u8 == depth_max {
       if first {
-        write!(writer, ",{}]", &s)?;
+        write!(writer, "{}]", &s)?;
       } else {
         write!(writer, ",\n{}]", &s)?;
       }
@@ -368,6 +368,28 @@ mod tests {
     // let json = String::from_utf8_lossy(&sink2);
     // println!("{}\n", &json);
     assert_eq!(sink, sink2);
+  }
+
+  #[test]
+  fn test_to_json_empty() {
+    let moc = RangeMOC::<u64, Hpx<u64>>::new_empty(8);
+    let mut sink = Vec::new();
+    (&moc)
+      .into_range_moc_iter()
+      .cells()
+      .to_json_aladin(Some(40), &mut sink)
+      .unwrap();
+    let json = String::from_utf8_lossy(&sink);
+    // println!("{}\n", &json);
+    assert_eq!(
+      sink,
+      String::from(
+        r#"{
+  "8": []
+}"#
+      )
+      .into_bytes()
+    )
   }
 
   #[test]
