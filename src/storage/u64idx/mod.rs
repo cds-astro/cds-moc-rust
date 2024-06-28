@@ -45,7 +45,9 @@ use crate::{
     CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator, RangeMOC2IntoIterator, RangeMOC2Iterator,
   },
   qty::{Frequency, Hpx, MocQty, Time},
-  storage::u64idx::op1::{op1_mom_sum, op1_mom_sum_from_data, op1_mom_sum_from_path},
+  storage::u64idx::op1::{
+    op1_mom_filter, op1_mom_sum, op1_mom_sum_from_data, op1_mom_sum_from_path,
+  },
 };
 
 pub mod common;
@@ -1827,6 +1829,24 @@ impl U64MocStore {
     I: Sized + Iterator<Item = (u64, f64)>,
   {
     op1_mom_sum(index, mom_it)
+  }
+
+  /// Filter the value of the given multi-order map to return only the one which are in the given MOC,
+  /// together with the associated sky area (or weight).
+  /// # Params
+  /// * `index`: index pf the S-MOC in the storage
+  /// * `mom_it`: iterator on non-overlapping `(uniq, value)` pairs.
+  /// # Output
+  /// * result made of first the vector of values, and the vector of associated weights.
+  pub fn multiordermap_filter_in_moc<I>(
+    &self,
+    index: usize,
+    mom_it: I,
+  ) -> Result<(Vec<f64>, Vec<f64>), String>
+  where
+    I: Sized + Iterator<Item = (u64, f64)>,
+  {
+    op1_mom_filter(index, mom_it)
   }
 
   /// Sum the value of the multi-order map in the given path which are in the given MOC.

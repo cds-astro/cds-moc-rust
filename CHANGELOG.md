@@ -1,14 +1,24 @@
 # `moc` Change Log
 
+## 0.16.0
+
+Released 2024-XX-XX
+
+### Added
+
+* MOM filtering to return values in a MOC and associated weights
+
+
+
 ## 0.15.0
 
 Released 2024-06-27
 
-## Fixed
+### Fixed
 
 * Remove spurious coma in empty MOC JSON serialization
 
-## Added
+### Added
 
 * Add methods `all_cells_with_unidirectional_neig`
 * Re-export 'OrdinalMap' and 'OrdinalSet'
@@ -20,7 +30,7 @@ Released 2024-06-27
 
 Released 2024-05-28
 
-## Added
+### Added
 
 * Metohd 'all_cells_with_unidirectional_neigs' for AladinLite
 * Re-export `cdshealpix::compass_point::OrdinalMap` and `cdshealpix::compass_point::OrdinalSet` in `moc::range`

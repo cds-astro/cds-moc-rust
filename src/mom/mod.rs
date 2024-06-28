@@ -11,7 +11,7 @@
 //!     + `(key << 2 + 3, value / 4)`
 
 use std::{
-  f64,
+  f64::{self, consts::FRAC_PI_3},
   marker::PhantomData,
   ops::{AddAssign, Mul},
 };
@@ -67,6 +67,13 @@ pub trait HpxMOMIterator<T: Idx, V: Value<T>>: MOMIterator<T, Hpx<T>, V> {
     }
     sum
   }
+
+  fn retain_values_with_weights_in_hpxmoc(
+    self,
+    moc: &RangeMOC<T, Hpx<T>>,
+  ) -> HpxMOMFilter<T, V, Self> {
+    HpxMOMFilter::new(self, moc)
+  }
 }
 
 pub struct HpxMomIter<T: Idx, Q: MocQty<T>, V: Value<T>, I: Sized + Iterator<Item = (T, V)>> {
@@ -100,4 +107,57 @@ impl<T: Idx, Q: MocQty<T>, V: Value<T>, I: Sized + Iterator<Item = (T, V)>>
 impl<T: Idx, Q: MocQty<T>, V: Value<T>, I: Sized + Iterator<Item = (T, V)>> HpxMOMIterator<T, V>
   for HpxMomIter<T, Q, V, I>
 {
+}
+
+/// Filter cell which are in a given MOC and Map to return
+/// a value together with the sky area it covers.
+pub struct HpxMOMFilter<'a, T, V, I>
+where
+  T: Idx,
+  V: Value<T>,
+  I: HpxMOMIterator<T, V>,
+{
+  it: I,
+  moc: &'a RangeMOC<T, Hpx<T>>,
+  _phantom: PhantomData<V>,
+}
+
+impl<'a, T, V, I> HpxMOMFilter<'a, T, V, I>
+where
+  T: Idx,
+  V: Value<T>,
+  I: HpxMOMIterator<T, V>,
+{
+  pub fn new(it: I, moc: &'a RangeMOC<T, Hpx<T>>) -> Self {
+    Self {
+      it,
+      moc,
+      _phantom: PhantomData,
+    }
+  }
+}
+
+impl<'a, T, V, I> Iterator for HpxMOMFilter<'a, T, V, I>
+where
+  T: Idx,
+  V: Value<T>,
+  I: HpxMOMIterator<T, V>,
+{
+  type Item = (V, f64); // (value, weight)
+
+  fn next(&mut self) -> Option<Self::Item> {
+    while let Some((uniq, val)) = self.it.next() {
+      let (depth, ipix) = Hpx::<T>::from_uniq_hpx(uniq);
+      let cell_fraction = self.moc.cell_fraction(depth, ipix);
+      if cell_fraction > 0.0 {
+        let cell_area = FRAC_PI_3 / (1_u64 << (depth << 1) as u32) as f64;
+        return Some((val, cell_area * cell_fraction));
+      }
+    }
+    None
+  }
+
+  fn size_hint(&self) -> (usize, Option<usize>) {
+    (0, self.it.size_hint().1)
+  }
 }
