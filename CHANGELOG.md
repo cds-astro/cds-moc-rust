@@ -1,5 +1,21 @@
 # `moc` Change Log
 
+## 0.15.0
+
+Released 2024-06-27
+
+## Fixed
+
+* Remove spurious coma in empty MOC JSON serialization
+
+## Added
+
+* Add methods `all_cells_with_unidirectional_neig`
+* Re-export 'OrdinalMap' and 'OrdinalSet'
+* Add a `BorrowedRangeMOC` struct with method `overlap` operator
+* Add method `overlapped_by_iter` to both `RangeMOC` and `BorrowedRangeMOC`
+
+
 ## 0.14.2
 
 Released 2024-05-28

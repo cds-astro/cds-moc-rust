@@ -1,5 +1,12 @@
 # `moc-cli` Change Log
 
+## 0.9.1
+
+Released 2024-06-28
+
+* Fix spurious coma in serialization of empty MOC in JSON 
+
+
 ## 0.9.0
 
 Released 2024-05-14
