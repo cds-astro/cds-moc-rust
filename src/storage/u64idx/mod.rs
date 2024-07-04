@@ -46,7 +46,7 @@ use crate::{
   },
   qty::{Frequency, Hpx, MocQty, Time},
   storage::u64idx::op1::{
-    op1_mom_filter, op1_mom_sum, op1_mom_sum_from_data, op1_mom_sum_from_path,
+    op1_mom_filter, op1_mom_filter_mask, op1_mom_sum, op1_mom_sum_from_data, op1_mom_sum_from_path,
   },
 };
 
@@ -1847,6 +1847,25 @@ impl U64MocStore {
     I: Sized + Iterator<Item = (u64, f64)>,
   {
     op1_mom_filter(index, mom_it)
+  }
+
+  /// Set to 'false' the booleans associated to the UNIQ HEALPix cells
+  /// intersecting (or fully covered) by the MOC of given index.
+  ///
+  /// # Params
+  /// * `index`: index pf the S-MOC in the storage
+  /// * `it`: iterator on `uniq` HEALPix cells.
+  /// * `fully_covered_only`: set the boolean to false only if the cell is fully covered (else if it intersects)
+  pub fn multiordermap_filter_mask_moc<'a, I>(
+    &self,
+    index: usize,
+    it: I,
+    fully_covered_only: bool,
+  ) -> Result<(), String>
+  where
+    I: Sized + Iterator<Item = (u64, &'a mut bool)>,
+  {
+    op1_mom_filter_mask(index, it, fully_covered_only)
   }
 
   /// Sum the value of the multi-order map in the given path which are in the given MOC.

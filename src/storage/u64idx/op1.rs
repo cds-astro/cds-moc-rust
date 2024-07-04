@@ -296,7 +296,7 @@ pub(crate) fn op1_mom_sum_from_data(index: usize, mom_data: &[u8]) -> Result<f64
   })
 }
 
-/// Retuns the `(values, weights)` from the `values` of the input MOM which are in the MOC.
+/// Returns the `(values, weights)` from the `values` of the input MOM which are in the MOC.
 pub(crate) fn op1_mom_filter<I>(index: usize, it: I) -> Result<(Vec<f64>, Vec<f64>), String>
 where
   I: Sized + Iterator<Item = (u64, f64)>,
@@ -305,6 +305,41 @@ where
     InternalMoc::Space(moc) => {
       let mom_it = HpxMomIter::<u64, Hpx<u64>, f64, _>::new(it);
       Ok(mom_it.retain_values_with_weights_in_hpxmoc(&moc).unzip())
+    }
+    InternalMoc::Time(_) => Err(String::from("MOM Filter not implemented for T-MOCs.")),
+    InternalMoc::Frequency(_) => Err(String::from("MOM Filter not implemented for F-MOCs.")),
+    InternalMoc::TimeSpace(_) => Err(String::from("MOM Filter not implemented for ST-MOCs.")),
+  })
+}
+
+/// Set to 'false' the booleans associated to the UNIQ HEALPix cells
+/// intersecting (or fully covered) by the MOC of given index.
+/// # Params
+/// * `fully_covered_only`: set the boolean to false only if the cell is fully covered (else if it intersects)
+pub(crate) fn op1_mom_filter_mask<'a, I>(
+  index: usize,
+  it: I,
+  fully_covered_only: bool,
+) -> Result<(), String>
+where
+  I: Sized + Iterator<Item = (u64, &'a mut bool)>,
+{
+  store::exec_on_one_readonly_moc(index, move |moc| match moc {
+    InternalMoc::Space(moc) => {
+      if fully_covered_only {
+        for (uniq, flag) in it {
+          let (depth, ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
+          let cell_fraction = moc.cell_fraction(depth, ipix);
+          *flag = cell_fraction < 1.0;
+        }
+      } else {
+        for (uniq, flag) in it {
+          let (depth, ipix) = Hpx::<u64>::from_uniq_hpx(uniq);
+          let cell_fraction = moc.cell_fraction(depth, ipix);
+          *flag = cell_fraction == 0.0;
+        }
+      }
+      Ok(())
     }
     InternalMoc::Time(_) => Err(String::from("MOM Filter not implemented for T-MOCs.")),
     InternalMoc::Frequency(_) => Err(String::from("MOM Filter not implemented for F-MOCs.")),
