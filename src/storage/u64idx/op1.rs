@@ -222,6 +222,21 @@ pub(crate) fn op1_flatten_to_depth(index: usize, depth: u8) -> Result<Vec<u64>, 
   })
 }
 
+pub(crate) fn op1_border_elementary_edges_vertices(index: usize) -> Result<Vec<[f64; 4]>, String> {
+  store::exec_on_one_readonly_moc(index, move |moc| match moc {
+    InternalMoc::Space(m) => Ok(m.border_elementary_edges_vertices().collect()),
+    InternalMoc::Time(_) => Err(String::from(
+      "Border elementary edges vertices not implemented for T-MOCs.",
+    )),
+    InternalMoc::Frequency(_) => Err(String::from(
+      "Border elementary edges vertices not implemented for F-MOCs.",
+    )),
+    InternalMoc::TimeSpace(_) => Err(String::from(
+      "Border elementary edges vertices not implemented for ST-MOCs.",
+    )),
+  })
+}
+
 pub(crate) fn op1_count_split(index: usize, indirect_neigh: bool) -> Result<u32, String> {
   store::exec_on_one_readonly_moc(index, move |moc| match moc {
     InternalMoc::Space(m) => Ok(m.split_into_joint_mocs(indirect_neigh).len() as u32),

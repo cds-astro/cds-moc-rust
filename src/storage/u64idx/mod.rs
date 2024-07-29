@@ -67,8 +67,8 @@ use self::{
     tmoc_from_fits_gen,
   },
   op1::{
-    op1_1st_axis_max, op1_1st_axis_min, op1_count_split, op1_flatten_to_depth,
-    op1_flatten_to_moc_depth, op1_moc_barycenter,
+    op1_1st_axis_max, op1_1st_axis_min, op1_border_elementary_edges_vertices, op1_count_split,
+    op1_flatten_to_depth, op1_flatten_to_moc_depth, op1_moc_barycenter,
     op1_moc_largest_distance_from_coo_to_moc_vertices, Op1, Op1MultiRes,
   },
   op2::Op2,
@@ -1792,6 +1792,14 @@ impl U64MocStore {
   pub fn flatten_to_depth(&self, index: usize, depth: u8) -> Result<Vec<u64>, String> {
     op1_flatten_to_depth(index, depth)
   }
+
+  /// Returns the MOC elementary edges, i.e. the edges at the deepest depth, in any order, made of
+  /// the starting vertex and the ending vertex so that each item is of the form:
+  /// `[stat_vertex_lon, starting_vertex_lat, ending_vertex_lon, ending_vertex_lat]`.
+  pub fn border_elementary_edges_vertices(&self, index: usize) -> Result<Vec<[f64; 4]>, String> {
+    op1_border_elementary_edges_vertices(index)
+  }
+  //
 
   /// Split the given disjoint S-MOC int joint S-MOCs.
   /// Split "direct", i.e. we consider 2 neighboring cells to be the same only if the share an edge.

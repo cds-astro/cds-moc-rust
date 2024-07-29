@@ -12,6 +12,7 @@ use std::{
   vec::IntoIter,
 };
 
+use healpix::compass_point::{Cardinal, CardinalSet};
 /// Re-export `Ordinal` not to be out-of-sync with cdshealpix version.
 pub use healpix::compass_point::{Ordinal, OrdinalMap, OrdinalSet};
 use healpix::{
@@ -969,6 +970,77 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
           Some(CellAndEdges { uniq, edges })
         }
       })
+  }
+
+  /// Same as `border_elementary_edges` but return edges vertices in an iterator of arrays of the form:
+  /// `[vertex_1.lon, vertex_1.lat, vertex_2_.lon, vertex_2.lat]`
+  pub fn border_elementary_edges_vertices(&self) -> impl Iterator<Item = [f64; 4]> + '_ {
+    let hp = healpix::nested::get(self.depth_max);
+    self
+      .internal_border_iter()
+      .flatten_to_fixed_depth_cells()
+      .filter_map(move |idx| {
+        let mut edges = OrdinalSet::new();
+        let mut vertices_set = CardinalSet::new();
+        let h = <T as Idx>::to_u64(idx);
+        let neigs = hp.neighbours(h, false);
+        if let Some(nh) = neigs.get(MainWind::NE) {
+          if !self.contains_depth_max_val(&T::from_u64(*nh)) {
+            edges.set(Ordinal::NE, true);
+            vertices_set.set(Cardinal::N, true);
+            vertices_set.set(Cardinal::E, true);
+          }
+        }
+        if let Some(nh) = neigs.get(MainWind::SE) {
+          if !self.contains_depth_max_val(&T::from_u64(*nh)) {
+            edges.set(Ordinal::SE, true);
+            vertices_set.set(Cardinal::S, true);
+            vertices_set.set(Cardinal::E, true);
+          }
+        }
+        if let Some(nh) = neigs.get(MainWind::NW) {
+          if !self.contains_depth_max_val(&T::from_u64(*nh)) {
+            edges.set(Ordinal::NW, true);
+            vertices_set.set(Cardinal::N, true);
+            vertices_set.set(Cardinal::W, true);
+          }
+        }
+        if let Some(nh) = neigs.get(MainWind::SW) {
+          if !self.contains_depth_max_val(&T::from_u64(*nh)) {
+            edges.set(Ordinal::SW, true);
+            vertices_set.set(Cardinal::S, true);
+            vertices_set.set(Cardinal::W, true);
+          }
+        }
+        if edges.is_empty() {
+          None
+        } else {
+          let vertices = hp.vertices_map(h, vertices_set);
+          Some(edges.into_iter().map(move |ordinal| match ordinal {
+            Ordinal::NE => {
+              let n = vertices.get(Cardinal::N).unwrap();
+              let e = vertices.get(Cardinal::E).unwrap();
+              [n.0, n.1, e.0, e.1]
+            }
+            Ordinal::SE => {
+              let s = vertices.get(Cardinal::S).unwrap();
+              let e = vertices.get(Cardinal::E).unwrap();
+              [s.0, s.1, e.0, e.1]
+            }
+            Ordinal::NW => {
+              let n = vertices.get(Cardinal::N).unwrap();
+              let w = vertices.get(Cardinal::W).unwrap();
+              [n.0, n.1, w.0, w.1]
+            }
+            Ordinal::SW => {
+              let s = vertices.get(Cardinal::S).unwrap();
+              let w = vertices.get(Cardinal::W).unwrap();
+              [s.0, s.1, w.0, w.1]
+            }
+          }))
+        }
+      })
+      .flatten()
   }
 }
 
