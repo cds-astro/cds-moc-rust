@@ -1149,6 +1149,31 @@ impl U64MocStore {
     store::add(moc)
   }
 
+  /// Same as `from_small_cones`, but in parallel.
+  #[cfg(not(target_arch = "wasm32"))]
+  pub fn from_small_cones_par<T>(
+    &self,
+    depth: u8,
+    delta_depth: u8,
+    coos_and_radius_deg: T,
+  ) -> Result<usize, String>
+  where
+    T: ParallelIterator<Item = ((f64, f64), f64)>,
+  {
+    check_depth::<Hpx<u64>>(depth)?;
+    let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
+    let coos_rad = coos_and_radius_deg.filter_map(|((lon_deg, lat_deg), radius_deg)| {
+      let lon = lon_deg2rad(lon_deg);
+      let lat = lat_deg2rad(lat_deg);
+      match (lon, lat) {
+        (Ok(lon), Ok(lat)) => Some((lon, lat, radius_deg.to_radians())),
+        _ => None,
+      }
+    });
+    let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_small_cones_par(depth, dd, coos_rad, None);
+    store::add(moc)
+  }
+
   /// Create and store a new MOC from the given list of cone centers and radii
   /// Adapted for a reasonable number of possibly large cones.
   ///

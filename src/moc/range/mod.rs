@@ -12,6 +12,8 @@ use std::{
   vec::IntoIter,
 };
 
+use rayon::prelude::*;
+
 use healpix::compass_point::{Cardinal, CardinalSet};
 /// Re-export `Ordinal` not to be out-of-sync with cdshealpix version.
 pub use healpix::compass_point::{Ordinal, OrdinalMap, OrdinalSet};
@@ -1203,6 +1205,32 @@ impl RangeMOC<u64, Hpx<u64>> {
       }),
       buf_capacity,
     )
+  }
+
+  /// Like `from_small_cones` but in parallel (the number of threads must be defined beforehand
+  /// in rayon initialization).
+  #[cfg(not(target_arch = "wasm32"))]
+  pub fn from_small_cones_par<I: ParallelIterator<Item = (f64, f64, f64)>>(
+    depth: u8,
+    delta_depth: u8,
+    cone_it: I,
+    buf_capacity: Option<usize>,
+  ) -> Self {
+    cone_it
+      .map(|(lon_rad, lat_rad, radius_rad)| {
+        cone_coverage_approx_custom(depth, delta_depth, lon_rad, lat_rad, radius_rad)
+      })
+      .fold(
+        || FixedDepthMocBuilder::new(depth, buf_capacity),
+        |mut builder, bmoc| {
+          for cell in bmoc.into_flat_iter() {
+            builder.push(cell);
+          }
+          builder
+        },
+      )
+      .map(|builder| builder.into_moc())
+      .reduce(|| RangeMOC::new_empty(depth), |l, r| l.or(&r))
   }
 
   /// # Input
