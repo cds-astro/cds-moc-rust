@@ -1055,6 +1055,149 @@ impl U64MocStore {
     }
   }
 
+  /*pub fn from_boxes() {
+    // ((lon_deg, lat_deg), ((a_deg, b_deg), pa_deg))
+  }*/
+
+  pub fn from_small_boxes<T>(&self, depth: u8, coos_and_params_deg: T) -> Result<usize, String>
+  where
+    T: Iterator<Item = ((f64, f64), ((f64, f64), f64))>,
+  {
+    check_depth::<Hpx<u64>>(depth)?;
+    let coos_and_params_rad_it =
+      coos_and_params_deg.filter_map(|((lon_deg, lat_deg), ((a_deg, b_deg), pa_deg))| {
+        let lon = lon_deg2rad(lon_deg);
+        let lat = lat_deg2rad(lat_deg);
+        let a = a_deg.to_radians();
+        let b = b_deg.to_radians();
+        let pa = pa_deg.to_radians();
+        match (lon, lat) {
+          (Ok(lon), Ok(lat)) => {
+            if a <= 0.0 || HALF_PI <= a {
+              None
+            } else if b <= 0.0 || a < b {
+              None
+            } else if pa < 0.0 || PI <= pa {
+              None
+            } else {
+              Some((lon, lat, a, b, pa))
+            }
+          }
+          _ => None,
+        }
+      });
+    let moc: RangeMOC<u64, Hpx<u64>> =
+      RangeMOC::from_small_boxes(depth, coos_and_params_rad_it, None);
+    store::add(moc)
+  }
+
+  pub fn from_large_boxes<T>(
+    &self,
+    depth: u8,
+    selection: CellSelection,
+    coos_and_params_deg: T,
+  ) -> Result<usize, String>
+  where
+    T: Iterator<Item = ((f64, f64), ((f64, f64), f64))>,
+  {
+    check_depth::<Hpx<u64>>(depth)?;
+    let coos_and_params_rad_it =
+      coos_and_params_deg.filter_map(|((lon_deg, lat_deg), ((a_deg, b_deg), pa_deg))| {
+        let lon = lon_deg2rad(lon_deg);
+        let lat = lat_deg2rad(lat_deg);
+        let a = a_deg.to_radians();
+        let b = b_deg.to_radians();
+        let pa = pa_deg.to_radians();
+        match (lon, lat) {
+          (Ok(lon), Ok(lat)) => {
+            if a <= 0.0 || HALF_PI <= a {
+              None
+            } else if b <= 0.0 || a < b {
+              None
+            } else if pa < 0.0 || PI <= pa {
+              None
+            } else {
+              Some((lon, lat, a, b, pa))
+            }
+          }
+          _ => None,
+        }
+      });
+    let moc: RangeMOC<u64, Hpx<u64>> =
+      RangeMOC::from_large_boxes(depth, selection, coos_and_params_rad_it);
+    store::add(moc)
+  }
+
+  /// Same as `from_large_cones`, but in parallel.
+  pub fn from_small_boxes_par<T>(&self, depth: u8, coos_and_params_deg: T) -> Result<usize, String>
+  where
+    T: ParallelIterator<Item = ((f64, f64), ((f64, f64), f64))>,
+  {
+    check_depth::<Hpx<u64>>(depth)?;
+    let coos_and_params_rad_it =
+      coos_and_params_deg.filter_map(|((lon_deg, lat_deg), ((a_deg, b_deg), pa_deg))| {
+        let lon = lon_deg2rad(lon_deg);
+        let lat = lat_deg2rad(lat_deg);
+        let a = a_deg.to_radians();
+        let b = b_deg.to_radians();
+        let pa = pa_deg.to_radians();
+        match (lon, lat) {
+          (Ok(lon), Ok(lat)) => {
+            if a <= 0.0 || HALF_PI <= a {
+              None
+            } else if b <= 0.0 || a < b {
+              None
+            } else if pa < 0.0 || PI <= pa {
+              None
+            } else {
+              Some((lon, lat, a, b, pa))
+            }
+          }
+          _ => None,
+        }
+      });
+    let moc: RangeMOC<u64, Hpx<u64>> =
+      RangeMOC::from_small_boxes_par(depth, coos_and_params_rad_it, None);
+    store::add(moc)
+  }
+
+  pub fn from_large_boxes_par<T>(
+    &self,
+    depth: u8,
+    selection: CellSelection,
+    coos_and_params_deg: T,
+  ) -> Result<usize, String>
+  where
+    T: ParallelIterator<Item = ((f64, f64), ((f64, f64), f64))>,
+  {
+    check_depth::<Hpx<u64>>(depth)?;
+    let coos_and_params_rad_it =
+      coos_and_params_deg.filter_map(|((lon_deg, lat_deg), ((a_deg, b_deg), pa_deg))| {
+        let lon = lon_deg2rad(lon_deg);
+        let lat = lat_deg2rad(lat_deg);
+        let a = a_deg.to_radians();
+        let b = b_deg.to_radians();
+        let pa = pa_deg.to_radians();
+        match (lon, lat) {
+          (Ok(lon), Ok(lat)) => {
+            if a <= 0.0 || HALF_PI <= a {
+              None
+            } else if b <= 0.0 || a < b {
+              None
+            } else if pa < 0.0 || PI <= pa {
+              None
+            } else {
+              Some((lon, lat, a, b, pa))
+            }
+          }
+          _ => None,
+        }
+      });
+    let moc: RangeMOC<u64, Hpx<u64>> =
+      RangeMOC::from_large_boxes_par(depth, selection, coos_and_params_rad_it);
+    store::add(moc)
+  }
+
   /// Create and store a new MOC from the given polygon vertices.
   ///
   /// # Params
@@ -1207,6 +1350,39 @@ impl U64MocStore {
       }
     });
     let moc: RangeMOC<u64, Hpx<u64>> = RangeMOC::from_large_cones(depth, dd, selection, coos_rad);
+    store::add(moc)
+  }
+
+  /// Same as `from_large_cones`, but in parallel.
+  pub fn from_large_cones_par<T>(
+    &self,
+    depth: u8,
+    delta_depth: u8,
+    selection: CellSelection,
+    coos_and_radius_deg: T,
+  ) -> Result<usize, String>
+  where
+    T: ParallelIterator<Item = ((f64, f64), f64)>,
+  {
+    check_depth::<Hpx<u64>>(depth)?;
+    let dd = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
+    let coos_rad = coos_and_radius_deg.filter_map(|((lon_deg, lat_deg), radius_deg)| {
+      let lon = lon_deg2rad(lon_deg);
+      let lat = lat_deg2rad(lat_deg);
+      match (lon, lat) {
+        (Ok(lon), Ok(lat)) => Some((lon, lat, radius_deg.to_radians())),
+        _ => None,
+      }
+    });
+    /*let cone_moc_it = coos_rad.map(move |(lon, lat, radius)| {
+      RangeMOC::<u64, Hpx<u64>>::from_cone(lon, lat, radius, depth, dd, selection)
+    });
+    let moc = cone_moc_it.reduce(
+      || RangeMOC::<u64, Hpx<u64>>::new_empty(depth),
+      |l, r| l.or(&r),
+    );*/
+    let moc: RangeMOC<u64, Hpx<u64>> =
+      RangeMOC::from_large_cones_par(depth, dd, selection, coos_rad);
     store::add(moc)
   }
 

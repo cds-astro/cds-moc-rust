@@ -14,11 +14,10 @@ use std::{
 
 use rayon::prelude::*;
 
-use healpix::compass_point::{Cardinal, CardinalSet};
 /// Re-export `Ordinal` not to be out-of-sync with cdshealpix version.
 pub use healpix::compass_point::{Ordinal, OrdinalMap, OrdinalSet};
 use healpix::{
-  compass_point::MainWind,
+  compass_point::{Cardinal, CardinalSet, MainWind},
   nested::{
     append_external_edge, bmoc::BMOC, box_coverage, cone_coverage_approx_custom,
     custom_polygon_coverage, elliptical_cone_coverage_custom, external_edge, external_edge_struct,
@@ -1142,6 +1141,7 @@ impl RangeMOC<u64, Hpx<u64>> {
     delta_depth: u8,
     selection: CellSelection,
   ) -> Self {
+    let delta_depth = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
     Self::from((
       cone_coverage_approx_custom(depth, delta_depth, lon, lat, radius),
       selection,
@@ -1168,10 +1168,84 @@ impl RangeMOC<u64, Hpx<u64>> {
     selection: CellSelection,
     coo_it: I,
   ) -> Self {
+    let delta_depth = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
     let it = coo_it.map(move |(lon, lat, radius)| {
       Self::from_cone(lon, lat, radius, depth, delta_depth, selection)
     });
     kway_or(Box::new(it))
+  }
+
+  /// `(lon, lat, a, b, pa)` all in radians
+  pub fn from_large_boxes<I: Iterator<Item = (f64, f64, f64, f64, f64)>>(
+    depth: u8,
+    selection: CellSelection,
+    coo_params_it: I,
+  ) -> Self {
+    let it = coo_params_it
+      .map(move |(lon, lat, a, b, pa)| Self::from_box(lon, lat, a, b, pa, depth, selection));
+    kway_or(Box::new(it))
+  }
+
+  /// `(lon, lat, a, b, pa)` all in radians
+  pub fn from_large_boxes_par<I: ParallelIterator<Item = (f64, f64, f64, f64, f64)>>(
+    depth: u8,
+    selection: CellSelection,
+    coo_params_it: I,
+  ) -> Self {
+    coo_params_it
+      .map(move |(lon, lat, a, b, pa)| Self::from_box(lon, lat, a, b, pa, depth, selection))
+      .reduce(|| RangeMOC::new_empty(depth), |l, r| l.or(&r))
+  }
+
+  /// `(lon, lat, a, b, pa)` all in radians
+  pub fn from_small_boxes<I: Iterator<Item = (f64, f64, f64, f64, f64)>>(
+    depth: u8,
+    coo_params_it: I,
+    buf_capacity: Option<usize>,
+  ) -> Self {
+    Self::from_fixed_depth_cells(
+      depth,
+      coo_params_it.flat_map(move |(lon, lat, a, b, pa)| {
+        box_coverage(depth, lon, lat, a, b, pa).into_flat_iter()
+      }),
+      buf_capacity,
+    )
+  }
+
+  /// `(lon, lat, a, b, pa)` all in radians
+  pub fn from_small_boxes_par<I: ParallelIterator<Item = (f64, f64, f64, f64, f64)>>(
+    depth: u8,
+    coo_params_it: I,
+    buf_capacity: Option<usize>,
+  ) -> Self {
+    coo_params_it
+      .map(|(lon, lat, a, b, pa)| box_coverage(depth, lon, lat, a, b, pa))
+      .fold(
+        || FixedDepthMocBuilder::new(depth, buf_capacity),
+        |mut builder, bmoc| {
+          for cell in bmoc.into_flat_iter() {
+            builder.push(cell);
+          }
+          builder
+        },
+      )
+      .map(|builder| builder.into_moc())
+      .reduce(|| RangeMOC::new_empty(depth), |l, r| l.or(&r))
+  }
+
+  /// Same as `from_large_cones` but supporting multi-threading.
+  pub fn from_large_cones_par<I: ParallelIterator<Item = (f64, f64, f64)>>(
+    depth: u8,
+    delta_depth: u8,
+    selection: CellSelection,
+    coo_it: I,
+  ) -> Self {
+    let delta_depth = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
+    coo_it
+      .map(move |(lon, lat, radius)| {
+        Self::from_cone(lon, lat, radius, depth, delta_depth, selection)
+      })
+      .reduce(|| RangeMOC::new_empty(depth), |l, r| l.or(&r))
   }
 
   /// Create a MOC from a possibly large list of relatively small cones
@@ -1197,6 +1271,7 @@ impl RangeMOC<u64, Hpx<u64>> {
     cone_it: I,
     buf_capacity: Option<usize>,
   ) -> Self {
+    let delta_depth = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
     Self::from_fixed_depth_cells(
       depth,
       cone_it.flat_map(move |(lon_rad, lat_rad, radius_rad)| {
@@ -1216,6 +1291,7 @@ impl RangeMOC<u64, Hpx<u64>> {
     cone_it: I,
     buf_capacity: Option<usize>,
   ) -> Self {
+    let delta_depth = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
     cone_it
       .map(|(lon_rad, lat_rad, radius_rad)| {
         cone_coverage_approx_custom(depth, delta_depth, lon_rad, lat_rad, radius_rad)
@@ -1257,6 +1333,7 @@ impl RangeMOC<u64, Hpx<u64>> {
     delta_depth: u8,
     selection: CellSelection,
   ) -> Self {
+    let delta_depth = delta_depth.min(Hpx::<u64>::MAX_DEPTH - depth);
     Self::from((
       elliptical_cone_coverage_custom(depth, delta_depth, lon, lat, a, b, pa),
       selection,
