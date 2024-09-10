@@ -1129,6 +1129,7 @@ impl U64MocStore {
   }
 
   /// Same as `from_large_cones`, but in parallel.
+  #[cfg(not(target_arch = "wasm32"))]
   pub fn from_small_boxes_par<T>(&self, depth: u8, coos_and_params_deg: T) -> Result<usize, String>
   where
     T: ParallelIterator<Item = ((f64, f64), ((f64, f64), f64))>,
@@ -1161,6 +1162,7 @@ impl U64MocStore {
     store::add(moc)
   }
 
+  #[cfg(not(target_arch = "wasm32"))]
   pub fn from_large_boxes_par<T>(
     &self,
     depth: u8,
@@ -1354,6 +1356,7 @@ impl U64MocStore {
   }
 
   /// Same as `from_large_cones`, but in parallel.
+  #[cfg(not(target_arch = "wasm32"))]
   pub fn from_large_cones_par<T>(
     &self,
     depth: u8,
