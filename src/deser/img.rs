@@ -268,7 +268,6 @@ pub fn to_png_file_auto<T: Idx>(
 }
 
 // Adapted from https://github.com/igiagkiozis/plotly/blob/master/plotly/src/plot.rs
-
 #[cfg(target_os = "linux")]
 fn show_with_default_app(path: &str) -> Result<(), io::Error> {
   use std::process::Command;

@@ -1,9 +1,11 @@
 //! Contains common method to parse FITS
 
-use std::io::{BufRead, Write};
-use std::num::ParseIntError;
-use std::slice::ChunksExact;
-use std::str::{self, FromStr};
+use std::{
+  io::{BufRead, Write},
+  num::ParseIntError,
+  slice::ChunksExact,
+  str::{self, FromStr},
+};
 
 use quick_error::ResultExt;
 
@@ -170,7 +172,7 @@ pub(super) fn get_value(keyword_record: &[u8]) -> &[u8] {
   &keyword_record[10..]
 }
 pub(super) fn get_left_trimmed_value(keyword_record: &[u8]) -> &[u8] {
-  trim_left(get_value(keyword_record))
+  get_value(keyword_record).trim_ascii_start()
 }
 
 pub(super) fn check_expected_value(
@@ -179,7 +181,7 @@ pub(super) fn check_expected_value(
 ) -> Result<(), FitsError> {
   debug_assert!(keyword_record.len() == 80); // length of a FITS keyword-record
   let src = get_value(keyword_record);
-  let lt_src = trim_left(src);
+  let lt_src = src.trim_ascii_start();
   if lt_src.len() >= expected.len() && &lt_src[..expected.len()] == expected {
     Ok(())
   } else {
@@ -192,31 +194,13 @@ pub(super) fn check_expected_value(
   }
 }
 
-pub(super) fn trim_left(src: &[u8]) -> &[u8] {
-  for (i, c) in src.iter().enumerate() {
-    if !c.is_ascii_whitespace() {
-      return &src[i..];
-    }
-  }
-  &[]
-}
-
-pub(super) fn trim_right(src: &[u8]) -> &[u8] {
-  for (i, c) in src.iter().enumerate().rev() {
-    if !c.is_ascii_whitespace() {
-      return &src[..=i];
-    }
-  }
-  &[]
-}
-
 /// We know that the expected value does not contains a simple quote.
 /// A trim_end is applied so that the result does not contain leading or trailing spaces.
 pub(super) fn get_str_val_no_quote(keyword_record: &[u8]) -> Result<&[u8], FitsError> {
   let mut it = get_left_trimmed_value(keyword_record).split_inclusive(|c| *c == b'\'');
   if let Some([b'\'']) = it.next() {
     if let Some([subslice @ .., b'\'']) = it.next() {
-      return Ok(trim_right(subslice));
+      return Ok(subslice.trim_ascii_end());
     }
   }
   let keyword_record = String::from_utf8_lossy(keyword_record)
