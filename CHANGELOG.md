@@ -1,5 +1,24 @@
 # `moc` Change Log
 
+## 0.17.0
+
+Released 2024-10-16
+
+### Changed
+
+* Bump cdshealpix version to 0.7
+* Use u8 slice `trim_ascii_start` and `trim_ascii_end` now that they have been stabilized
+
+### Added
+
+* Add methods in `RangeMOC` and `storage`:
+    + `from_small_cones_par`
+    + `from_small_boxes`, `from_small_boxes_par`
+    + `from_large_boxes`, `from_large_boxes_par`
+    + `border_elementary_edges_vertices`
+* Add `multiordermap_filter_mask_moc` in `storage`
+
+
 ## 0.16.0
 
 Released 2024-XX-XX
