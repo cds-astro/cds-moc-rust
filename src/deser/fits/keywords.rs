@@ -1,10 +1,12 @@
 //! This module contains the MOC specific FITS keywords
 
-use std::fmt;
-use std::slice::ChunksMut;
-use std::str::{self, FromStr};
+use std::{
+  fmt,
+  slice::ChunksMut,
+  str::{self, FromStr},
+};
 
-use crate::deser::fits::{
+use super::{
   common::{get_keyword, get_str_val_no_quote, parse_uint_val, write_keyword_record},
   error::FitsError,
 };

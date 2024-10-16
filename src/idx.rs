@@ -1,11 +1,13 @@
 //! This module contains the trait defining the type `Idx` that can be used to represent the
 //! index value of a MOC cell, associated with utility constants and methods.
 
-use std::fmt::{Debug, Display};
-use std::io::{Read, Write};
-use std::mem;
-use std::ops::{AddAssign, BitAndAssign, BitOrAssign, SubAssign};
-use std::str::FromStr;
+use std::{
+  fmt::{Debug, Display},
+  io::{Read, Write},
+  mem,
+  ops::{AddAssign, BitAndAssign, BitOrAssign, SubAssign},
+  str::FromStr,
+};
 
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
 use num::{Integer, PrimInt, ToPrimitive};

@@ -81,9 +81,8 @@ pub fn from_fits_skymap<R: Read + Seek>(
   reverse_decent: bool,
 ) -> Result<RangeMOC<u64, Hpx<u64>>, FitsError> {
   if is_gz(&mut reader)? {
-    let reader = uncompress(reader);
     from_fits_skymap_internal(
-      reader,
+      uncompress(reader),
       skip_value_le_this,
       cumul_from,
       cumul_to,

@@ -1,8 +1,6 @@
 use num::One;
 
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::ops::Range;
+use std::{fmt::Debug, marker::PhantomData, ops::Range};
 
 use crate::deser::fits::keywords::MocDim;
 use crate::idx::Idx;
