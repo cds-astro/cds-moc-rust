@@ -59,8 +59,8 @@ mod store;
 
 use self::{
   common::{
-    check_depth, lat_deg2rad, lon_deg2rad, InternalMoc, MocQType, FMOC, HALF_PI, PI, SMOC, STMOC,
-    TMOC,
+    check_depth, lat_deg2rad, lon_deg2rad, lon_deg2rad_relaxed, InternalMoc, MocQType, FMOC,
+    HALF_PI, PI, SMOC, STMOC, TMOC,
   },
   load::{
     fmoc_from_fits_gen, from_fits_gen, from_fits_u64, smoc_from_fits_gen, stmoc_from_fits_u64,
@@ -1007,7 +1007,7 @@ impl U64MocStore {
     check_depth::<Hpx<u64>>(depth)?;
     let lon_min = lon_deg2rad(lon_deg_min)?;
     let lat_min = lat_deg2rad(lat_deg_min)?;
-    let lon_max = lon_deg2rad(lon_deg_max)?;
+    let lon_max = lon_deg2rad_relaxed(lon_deg_max)?;
     let lat_max = lat_deg2rad(lat_deg_max)?;
     let moc: RangeMOC<u64, Hpx<u64>> =
       RangeMOC::from_zone(lon_min, lat_min, lon_max, lat_max, depth, selection);

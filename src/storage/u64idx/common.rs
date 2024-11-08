@@ -464,6 +464,15 @@ pub(crate) fn lon_deg2rad(lon_deg: f64) -> Result<f64, String> {
   }
 }
 
+pub(crate) fn lon_deg2rad_relaxed(lon_deg: f64) -> Result<f64, String> {
+  let lon = lon_deg.to_radians();
+  if lon < 0.0 || TWICE_PI < lon {
+    Err(String::from("Longitude must be in [0, 2pi]"))
+  } else {
+    Ok(lon)
+  }
+}
+
 pub(crate) fn lat_deg2rad(lat_deg: f64) -> Result<f64, String> {
   let lat = lat_deg.to_radians();
   if lat < -HALF_PI || HALF_PI < lat {
