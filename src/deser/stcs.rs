@@ -2,6 +2,7 @@
 
 use thiserror::Error;
 
+use log::warn;
 use nom::{
   error::{convert_error, VerboseError},
   Err,
@@ -299,7 +300,9 @@ impl SpaceVisitor for Stc2Moc {
   ) -> Result<Self, Self::Error> {
     // Check ICRS frame
     let frame = fill_frame_refpos_flavor.frame();
-    if frame != Frame::ICRS {
+    if frame == Frame::UnknownFrame {
+      warn!("No frame or frame 'UnknownFrame' found in STC-S: ICRS frame is assumed.")
+    } else if frame != Frame::ICRS {
       return Err(Stc2MocError::FrameIsNotICRS { found: frame });
     }
     // Check SPHER2 flavor
