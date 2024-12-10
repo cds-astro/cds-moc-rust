@@ -287,7 +287,7 @@ impl FMOC {
   /// * `freq` - array of frequencies in Hz (`f64`)
   pub fn from_hz(depth: u8, freq: Box<[f64]>) -> Result<FMOC, JsValue> {
     U64MocStore::get_global_store()
-      .from_hz_values(depth, freq.into_iter().cloned())
+      .from_hz_values(depth, freq.iter().cloned())
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }

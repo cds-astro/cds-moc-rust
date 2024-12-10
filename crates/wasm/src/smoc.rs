@@ -706,8 +706,8 @@ impl MOC {
         .unwrap_or(depth),
     );
     let uniq_vals = uniqs
-      .into_iter()
-      .zip(values.into_iter())
+      .iter()
+      .zip(values.iter())
       .map(|(u, v)| (*u as u64, *v));
     U64MocStore::get_global_store()
       .from_valued_cells(

@@ -296,7 +296,7 @@ impl TMOC {
   /// We will add such a method later if required by users.
   pub fn from_decimal_jd(depth: u8, jd: Box<[f64]>) -> Result<TMOC, JsValue> {
     U64MocStore::get_global_store()
-      .from_decimal_jd_values(depth, jd.into_iter().cloned())
+      .from_decimal_jd_values(depth, jd.iter().cloned())
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
@@ -341,7 +341,7 @@ impl TMOC {
   #[wasm_bindgen(js_name = "filterJDs", catch)]
   pub fn filter_time(&self, jds: Box<[f64]>) -> Result<Box<[u8]>, JsValue> {
     U64MocStore::get_global_store()
-      .filter_time_approx(self.storage_index(), jds.into_iter().cloned(), |b| b as u8)
+      .filter_time_approx(self.storage_index(), jds.iter().cloned(), |b| b as u8)
       .map(|v| v.into_boxed_slice())
       .map_err(|e| e.into())
   }

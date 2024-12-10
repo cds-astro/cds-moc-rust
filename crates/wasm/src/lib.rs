@@ -1,33 +1,23 @@
 extern crate console_error_panic_hook;
 
-use std::{
-  panic,
-  str::from_utf8_unchecked
-};
+use std::{panic, str::from_utf8_unchecked};
 
+use js_sys::{Array, Uint8Array};
+use serde::{Deserialize, Serialize};
 use unreachable::{UncheckedOptionExt, UncheckedResultExt};
-
-use serde::{Serialize, Deserialize};
-
-use wasm_bindgen::{
-  prelude::*,
-  JsCast
-};
+use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-  Url, Blob, BlobPropertyBag,
-  Event, FileReader,
-  HtmlAnchorElement, HtmlInputElement,
-  Request, RequestInit, RequestMode, Response
+  Blob, BlobPropertyBag, Event, FileReader, HtmlAnchorElement, HtmlInputElement, Request,
+  RequestInit, RequestMode, Response, Url,
 };
-use js_sys::{Array, Uint8Array};
 
 use moclib::storage::u64idx::U64MocStore;
 
-pub mod smoc;
-pub mod tmoc;
 pub mod fmoc;
+pub mod smoc;
 pub mod stmoc;
+pub mod tmoc;
 
 use smoc::MOC;
 
@@ -66,13 +56,12 @@ trait IsMOC: Sized {
 
   fn add_to_store(name: &str, moc: Self) -> Result<(), JsValue>;
 
-
   // - from
 
   fn from_ascii(data: &str) -> Result<Self, JsValue>;
-  
+
   // /// async func not supported in trait...
-  // async fn from_ascii_url(url: String) -> Result<Self, JsValue> 
+  // async fn from_ascii_url(url: String) -> Result<Self, JsValue>
 
   fn from_json(data: &str) -> Result<Self, JsValue>;
 
@@ -88,7 +77,7 @@ trait IsMOC: Sized {
   fn from_local_file() -> Result<(), JsValue> {
     from_local_files::<Self>()
   }
-  
+
   // - to
 
   /// Returns the ASCII serialization of the given MOC.
@@ -135,7 +124,14 @@ trait IsMOC: Sized {
     U64MocStore::get_global_store()
       .to_ascii_str(self.storage_index(), fold)
       .map_err(|e| e.into())
-      .and_then(|data| to_file("moc", ".txt", "text/plain", data.into_bytes().into_boxed_slice()))
+      .and_then(|data| {
+        to_file(
+          "moc",
+          ".txt",
+          "text/plain",
+          data.into_bytes().into_boxed_slice(),
+        )
+      })
   }
 
   /// Download the JSON serialization of the given MOC.
@@ -146,7 +142,14 @@ trait IsMOC: Sized {
     U64MocStore::get_global_store()
       .to_json_str(self.storage_index(), fold)
       .map_err(|e| e.into())
-      .and_then(|data| to_file("moc", ".json", "application/json", data.into_bytes().into_boxed_slice()))
+      .and_then(|data| {
+        to_file(
+          "moc",
+          ".json",
+          "application/json",
+          data.into_bytes().into_boxed_slice(),
+        )
+      })
   }
 
   /// Download the FITS serialization of the MOC of given `name`.
@@ -156,17 +159,15 @@ trait IsMOC: Sized {
     U64MocStore::get_global_store()
       .to_fits_buff(self.storage_index(), force_v1_compatibility)
       .map_err(|e| e.into())
-      .and_then(|data| to_file("moc",".fits", "application/fits", data))
+      .and_then(|data| to_file("moc", ".fits", "application/fits", data))
   }
-
 }
 
 /// Common operations on 1D MOCs
 trait IsOneDimMOC: IsMOC {
-  
   fn depth(&self) -> Result<u8, JsValue>;
 
-  fn coverage_percentage(&self) -> Result<f64, JsValue>  {
+  fn coverage_percentage(&self) -> Result<f64, JsValue> {
     U64MocStore::get_global_store()
       .get_coverage_percentage(self.storage_index())
       .map_err(|e| e.into())
@@ -250,9 +251,7 @@ trait IsOneDimMOC: IsMOC {
       .map(Self::from_store_index)
       .map_err(|e| e.into())
   }
-
 }
-
 
 //////////////
 // LOAD MOC //
@@ -266,25 +265,28 @@ trait IsOneDimMOC: IsMOC {
 async fn from_url<T>(
   url: String,
   mime: &str,
-  parse: Box<dyn Fn(&[u8]) ->  Result<T, JsValue>>
-) -> Result<T, JsValue>
-{
+  parse: Box<dyn Fn(&[u8]) -> Result<T, JsValue>>,
+) -> Result<T, JsValue> {
   // https://rustwasm.github.io/docs/wasm-bindgen/examples/fetch.html
   let mut opts = RequestInit::new();
-  opts.method("GET");
-  opts.mode(RequestMode::Cors);
-  
+  opts.set_method("GET");
+  opts.set_mode(RequestMode::Cors);
+
   let window = web_sys::window().ok_or_else(|| JsValue::from_str("Unable to get the Window"))?;
-  
+
   let request = Request::new_with_str_and_init(&url, &opts)?;
   request.headers().set("Accept", mime)?;
-  
-  let document = window.document().ok_or_else(|| JsValue::from_str("Unable to get the Windows Document"))?;
+
+  let document = window
+    .document()
+    .ok_or_else(|| JsValue::from_str("Unable to get the Windows Document"))?;
   request.headers().set("Referer", &document.referrer())?; // For CORS
 
   let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
 
-  let resp: Response = resp_value.dyn_into().map_err(|_| JsValue::from_str("Error casting to Response"))?;
+  let resp: Response = resp_value
+    .dyn_into()
+    .map_err(|_| JsValue::from_str("Error casting to Response"))?;
   // Convert this other `Promise` into a rust `Future`.
   let buff = JsFuture::from(resp.array_buffer()?).await?;
   // log(&format!("Blob: {:?}", &blob));
@@ -293,8 +295,7 @@ async fn from_url<T>(
   parse(&file_content)
 }
 
-
-/// Open the file selection dialog and load the MOC contained in the selected file 
+/// Open the file selection dialog and load the MOC contained in the selected file
 /// (for security reasons, we cannot simply provide a path on the client machine).
 /// # Warning
 /// Because of security restriction, the call to this method
@@ -302,19 +303,31 @@ async fn from_url<T>(
 pub(crate) fn from_local_files<T: IsMOC>() -> Result<(), JsValue> {
   // Create the file input action that will be fired by the event 'change'
   let file_input_action = Closure::wrap(Box::new(move |event: Event| {
-    let element = unsafe { event.target().unchecked_unwrap().dyn_into::<HtmlInputElement>().unchecked_unwrap_ok() };
-    let filelist = unsafe {  element.files().unchecked_unwrap() };
+    let element = unsafe {
+      event
+        .target()
+        .unchecked_unwrap()
+        .dyn_into::<HtmlInputElement>()
+        .unchecked_unwrap_ok()
+    };
+    let filelist = unsafe { element.files().unchecked_unwrap() };
     for i in 0..filelist.length() {
-      let file = unsafe {  filelist.get(i).unchecked_unwrap() };
+      let file = unsafe { filelist.get(i).unchecked_unwrap() };
       let file_name = file.name();
-      let file_reader = unsafe {  FileReader::new().unchecked_unwrap_ok() };
+      let file_reader = unsafe { FileReader::new().unchecked_unwrap_ok() };
       // There is a stream method, but I am not sure how to use it. I am so far going the easy way.
       match file_reader.read_as_array_buffer(&file) {
         Err(_) => log("Error reading file content"),
-        _ => { },
+        _ => {}
       };
       let file_onload = Closure::wrap(Box::new(move |event: Event| {
-        let file_reader: FileReader = unsafe { event.target().unchecked_unwrap().dyn_into().unchecked_unwrap_ok() };
+        let file_reader: FileReader = unsafe {
+          event
+            .target()
+            .unchecked_unwrap()
+            .dyn_into()
+            .unchecked_unwrap_ok()
+        };
         let file_content = unsafe { file_reader.result().unchecked_unwrap_ok() };
         let file_content: Vec<u8> = js_sys::Uint8Array::new(&file_content).to_vec();
         // log(&format!("File len {:?}", file_content.len()));
@@ -323,21 +336,25 @@ pub(crate) fn from_local_files<T: IsMOC>() -> Result<(), JsValue> {
         let (name, ext) = unsafe { file_name.rsplit_once('.').unchecked_unwrap() };
         let res = match ext {
           "fits" | "gz" => T::from_fits(&file_content),
-          "json" => T::from_json(unsafe{ from_utf8_unchecked(&file_content) }),
-          "txt" | "ascii" => T::from_ascii(unsafe{ from_utf8_unchecked(&file_content) }),
+          "json" => T::from_json(unsafe { from_utf8_unchecked(&file_content) }),
+          "txt" | "ascii" => T::from_ascii(unsafe { from_utf8_unchecked(&file_content) }),
           _ => unreachable!(), // since file_input.set_attribute("accept", ".fits, .json, .ascii, .txt");
-        }.and_then(|moc| T::add_to_store(name, moc));
+        }
+        .and_then(|moc| T::add_to_store(name, moc));
         // Handle here the error
         match res {
-          Err(e) => log(&e.as_string().unwrap_or_else(|| String::from("Error parsing file"))),
-          _ => { },
+          Err(e) => log(
+            &e.as_string()
+              .unwrap_or_else(|| String::from("Error parsing file")),
+          ),
+          _ => {}
         };
       }) as Box<dyn FnMut(_)>);
       file_reader.set_onload(Some(file_onload.as_ref().unchecked_ref()));
       file_onload.forget();
     }
   }) as Box<dyn FnMut(_)>);
-  
+
   // Create a temporary input file and click on it
   // - get the body
   let window = web_sys::window().expect("no global `window` exists");
@@ -345,14 +362,24 @@ pub(crate) fn from_local_files<T: IsMOC>() -> Result<(), JsValue> {
   let document = window.document().expect("should have a document on window");
   let body = document.body().expect("document should have a body");
   // - create the input
-  let file_input: HtmlInputElement = unsafe { document.create_element("input").unchecked_unwrap_ok().dyn_into()? };
+  let file_input: HtmlInputElement = unsafe {
+    document
+      .create_element("input")
+      .unchecked_unwrap_ok()
+      .dyn_into()?
+  };
   file_input.set_type("file");
   unsafe {
-    file_input.set_attribute("multiple", "").unchecked_unwrap_ok();
+    file_input
+      .set_attribute("multiple", "")
+      .unchecked_unwrap_ok();
     file_input.set_attribute("hidden", "").unchecked_unwrap_ok();
-    file_input.set_attribute("accept", ".fits, .json, .ascii, .txt").unchecked_unwrap_ok();
+    file_input
+      .set_attribute("accept", ".fits, .json, .ascii, .txt")
+      .unchecked_unwrap_ok();
   }
-  file_input.add_event_listener_with_callback("change", file_input_action.as_ref().unchecked_ref())?;
+  file_input
+    .add_event_listener_with_callback("change", file_input_action.as_ref().unchecked_ref())?;
   file_input_action.forget();
   // - attach the input
   body.append_child(&file_input)?;
@@ -363,8 +390,7 @@ pub(crate) fn from_local_files<T: IsMOC>() -> Result<(), JsValue> {
   Ok(())
 }
 
-
-/// Open the file selection dialog and load the mulit-order-map the fits file contains 
+/// Open the file selection dialog and load the mulit-order-map the fits file contains
 /// (for security reasons, we cannot simply provide a path on the client machine).
 /// # Warning
 /// Because of security restriction, the call to this method
@@ -379,19 +405,31 @@ pub(crate) fn from_local_multiordermap(
 ) -> Result<(), JsValue> {
   // Create the file input action that will be fired by the event 'change'
   let file_input_action = Closure::wrap(Box::new(move |event: Event| {
-    let element = unsafe { event.target().unchecked_unwrap().dyn_into::<HtmlInputElement>().unchecked_unwrap_ok() };
-    let filelist = unsafe {  element.files().unchecked_unwrap() };
+    let element = unsafe {
+      event
+        .target()
+        .unchecked_unwrap()
+        .dyn_into::<HtmlInputElement>()
+        .unchecked_unwrap_ok()
+    };
+    let filelist = unsafe { element.files().unchecked_unwrap() };
     for i in 0..filelist.length() {
-      let file = unsafe {  filelist.get(i).unchecked_unwrap() };
+      let file = unsafe { filelist.get(i).unchecked_unwrap() };
       let file_name = file.name();
-      let file_reader = unsafe {  FileReader::new().unchecked_unwrap_ok() };
+      let file_reader = unsafe { FileReader::new().unchecked_unwrap_ok() };
       // There is a stream method, but I am not sure how to use it. I am so far going the easy way.
       match file_reader.read_as_array_buffer(&file) {
         Err(_) => log("Error reading file content"),
-        _ => { },
+        _ => {}
       };
       let file_onload = Closure::wrap(Box::new(move |event: Event| {
-        let file_reader: FileReader = unsafe { event.target().unchecked_unwrap().dyn_into().unchecked_unwrap_ok() };
+        let file_reader: FileReader = unsafe {
+          event
+            .target()
+            .unchecked_unwrap()
+            .dyn_into()
+            .unchecked_unwrap_ok()
+        };
         let file_content = unsafe { file_reader.result().unchecked_unwrap_ok() };
         let file_content: Vec<u8> = js_sys::Uint8Array::new(&file_content).to_vec();
         // log(&format!("File len {:?}", file_content.len()));
@@ -399,14 +437,23 @@ pub(crate) fn from_local_multiordermap(
         let (name, ext) = unsafe { file_name.rsplit_once('.').unchecked_unwrap() };
         let res = match ext {
           "fits" | "gz" => MOC::from_multiordermap_fits_file(
-            &file_content, from_threshold, to_threshold, 
-            asc, not_strict, split, revese_recursive_descent
+            &file_content,
+            from_threshold,
+            to_threshold,
+            asc,
+            not_strict,
+            split,
+            revese_recursive_descent,
           ),
           _ => unreachable!(), // since file_input.set_attribute("accept", ".fits");
-        }.and_then(|moc| MOC::add_to_store(name, moc));
+        }
+        .and_then(|moc| MOC::add_to_store(name, moc));
         match res {
-          Err(e) => log(&e.as_string().unwrap_or_else(|| String::from("Error parsing file"))),
-          _ => { },
+          Err(e) => log(
+            &e.as_string()
+              .unwrap_or_else(|| String::from("Error parsing file")),
+          ),
+          _ => {}
         };
       }) as Box<dyn FnMut(_)>);
       file_reader.set_onload(Some(file_onload.as_ref().unchecked_ref()));
@@ -421,14 +468,24 @@ pub(crate) fn from_local_multiordermap(
   let document = window.document().expect("should have a document on window");
   let body = document.body().expect("document should have a body");
   // - create the input
-  let file_input: HtmlInputElement = unsafe { document.create_element("input").unchecked_unwrap_ok().dyn_into()? };
+  let file_input: HtmlInputElement = unsafe {
+    document
+      .create_element("input")
+      .unchecked_unwrap_ok()
+      .dyn_into()?
+  };
   file_input.set_type("file");
   unsafe {
-    file_input.set_attribute("multiple", "").unchecked_unwrap_ok();
+    file_input
+      .set_attribute("multiple", "")
+      .unchecked_unwrap_ok();
     file_input.set_attribute("hidden", "").unchecked_unwrap_ok();
-    file_input.set_attribute("accept", ".fits").unchecked_unwrap_ok();
+    file_input
+      .set_attribute("accept", ".fits")
+      .unchecked_unwrap_ok();
   }
-  file_input.add_event_listener_with_callback("change", file_input_action.as_ref().unchecked_ref())?;
+  file_input
+    .add_event_listener_with_callback("change", file_input_action.as_ref().unchecked_ref())?;
   file_input_action.forget();
   // - attach the input
   body.append_child(&file_input)?;
@@ -439,7 +496,7 @@ pub(crate) fn from_local_multiordermap(
   Ok(())
 }
 
-/// Open the file selection dialog and load the skymap fits file 
+/// Open the file selection dialog and load the skymap fits file
 /// (for security reasons, we cannot simply provide a path on the client machine).
 /// # Warning
 /// Because of security restriction, the call to this method
@@ -455,19 +512,31 @@ pub(crate) fn from_local_skymap(
 ) -> Result<(), JsValue> {
   // Create the file input action that will be fired by the event 'change'
   let file_input_action = Closure::wrap(Box::new(move |event: Event| {
-    let element = unsafe { event.target().unchecked_unwrap().dyn_into::<HtmlInputElement>().unchecked_unwrap_ok() };
-    let filelist = unsafe {  element.files().unchecked_unwrap() };
+    let element = unsafe {
+      event
+        .target()
+        .unchecked_unwrap()
+        .dyn_into::<HtmlInputElement>()
+        .unchecked_unwrap_ok()
+    };
+    let filelist = unsafe { element.files().unchecked_unwrap() };
     for i in 0..filelist.length() {
-      let file = unsafe {  filelist.get(i).unchecked_unwrap() };
+      let file = unsafe { filelist.get(i).unchecked_unwrap() };
       let file_name = file.name();
-      let file_reader = unsafe {  FileReader::new().unchecked_unwrap_ok() };
+      let file_reader = unsafe { FileReader::new().unchecked_unwrap_ok() };
       // There is a stream method, but I am not sure how to use it. I am so far going the easy way.
       match file_reader.read_as_array_buffer(&file) {
         Err(_) => log("Error reading file content"),
-        _ => { },
+        _ => {}
       };
       let file_onload = Closure::wrap(Box::new(move |event: Event| {
-        let file_reader: FileReader = unsafe { event.target().unchecked_unwrap().dyn_into().unchecked_unwrap_ok() };
+        let file_reader: FileReader = unsafe {
+          event
+            .target()
+            .unchecked_unwrap()
+            .dyn_into()
+            .unchecked_unwrap_ok()
+        };
         let file_content = unsafe { file_reader.result().unchecked_unwrap_ok() };
         let file_content: Vec<u8> = js_sys::Uint8Array::new(&file_content).to_vec();
         // log(&format!("File len {:?}", file_content.len()));
@@ -475,14 +544,24 @@ pub(crate) fn from_local_skymap(
         let (name, ext) = unsafe { file_name.rsplit_once('.').unchecked_unwrap() };
         let res = match ext {
           "fits" | "gz" => MOC::from_skymap_fits_file(
-            &file_content, skip_values_le, from_threshold, to_threshold,
-            asc, not_strict, split, revese_recursive_descent
+            &file_content,
+            skip_values_le,
+            from_threshold,
+            to_threshold,
+            asc,
+            not_strict,
+            split,
+            revese_recursive_descent,
           ),
           _ => unreachable!(), // since file_input.set_attribute("accept", ".fits");
-        }.and_then(|moc| MOC::add_to_store(name, moc));
+        }
+        .and_then(|moc| MOC::add_to_store(name, moc));
         match res {
-          Err(e) => log(&e.as_string().unwrap_or_else(|| String::from("Error parsing file"))),
-          _ => { },
+          Err(e) => log(
+            &e.as_string()
+              .unwrap_or_else(|| String::from("Error parsing file")),
+          ),
+          _ => {}
         };
       }) as Box<dyn FnMut(_)>);
       file_reader.set_onload(Some(file_onload.as_ref().unchecked_ref()));
@@ -497,14 +576,24 @@ pub(crate) fn from_local_skymap(
   let document = window.document().expect("should have a document on window");
   let body = document.body().expect("document should have a body");
   // - create the input
-  let file_input: HtmlInputElement = unsafe { document.create_element("input").unchecked_unwrap_ok().dyn_into()? };
+  let file_input: HtmlInputElement = unsafe {
+    document
+      .create_element("input")
+      .unchecked_unwrap_ok()
+      .dyn_into()?
+  };
   file_input.set_type("file");
   unsafe {
-    file_input.set_attribute("multiple", "").unchecked_unwrap_ok();
+    file_input
+      .set_attribute("multiple", "")
+      .unchecked_unwrap_ok();
     file_input.set_attribute("hidden", "").unchecked_unwrap_ok();
-    file_input.set_attribute("accept", ".fits").unchecked_unwrap_ok();
+    file_input
+      .set_attribute("accept", ".fits")
+      .unchecked_unwrap_ok();
   }
-  file_input.add_event_listener_with_callback("change", file_input_action.as_ref().unchecked_ref())?;
+  file_input
+    .add_event_listener_with_callback("change", file_input_action.as_ref().unchecked_ref())?;
   file_input_action.forget();
   // - attach the input
   body.append_child(&file_input)?;
@@ -515,7 +604,6 @@ pub(crate) fn from_local_skymap(
   Ok(())
 }
 
-
 /// Create a temporary link to trigger the download of the given content.
 ///
 /// # Arguments
@@ -523,12 +611,7 @@ pub(crate) fn from_local_skymap(
 /// * ext: `.fits` , `.ascii` or `.json`
 /// * mime: `application/fits`, `text/plain`, `application/json`, ...
 /// * data: file content
-fn to_file(
-  name: &str,
-  ext: &str, 
-  mime: &str,
-  data: Box<[u8]>
-) -> Result<(), JsValue> {
+fn to_file(name: &str, ext: &str, mime: &str, data: Box<[u8]>) -> Result<(), JsValue> {
   // Set filename
   let mut filename = String::from(name);
   if !filename.ends_with(ext) {
@@ -540,10 +623,10 @@ fn to_file(
   let bytes = Array::new();
   bytes.push(&data);
   let mut blob_prop = BlobPropertyBag::new();
-  blob_prop.type_(mime);
+  blob_prop.set_type(mime);
 
   let blob = Blob::new_with_u8_array_sequence_and_options(&bytes, &blob_prop)?;
-  
+
   // Generate the URL with the attached data
   let url = Url::create_object_url_with_blob(&blob)?;
 
