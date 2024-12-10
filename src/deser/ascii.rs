@@ -1,31 +1,37 @@
-use std::io::{self, BufRead, Lines, Write};
-use std::marker::PhantomData;
-use std::str::FromStr;
+use std::{
+  io::{self, BufRead, Lines, Write},
+  marker::PhantomData,
+  str::FromStr,
+};
 
 use byteorder::WriteBytesExt;
+use log::error;
 use quick_error::quick_error;
 
-use nom::branch::alt;
-use nom::character::complete::char;
-use nom::character::complete::{digit1, multispace0};
-use nom::combinator::{cut, map, map_res, opt};
-use nom::error::{convert_error, FromExternalError, ParseError, VerboseError};
-use nom::multi::many1;
-use nom::sequence::{preceded, terminated, tuple};
-use nom::IResult;
+use nom::{
+  branch::alt,
+  character::complete::{char, digit1, multispace0},
+  combinator::{cut, map, map_res, opt},
+  error::{convert_error, FromExternalError, ParseError, VerboseError},
+  multi::many1,
+  sequence::{preceded, terminated, tuple},
+  IResult,
+};
 
-use crate::elem::{cell::Cell, cellcellrange::CellOrCellRange, cellrange::CellRange};
-use crate::elemset::cellcellrange::{CellOrCellRanges, MocCellOrCellRanges};
-use crate::idx::Idx;
-use crate::moc::{
-  cellcellrange::CellOrCellRangeMOC, CellOrCellRangeMOCIterator, HasMaxDepth, MOCProperties,
-  NonOverlapping, ZSorted,
+use crate::{
+  elem::{cell::Cell, cellcellrange::CellOrCellRange, cellrange::CellRange},
+  elemset::cellcellrange::{CellOrCellRanges, MocCellOrCellRanges},
+  idx::Idx,
+  moc::{
+    cellcellrange::CellOrCellRangeMOC, CellOrCellRangeMOCIterator, HasMaxDepth, MOCProperties,
+    NonOverlapping, ZSorted,
+  },
+  moc2d::{
+    cellcellrange::{CellOrCellRangeMOC2, CellOrCellRangeMOC2Elem},
+    CellOrCellRangeMOC2ElemIt, CellOrCellRangeMOC2Iterator,
+  },
+  qty::MocQty,
 };
-use crate::moc2d::{
-  cellcellrange::{CellOrCellRangeMOC2, CellOrCellRangeMOC2Elem},
-  CellOrCellRangeMOC2ElemIt, CellOrCellRangeMOC2Iterator,
-};
-use crate::qty::MocQty;
 
 quick_error! {
   #[derive(Debug)]
@@ -539,9 +545,9 @@ impl<T: Idx, Q: MocQty<T>, R: BufRead> Iterator for MOCFromAsciiStream<T, Q, R> 
                     return Some(CellOrCellRange::Cell(Cell::new(depth, idx)));
                   }
                 }
-                eprintln!("Error parsing ascii stream at line: {:?}", line);
+                error!("Error parsing ascii stream at line: {:?}", line);
               }
-              _ => eprintln!(
+              _ => error!(
                 "Error parsing ascii stream at line: {:?}. Separator '/' not found.",
                 line
               ),
@@ -549,7 +555,7 @@ impl<T: Idx, Q: MocQty<T>, R: BufRead> Iterator for MOCFromAsciiStream<T, Q, R> 
           }
         }
         Ok(None) => return None,
-        Err(e) => eprintln!("Error reading ascii stream: {:?}", e),
+        Err(e) => error!("Error reading ascii stream: {:?}", e),
       }
     }
   }

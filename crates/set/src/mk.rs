@@ -7,6 +7,7 @@ use std::{
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use clap::Parser;
+use log::warn;
 use memmap::MmapMut;
 
 use moclib::{
@@ -66,7 +67,7 @@ impl Make {
       .enumerate()
       .filter_map(|(i, line)| match line.trim().split_once(self.separator) {
         None => {
-          eprintln!(
+          warn!(
             "Line {} ignored. No delimiter '{}' found in {}.",
             i, self.separator, line
           );
@@ -75,7 +76,7 @@ impl Make {
         Some((id, path)) => match id.trim().parse::<i64>() {
           Ok(id) => Some((id, PathBuf::from(path.trim()))),
           Err(e) => {
-            eprintln!(
+            warn!(
               "Line {} ignored. Error parsing identifier '{}': {}",
               i, id, e
             );
@@ -145,7 +146,7 @@ impl Make {
       // TODO/WARNING: part of code duplicated with 'append.rs' => to be clean (e.g. passing a closure)!
       from_byte = match from_fits_file(path.clone()) {
         Err(e) => {
-          eprintln!("MOC id: {}; path: {:?}; ignored. Cause: {:?}", id, path, e);
+          warn!("MOC id: {}; path: {:?}; ignored. Cause: {:?}", id, path, e);
           from_byte
         }
         Ok(MocIdxType::<BufReader<File>>::U16(MocQtyType::<u16, BufReader<File>>::Hpx(moc))) => {
@@ -204,7 +205,7 @@ impl Make {
           }
         }
         _ => {
-          eprintln!(
+          warn!(
             "MOC id: {}; path: {:?}; ignored. Cause: MOC type not supported.",
             id, path
           );

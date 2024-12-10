@@ -8,6 +8,7 @@ use std::{
   str::{self, FromStr},
 };
 
+use log::error;
 use structopt::StructOpt;
 
 use healpix::nested::Layer;
@@ -440,7 +441,7 @@ impl From {
           move |line: std::io::Result<String>| match line2cone_params(&separator, line) {
             Ok(lonlatrad) => Some(lonlatrad),
             Err(e) => {
-              eprintln!("Error reading or parsing line: {:?}", e);
+              error!("Error reading or parsing line: {:?}", e);
               None
             }
           };
@@ -734,7 +735,7 @@ impl From {
         let line2moc = move |line: std::io::Result<String>| match line2m(depth, &separator, line) {
           Ok(moc) => Some(moc),
           Err(e) => {
-            eprintln!("Error reading or parsing line: {:?}", e);
+            error!("Error reading or parsing line: {:?}", e);
             None
           }
         };
@@ -783,7 +784,7 @@ impl From {
         let line2pos = move |line: std::io::Result<String>| match line2coos(&separator, line) {
           Ok(lonlat) => Some(lonlat),
           Err(e) => {
-            eprintln!("Error reading or parsing line: {:?}", e);
+            error!("Error reading or parsing line: {:?}", e);
             None
           }
         };
@@ -873,7 +874,7 @@ impl From {
           ) {
             Ok(uniq_val_dens) => Some(uniq_val_dens),
             Err(e) => {
-              eprintln!("Error reading or parsing line: {:?}", e);
+              error!("Error reading or parsing line: {:?}", e);
               None
             }
           };
@@ -903,7 +904,7 @@ impl From {
             move |line: std::io::Result<String>| match line2uvd_from_val(&separator, depth, line) {
               Ok(uniq_val_dens) => Some(uniq_val_dens),
               Err(e) => {
-                eprintln!("Error reading or parsing line: {:?}", e);
+                error!("Error reading or parsing line: {:?}", e);
                 None
               }
             };
@@ -998,7 +999,7 @@ impl From {
         {
           Ok(t) => Some(t),
           Err(e) => {
-            eprintln!("Error reading or parsing line: {:?}", e);
+            error!("Error reading or parsing line: {:?}", e);
             None
           }
         };
@@ -1050,7 +1051,7 @@ impl From {
           move |line: std::io::Result<String>| match line2tr(&separator, &time, line) {
             Ok(trange) => Some(trange),
             Err(e) => {
-              eprintln!("Error reading or parsing line: {:?}", e);
+              error!("Error reading or parsing line: {:?}", e);
               None
             }
           };
@@ -1116,7 +1117,7 @@ impl From {
         ) {
           Ok(lonlat) => Some(lonlat),
           Err(e) => {
-            eprintln!("Error reading or parsing line: {:?}", e);
+            error!("Error reading or parsing line: {:?}", e);
             None
           }
         };
@@ -1183,7 +1184,7 @@ impl From {
           move |line: std::io::Result<String>| match line2trcoos(&separator, &time, layer, line) {
             Ok(lonlat) => Some(lonlat),
             Err(e) => {
-              eprintln!("Error reading or parsing line: {:?}", e);
+              error!("Error reading or parsing line: {:?}", e);
               None
             }
           };
@@ -1211,11 +1212,11 @@ impl From {
         let line2freq = move |line: std::io::Result<String>| match line.map(|s| s.parse::<f64>()) {
           Ok(Ok(f)) => Some(f),
           Ok(Err(e)) => {
-            eprintln!("Error reading or parsing line: {:?}", e);
+            error!("Error reading or parsing line: {:?}", e);
             None
           }
           Err(e) => {
-            eprintln!("Error reading or parsing line: {:?}", e);
+            error!("Error reading or parsing line: {:?}", e);
             None
           }
         };
@@ -1264,7 +1265,7 @@ impl From {
         let line2trange = move |line: std::io::Result<String>| match line2tr(&separator, line) {
           Ok(trange) => Some(trange),
           Err(e) => {
-            eprintln!("Error reading or parsing line: {:?}", e);
+            error!("Error reading or parsing line: {:?}", e);
             None
           }
         };

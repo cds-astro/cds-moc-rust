@@ -1,41 +1,45 @@
 //! This module deals with MOC serialization/deserialization in the
 //! [FITS standard](https://fits.gsfc.nasa.gov/standard40/fits_standard40aa-le.pdf).
 
-use std::io::{BufRead, Cursor, Write};
-use std::marker::PhantomData;
-use std::ops::Range;
+use std::{
+  io::{BufRead, Cursor, Write},
+  marker::PhantomData,
+  ops::Range,
+};
 
 use byteorder::BigEndian;
+use log::warn;
 
-use crate::deser::fits::{
-  common::{
-    check_keyword_and_parse_uint_val, check_keyword_and_val, consume_primary_hdu,
-    next_36_chunks_of_80_bytes, write_primary_hdu, write_uint_mandatory_keyword_record,
+use crate::{
+  deser::fits::{
+    common::{
+      check_keyword_and_parse_uint_val, check_keyword_and_val, consume_primary_hdu,
+      next_36_chunks_of_80_bytes, write_primary_hdu, write_uint_mandatory_keyword_record,
+    },
+    error::FitsError,
+    keywords::{
+      CoordSys, FitsCard, MocDim, MocId, MocKeywords, MocKeywordsMap, MocOrdF, MocOrdS, MocOrdT,
+      MocOrder, MocTool, MocVers, Ordering, TForm1, TType1, TimeSys,
+    },
   },
-  error::FitsError,
-  keywords::{
-    CoordSys, FitsCard, MocDim, MocId, MocKeywords, MocKeywordsMap, MocOrdF, MocOrdS, MocOrdT,
-    MocOrder, MocTool, MocVers, Ordering, TForm1, TType1, TimeSys,
+  elem::cell::Cell,
+  elemset::{
+    cell::{Cells, MocCells},
+    range::MocRanges,
   },
+  idx::Idx,
+  moc::{
+    cell::CellMOC,
+    range::{op::convert::convert_to_u64, RangeMOC, RangeMocIter},
+    CellMOCIntoIterator, CellMOCIterator, HasMaxDepth, MOCProperties, NonOverlapping,
+    RangeMOCIterator, ZSorted,
+  },
+  moc2d::{
+    range::{RangeMOC2, RangeMOC2Elem},
+    HasTwoMaxDepth, MOC2Properties, RangeMOC2ElemIt, RangeMOC2IntoIterator, RangeMOC2Iterator,
+  },
+  qty::{Frequency, Hpx, MocQty, MocableQty, Time},
 };
-use crate::elem::cell::Cell;
-use crate::elemset::{
-  cell::{Cells, MocCells},
-  range::MocRanges,
-};
-use crate::idx::Idx;
-use crate::moc::range::op::convert::convert_to_u64;
-use crate::moc::{
-  cell::CellMOC,
-  range::{RangeMOC, RangeMocIter},
-  CellMOCIntoIterator, CellMOCIterator, HasMaxDepth, MOCProperties, NonOverlapping,
-  RangeMOCIterator, ZSorted,
-};
-use crate::moc2d::{
-  range::{RangeMOC2, RangeMOC2Elem},
-  HasTwoMaxDepth, MOC2Properties, RangeMOC2ElemIt, RangeMOC2IntoIterator, RangeMOC2Iterator,
-};
-use crate::qty::{Frequency, Hpx, MocQty, MocableQty, Time};
 
 pub mod common;
 pub mod error;
@@ -594,7 +598,10 @@ pub fn from_fits_ivoa_custom<R: BufRead>(
         if let Some(previous_mkw) = moc_kws.insert(mkw?) {
           // A FITS keyword MUST BE uniq (I may be more relax here, taking the last one and not complaining)
           // return Err(FitsError::MultipleKeyword(previous_mkw.keyword_str().to_string()))
-          eprintln!("WARNING: Keyword '{}' found more than once in a same HDU! We use the first occurrence.", previous_mkw.keyword_str());
+          warn!(
+            "Keyword '{}' found more than once in a same HDU! We use the first occurrence.",
+            previous_mkw.keyword_str()
+          );
           moc_kws.insert(previous_mkw);
         }
         // else keyword added without error
@@ -993,8 +1000,8 @@ where
   R: BufRead,
 {
   if depth_max > Hpx::<T>::MAX_DEPTH {
-    eprintln!(
-      "WARNING: Wrong depth_max {}. Reset to {}",
+    warn!(
+      "Wrong depth_max {}. Reset to {}",
       depth_max,
       Hpx::<T>::MAX_DEPTH
     );

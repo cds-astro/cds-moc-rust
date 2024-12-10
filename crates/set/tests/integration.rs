@@ -11,7 +11,7 @@ fn integration_test() {
     .arg("cd resources/tests && ./test.bash")
     .output()
     .expect("failed to execute process");
-  // eprintln!("Stderr: {:?}", String::from_utf8(output.stderr));
+  // println!("Stderr: {:?}", String::from_utf8(output.stderr));
   assert!(output.status.success(), "Output status: {}", output.status);
   // We double check to be sure that we reach the end of the script
   assert_eq!(output.stdout, b"Everything seems OK :)\n");

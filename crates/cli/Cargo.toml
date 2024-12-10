@@ -21,6 +21,7 @@ bench = false
 test = false
 
 [dependencies]
+log = "0.4"
 moclib = { package = "moc", path = "../.." }
 num = "0.4"
 structopt = "0.3"

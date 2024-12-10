@@ -1,25 +1,31 @@
-use std::io::{self, BufRead, BufReader, Read, Seek};
-use std::mem::size_of;
+use std::{
+  io::{self, BufRead, BufReader, Read, Seek},
+  mem::size_of,
+};
 
 use byteorder::{BigEndian, ReadBytesExt};
+use log::warn;
+
 use healpix::depth;
 
-use crate::deser::{
-  fits::{
-    common::{
-      check_keyword_and_get_str_val, check_keyword_and_parse_uint_val, check_keyword_and_val,
-      consume_primary_hdu, next_36_chunks_of_80_bytes,
+use crate::{
+  deser::{
+    fits::{
+      common::{
+        check_keyword_and_get_str_val, check_keyword_and_parse_uint_val, check_keyword_and_val,
+        consume_primary_hdu, next_36_chunks_of_80_bytes,
+      },
+      error::FitsError,
+      keywords::{FitsCard, IndexSchema, MocKeywords, MocKeywordsMap, MocOrder, Nside, Ordering},
     },
-    error::FitsError,
-    keywords::{FitsCard, IndexSchema, MocKeywords, MocKeywordsMap, MocOrder, Nside, Ordering},
+    gz::{is_gz, uncompress},
   },
-  gz::{is_gz, uncompress},
+  elem::{
+    cell::Cell, cellrange::CellRange, range::MocRange, valuedcell::valued_cells_to_moc_with_opt,
+  },
+  moc::range::RangeMOC,
+  qty::Hpx,
 };
-use crate::elem::{
-  cell::Cell, cellrange::CellRange, range::MocRange, valuedcell::valued_cells_to_moc_with_opt,
-};
-use crate::moc::range::RangeMOC;
-use crate::qty::Hpx;
 
 /// We expect the FITS file to be a BINTABLE containing a skymap.
 /// [Here](https://gamma-astro-data-formats.readthedocs.io/en/latest/skymaps/healpix/index.html)
@@ -138,7 +144,7 @@ fn from_fits_skymap_internal<R: BufRead>(
       String::from("starts with 'PROB'"),
       String::from(ttype1),
     );
-    eprintln!("WARNING: {}", err);
+    warn!("{}", err);
   }
   let tform1 = check_keyword_and_get_str_val(it80.next().unwrap(), b"TFORM1 ")?;
   let (is_f64, n_pack) = if tform1 == "D" || tform1 == "1D" {
@@ -168,7 +174,10 @@ fn from_fits_skymap_internal<R: BufRead>(
         if let Some(previous_mkw) = moc_kws.insert(mkw?) {
           // A FITS keyword MUST BE uniq (I may be more relax here, taking the last one and not complaining)
           // return Err(FitsError::MultipleKeyword(previous_mkw.keyword_str().to_string()))
-          eprintln!("WARNING: Keyword '{}' found more than once in a same HDU! We use the first occurrence.", previous_mkw.keyword_str());
+          warn!(
+            "Keyword '{}' found more than once in a same HDU! We use the first occurrence.",
+            previous_mkw.keyword_str()
+          );
           moc_kws.insert(previous_mkw);
         }
         // else keyword added without error
@@ -183,7 +192,7 @@ fn from_fits_skymap_internal<R: BufRead>(
   moc_kws.check_pixtype()?;
   // moc_kws.check_ordering(Ordering::Nested)?;
   if let Err(e) = moc_kws.check_coordsys() {
-    eprintln!("WARNING: {}", e);
+    warn!("{}", e);
   }
   moc_kws.check_index_schema(IndexSchema::Implicit)?;
   // - get MOC depth
