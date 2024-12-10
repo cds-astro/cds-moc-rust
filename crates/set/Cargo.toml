@@ -23,7 +23,7 @@ test = false
 [dependencies]
 log = "0.4"
 moclib = { package = "moc", path = "../.." }
-cdshealpix = "0.6.8"
+cdshealpix = "0.7"
 memmap = { package = "memmap2", version = "0.5" }
 clap = { version = "4.4", features = ["derive"] }
 byteorder = "1"
