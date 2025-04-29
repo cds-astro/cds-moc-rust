@@ -11,7 +11,7 @@ use std::{
 
 use clap::Parser;
 
-use cdshealpix::{best_starting_depth, has_best_starting_depth, nested};
+use healpix::{best_starting_depth, has_best_starting_depth, nested};
 
 use moclib::moc::range::CellSelection;
 use moclib::{

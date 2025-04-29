@@ -21,14 +21,15 @@ bench = false
 test = false
 
 [dependencies]
-log = "0.4"
 moclib = { package = "moc", path = "../.." }
-num = "0.4"
-structopt = "0.3"
-healpix = { package = "cdshealpix", version = "0.7" }
-mapproj = "0.3.0"
-rayon = "1.5.1"
-time = { version = "0.3.3", features = ["parsing"] }
+healpix = { workspace = true }
+log = { workspace = true }
+mapproj = { workspace = true }
+rayon = { workspace = true }
+num = { workspace = true }
+# Other dependencies
+structopt = "0.3.26"# To be replaced by clap!!
+time = { version = "0.3.41", features = ["parsing"] }
 
 [package.metadata.deb]
 maintainer = "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"

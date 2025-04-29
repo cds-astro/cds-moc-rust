@@ -21,13 +21,14 @@ bench = false
 test = false
 
 [dependencies]
-log = "0.4"
 moclib = { package = "moc", path = "../.." }
-cdshealpix = "0.7"
-memmap = { package = "memmap2", version = "0.5" }
-clap = { version = "4.4", features = ["derive"] }
-byteorder = "1"
-rayon = "1.8.1"
+healpix = { workspace = true }
+byteorder = { workspace = true }
+log = { workspace = true }
+rayon = { workspace = true }
+# other dependencies
+clap = { version = "4.5.37", features = ["derive"] }
+memmap = { package = "memmap2", version = "0.9.5" }
 
 [package.metadata.deb]
 maintainer = "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"

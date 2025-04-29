@@ -8,7 +8,6 @@ use std::{
 
 use clap::Parser;
 
-use moclib::moc::CellHpxMOCIterator;
 use moclib::{
   deser::{
     ascii::to_ascii_ivoa,
@@ -18,7 +17,7 @@ use moclib::{
   idx::Idx,
   moc::{
     range::{op::convert::convert_to_u64, RangeRefMocIter},
-    CellMOCIterator, RangeMOCIterator,
+    CellHpxMOCIterator, CellMOCIterator, RangeMOCIterator,
   },
   qty::{Hpx, MocQty},
 };
