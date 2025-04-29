@@ -84,8 +84,10 @@ pub(super) fn next_36_chunks_of_80_bytes<'a, R: BufRead>(
   reader: &'a mut R,
   header_block: &'a mut [u8; 2880],
 ) -> Result<ChunksExact<'a, u8>, FitsError> {
-  reader.read_exact(header_block)?;
-  Ok(header_block.chunks_exact(80))
+  reader
+    .read_exact(header_block)
+    .map_err(FitsError::Io)
+    .map(|()| header_block.chunks_exact(80))
 }
 
 fn contains_end<'a, I: Iterator<Item = &'a [u8]>>(chunks_of_80: &'a mut I) -> bool {
@@ -103,9 +105,9 @@ pub(super) fn check_keyword_and_val(
   expected_kw: &[u8],
   expected_val: &[u8],
 ) -> Result<(), FitsError> {
-  check_expected_keyword(keyword_record, expected_kw)?;
-  check_for_value_indicator(keyword_record)?;
-  check_expected_value(keyword_record, expected_val)
+  check_expected_keyword(keyword_record, expected_kw)
+    .and_then(|()| check_for_value_indicator(keyword_record))
+    .and_then(|()| check_expected_value(keyword_record, expected_val))
 }
 
 pub(super) fn check_keyword_and_parse_uint_val<T>(
@@ -115,19 +117,21 @@ pub(super) fn check_keyword_and_parse_uint_val<T>(
 where
   T: Into<u64> + FromStr<Err = ParseIntError>,
 {
-  check_expected_keyword(keyword_record, expected_kw)?;
-  check_for_value_indicator(keyword_record)?;
-  parse_uint_val::<T>(keyword_record)
+  check_expected_keyword(keyword_record, expected_kw)
+    .and_then(|()| check_for_value_indicator(keyword_record))
+    .and_then(|()| parse_uint_val::<T>(keyword_record))
 }
 
 pub(super) fn check_keyword_and_get_str_val<'a>(
   keyword_record: &'a [u8],
   expected_kw: &[u8],
 ) -> Result<&'a str, FitsError> {
-  check_expected_keyword(keyword_record, expected_kw)?;
-  check_for_value_indicator(keyword_record)?;
-  // We go unsafe because FITS headers are not supposed to contain non-ASCII chars
-  get_str_val_no_quote(keyword_record).map(|bytes| unsafe { str::from_utf8_unchecked(bytes) })
+  check_expected_keyword(keyword_record, expected_kw)
+    .and_then(|()| check_for_value_indicator(keyword_record))
+    .and_then(|()| {
+      // We go unsafe because FITS headers are not supposed to contain non-ASCII chars
+      get_str_val_no_quote(keyword_record).map(|bytes| unsafe { str::from_utf8_unchecked(bytes) })
+    })
 }
 
 pub(super) fn check_expected_keyword(

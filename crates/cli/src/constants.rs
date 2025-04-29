@@ -47,7 +47,7 @@ fn print_hpx_info() {
   );
   for depth in 0..=Hpx::<u64>::MAX_DEPTH {
     let ncells = Hpx::<u64>::n_cells(depth);
-    let area_rad2 = (4.0 * std::f64::consts::PI) / (ncells as f64);
+    let area_rad2 = std::f64::consts::PI / ((ncells >> 2) as f64);
     let side_deg = area_rad2.sqrt().to_degrees();
     if side_deg < 1.0 / MAS {
       println!(

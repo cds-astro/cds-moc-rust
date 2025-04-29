@@ -14,9 +14,9 @@ use crate::ranges::Ranges;
 // Iterator => possibility to perform operations on very large ST-MOC with a tiny
 //             memory footprint
 // So far the code is much more complex that I wanted.
-// One reason, besides the fact that we are working on iterator, is that I wnated to avoid:
+// One reason, besides the fact that we are working on iterator, is that I wanted to avoid:
 // - having to compute several time the same moc_2 union
-// - post process to merge moc_1 havong a same moc_2
+// - post process to merge moc_1 having a same moc_2
 // I should review this code an try to remove duplicated parts
 
 /// Performs a logical `OR` between the two input iterators of ranges2.
