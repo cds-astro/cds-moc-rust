@@ -626,7 +626,13 @@ pub fn from_fits_ivoa_custom<R: BufRead>(
         Some(MocKeywords::MOCDim(MocDim::Space)) => {
           let depth_max = match moc_kws.get::<MocOrdS>() {
             Some(MocKeywords::MOCOrdS(MocOrdS { depth })) => *depth,
-            _ => return Err(FitsError::MissingKeyword(MocOrder::keyword_string())),
+            _ => match moc_kws.get::<MocOrder>() {
+              Some(MocKeywords::MOCOrder(MocOrder { depth })) => {
+                warn!("Keyword 'MOCORDER' deprecated in version 2.0. Use 'MOCORD_S' instead.");
+                *depth
+              }
+              _ => return Err(FitsError::MissingKeyword(MocOrdS::keyword_string())),
+            },
           };
           moc_kws.check_coordsys()?;
           match moc_kws.get::<Ordering>() {
@@ -800,7 +806,7 @@ fn load_s_moc_nuniq<R: BufRead>(
       ))))
     }
     (Some(MocKeywords::TForm1(tform)), nb) => Err(FitsError::UncompatibleKeywordContent(
-      format!("NAXIS1  = {}", nb),
+      format!("TFORM1  = {}", nb),
       tform.to_string(),
     )),
     (None, _) => Err(FitsError::MissingKeyword(TForm1::keyword_string())),

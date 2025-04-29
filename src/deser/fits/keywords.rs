@@ -381,10 +381,10 @@ impl FitsCard for TForm1 {
 
   fn specific_parse_value(keyword_record: &[u8]) -> Result<Self, FitsError> {
     match get_str_val_no_quote(keyword_record)? {
-      b"1B" => Ok(TForm1::OneB),
-      b"1I" => Ok(TForm1::OneI),
-      b"1J" => Ok(TForm1::OneJ),
-      b"1K" => Ok(TForm1::OneK),
+      b"1B" | b"B" => Ok(TForm1::OneB),
+      b"1I" | b"I" => Ok(TForm1::OneI),
+      b"1J" | b"J" => Ok(TForm1::OneJ),
+      b"1K" | b"K" => Ok(TForm1::OneK),
       b"2K" => Ok(TForm1::TwoK),
       parsed_val => Err(Self::predefine_val_err(parsed_val, &[b"1I", b"1J", b"1K"])),
     }
