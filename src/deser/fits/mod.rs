@@ -810,7 +810,7 @@ fn load_s_moc_nuniq<R: BufRead>(
       tform.to_string(),
     )),
     (None, _) => Err(FitsError::MissingKeyword(TForm1::keyword_string())),
-    (_, _) => unreachable!(), // Except if a bug in the code, we are sure to get a TForm1
+    (_, _) => unreachable!(), // Except if there is a bug in the code, we are sure to get a TForm1
   }
 }
 
@@ -1017,8 +1017,17 @@ where
   for _ in 0..n_elems {
     let uniq = T::read::<_, BigEndian>(&mut reader)?;
     if uniq > T::zero() {
-      // Bug in Aladin writting extra uniq of values set to 0!!
-      v.push(Cell::from_uniq_hpx(uniq));
+      // Bug in Aladin writing extra uniq of values set to 0!!
+      let cell = Cell::from_uniq_hpx(uniq);
+      // Bug in old versions of the Java MOC lib writing values deeper than depth_max
+      if cell.depth > depth_max {
+        warn!(
+          "Wrong NUNIQ: depth {} larger than the MOC depth '{}': the NUNIQ {} is ignored!",
+          cell.depth, depth_max, uniq
+        )
+      } else {
+        v.push(cell);
+      }
     }
   }
   v.sort_by(|a, b| a.flat_cmp::<Hpx<T>>(b));
