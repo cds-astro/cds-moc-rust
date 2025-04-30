@@ -10,7 +10,6 @@
 //! very active.
 
 use std::{
-  convert,
   fs::{self, File},
   io::{BufRead, BufReader, Cursor},
   ops::Range,
@@ -133,16 +132,16 @@ impl U64MocStore {
 
   /// Copy the moc at the given index
   pub fn copy(&self, index: usize) -> Result<(), String> {
-    store::copy_moc(index).and_then(convert::identity)
+    store::copy_moc(index)
   }
 
   /// Remove from the store the MOC at the given index.
   pub fn drop(&self, index: usize) -> Result<(), String> {
-    store::drop(index).and_then(convert::identity).map(|_| ())
+    store::drop(index).map(|_| ())
   }
 
   pub fn drop_smoc(&self, index: usize) -> Result<Option<SMOC>, String> {
-    store::drop(index)?.and_then(|opt_moc| {
+    store::drop(index).and_then(|opt_moc| {
       opt_moc
         .map(|moc| match moc {
           InternalMoc::Space(moc) => Ok(moc),
@@ -153,7 +152,7 @@ impl U64MocStore {
   }
 
   pub fn drop_tmoc(&self, index: usize) -> Result<Option<TMOC>, String> {
-    store::drop(index)?.and_then(|opt_moc| {
+    store::drop(index).and_then(|opt_moc| {
       opt_moc
         .map(|moc| match moc {
           InternalMoc::Time(moc) => Ok(moc),
@@ -164,7 +163,7 @@ impl U64MocStore {
   }
 
   pub fn drop_fmoc(&self, index: usize) -> Result<Option<FMOC>, String> {
-    store::drop(index)?.and_then(|opt_moc| {
+    store::drop(index).and_then(|opt_moc| {
       opt_moc
         .map(|moc| match moc {
           InternalMoc::Frequency(moc) => Ok(moc),
@@ -175,7 +174,7 @@ impl U64MocStore {
   }
 
   pub fn drop_stmoc(&self, index: usize) -> Result<Option<STMOC>, String> {
-    store::drop(index)?.and_then(|opt_moc| {
+    store::drop(index).and_then(|opt_moc| {
       opt_moc
         .map(|moc| match moc {
           InternalMoc::TimeSpace(moc) => Ok(moc),
@@ -2110,6 +2109,27 @@ impl U64MocStore {
 
   pub fn degrade(&self, index: usize, new_depth: u8) -> Result<usize, String> {
     Op1::Degrade { new_depth }.exec(index)
+  }
+
+  pub fn refine(&self, index: usize, new_depth: u8) -> Result<(), String> {
+    let op = |moc: &mut InternalMoc| match moc {
+      InternalMoc::Space(moc) => {
+        moc.refine(new_depth);
+        Ok(())
+      }
+      InternalMoc::Time(moc) => {
+        moc.refine(new_depth);
+        Ok(())
+      }
+      InternalMoc::Frequency(moc) => {
+        moc.refine(new_depth);
+        Ok(())
+      }
+      _ => Err(String::from(
+        "Can't 'refine' with a single new depth on a MOC different from a S-MOC, T-MOC or F-MOC",
+      )),
+    };
+    store::exec_on_one_readwrite_moc(index, op)
   }
 
   pub fn extend(&self, index: usize) -> Result<usize, String> {

@@ -5,7 +5,7 @@ use crate::moc::{HasMaxDepth, MOCProperties, NonOverlapping, RangeMOCIterator, Z
 use crate::qty::MocQty;
 
 /// Decorates the given iterator with an iterator that panics (while iterating) if the input
-/// iterator is not made of sorted, non overlaping ranges.
+/// iterator is not made of sorted, non overlapping ranges.
 pub fn check<T, Q, I>(it: I) -> CheckedIterator<T, Q, I>
 where
   T: Idx,

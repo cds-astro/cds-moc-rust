@@ -347,6 +347,10 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
     RangeMOC::new(depth_max, ranges)
   }
 
+  pub fn refine(&mut self, new_depth: u8) {
+    self.depth_max = self.depth_max.max(new_depth);
+  }
+
   /// Returns an iterator over the ranges of self that are overlapping the rhs range MOC
   pub fn overlapped_by_iter<'a>(&'a self, rhs: &'a RangeMOC<T, Q>) -> OverlappedByIter<'a, T, Q> {
     let l = &self.ranges.0 .0;

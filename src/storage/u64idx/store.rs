@@ -22,12 +22,12 @@ where
 
 fn exec_on_readwrite_store<R, F>(op: F) -> Result<R, String>
 where
-  F: FnOnce(RwLockWriteGuard<'_, Slab<(u8, InternalMoc)>>) -> R,
+  F: FnOnce(RwLockWriteGuard<'_, Slab<(u8, InternalMoc)>>) -> Result<R, String>,
 {
   STORE
     .write()
-    .map(op)
     .map_err(|e| format!("Write lock poisoned: {}", e))
+    .and_then(op)
 }
 
 pub(crate) fn exec_on_one_readonly_moc<T, F>(index: usize, op: F) -> Result<T, String>
@@ -37,6 +37,18 @@ where
   exec_on_readonly_store(|store| {
     store
       .get(index)
+      .ok_or_else(|| format!("MOC at index '{}' not found", index))
+      .and_then(|(_, moc)| op(moc))
+  })
+}
+
+pub(crate) fn exec_on_one_readwrite_moc<T, F>(index: usize, op: F) -> Result<T, String>
+where
+  F: FnOnce(&mut InternalMoc) -> Result<T, String>,
+{
+  exec_on_readwrite_store(|mut store| {
+    store
+      .get_mut(index)
       .ok_or_else(|| format!("MOC at index '{}' not found", index))
       .and_then(|(_, moc)| op(moc))
   })
@@ -78,11 +90,11 @@ where
 
 /// Add a new MOC to the store, retrieve the index at which it has been inserted
 pub(crate) fn add<T: Into<InternalMoc>>(moc: T) -> Result<usize, String> {
-  exec_on_readwrite_store(|mut store| store.insert((1, moc.into())))
+  exec_on_readwrite_store(|mut store| Ok(store.insert((1, moc.into()))))
 }
 
 /// Add a new MOC to the store, retrieve the index at which it has been inserted
-pub(crate) fn copy_moc(index: usize) -> Result<Result<(), String>, String> {
+pub(crate) fn copy_moc(index: usize) -> Result<(), String> {
   exec_on_readwrite_store(|mut store| {
     store
       .get_mut(index)
@@ -101,7 +113,7 @@ pub(crate) fn copy_moc(index: usize) -> Result<Result<(), String>, String> {
 }
 
 /// Drop and return the content of the store at the given index.
-pub(crate) fn drop(index: usize) -> Result<Result<Option<InternalMoc>, String>, String> {
+pub(crate) fn drop(index: usize) -> Result<Option<InternalMoc>, String> {
   exec_on_readwrite_store(move |mut store| {
     let count = store
       .get_mut(index)
@@ -172,10 +184,12 @@ where
   let mut mocs = exec_on_one_readonly_moc(index, op)?;
   // Then use the write lock only to store the results (shorter operation)
   exec_on_readwrite_store(move |mut store| {
-    mocs
-      .drain(..)
-      .map(move |moc| store.insert((1, moc)))
-      .collect()
+    Ok(
+      mocs
+        .drain(..)
+        .map(move |moc| store.insert((1, moc)))
+        .collect(),
+    )
   })
 }
 
