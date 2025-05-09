@@ -268,7 +268,7 @@ async fn from_url<T>(
   parse: Box<dyn Fn(&[u8]) -> Result<T, JsValue>>,
 ) -> Result<T, JsValue> {
   // https://rustwasm.github.io/docs/wasm-bindgen/examples/fetch.html
-  let mut opts = RequestInit::new();
+  let opts = RequestInit::new();
   opts.set_method("GET");
   opts.set_mode(RequestMode::Cors);
 
@@ -622,7 +622,7 @@ fn to_file(name: &str, ext: &str, mime: &str, data: Box<[u8]>) -> Result<(), JsV
   let data: Uint8Array = data.as_ref().into();
   let bytes = Array::new();
   bytes.push(&data);
-  let mut blob_prop = BlobPropertyBag::new();
+  let blob_prop = BlobPropertyBag::new();
   blob_prop.set_type(mime);
 
   let blob = Blob::new_with_u8_array_sequence_and_options(&bytes, &blob_prop)?;

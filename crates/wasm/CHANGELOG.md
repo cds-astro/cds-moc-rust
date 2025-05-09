@@ -1,11 +1,16 @@
 # `moc-wasm` Change Log
 
+## 0.10.0
+
+Released 2025-05-xx
+
+* Bump cdshealpix to 0.7.x
+
 ## 0.9.1
 
 Released 2024-06-28
 
 * Fix spurious coma in serialization of empty MOC in JSON
-
 
 ## 0.9.0
 
@@ -20,7 +25,6 @@ Released 2024-01-31
 
 * No modification, release due to new mocset release
 
-
 ## 0.8.1
 
 Released 2023-12-20
@@ -28,13 +32,11 @@ Released 2023-12-20
 * Fix issues S-MOC from STC-S
 * Update cdshealpix
 
-
 ## 0.8.0
 
 Released 2023-12-12
 
 * Add `fromSTCS` function
-
 
 ## 0.7.0
 
@@ -42,20 +44,18 @@ Released 2023-04-21
 
 ### ⚠️ BREAKING Changes
 
-The full API has been changed! 
+The full API has been changed!
 Instead of relying on functions accessing MOCs by names,
-we use methods on Javascirpt objects (MOC, TMOC, FMOC and STMOC). 
+we use methods on Javascirpt objects (MOC, TMOC, FMOC and STMOC).
 The internal store is now the same as the one used in [MOCPy](https://github.com/cds-astro/mocpy/).
 See the README file and the example index.html file for more details.
-
 
 ## 0.6.0
 
 Released 2023-03-28
 
 * No modification, release due to new moc-cli release
-* TBD: use MOC Lib Rust store, use object and indices on the JS side (like for MOCPy) 
-
+* TBD: use MOC Lib Rust store, use object and indices on the JS side (like for MOCPy)
 
 ## 0.5.3
 
@@ -67,11 +67,9 @@ Realeased 2022-11-10
 * Add option in `toFits` functions to generate a FITS file compatible with v1.0
   of the MOC standard (S-MOC only).
 
-
 ## 0.5.2
 
 Realeased 2022-09-12
-
 
 ## 0.5.1
 
@@ -81,7 +79,6 @@ Realeased 2022-09-09
 
 * Print the deepest order in JSON output even when it contains no cell
 
-
 ## 0.4.0
 
 Realeased 2022-04-13
@@ -89,20 +86,18 @@ Realeased 2022-04-13
 * Add support for (possibly gzipped) skymaps of fixed format
 * Add gzip support for multi-resolution maps
 
-
 ## 0.3.2
 
 Realeased 2022-03-22
 
-* Fix all `toFile` methods (encoding problem when direclty saving a blob) 
-* Add the possibility to overwrite the supported mime type when loading a FITS file from a URL  
+* Fix all `toFile` methods (encoding problem when direclty saving a blob)
+* Add the possibility to overwrite the supported mime type when loading a FITS file from a URL
 
 ## 0.3.1
 
 Realeased 2022-02-07
 
 * Fix erroneous inequality tests in `from_box` and `from_ellipse`
-
 
 ## 0.3.0
 
@@ -111,7 +106,6 @@ Released 2022-02-04
 * Add moc from ring
 * Add indirect split (in addition to direct split)
 * More robust FITS deserialization with the UNIQ scheme (no bug in case of trailing 0 uniq indices)
-
 
 ## 0.2.0
 
@@ -125,7 +119,6 @@ Released 2021-11-09.
 * `from_valued_cells`: MOC from multi-order map
 * `split`: split a disjoint S-MOC into joint S-MOCs
 * `split_count`: count the number of joint S-MOCs in a disjoint S-MOC
-
 
 ## 0.1.0
 

@@ -1,5 +1,23 @@
 # `moc` Change Log
 
+## 0.18.0
+
+Released 2025-05-xx
+
+### Changed
+
+* Ignore too deep `NUNIQ` in bugged FITS file from another lib
+* Accept `MOCORDER` with no `MOCORD_S` in FITS file of v2.0
+* change `exec_on_readwrite_store` signature
+
+### Added
+
+* Accept FITS `TFORM = B/I/J/K` in addition to `1B/1I/1K/1K` in FITS files
+* Add `refine` method on MOCs
+* Add SF-MOC support!!!
+
+
+
 ## 0.17.0
 
 Released 2024-10-16
@@ -51,7 +69,7 @@ Released 2024-05-28
 
 ### Added
 
-* Metohd 'all_cells_with_unidirectional_neigs' for AladinLite
+* Method 'all_cells_with_unidirectional_neigs' for AladinLite
 * Re-export `cdshealpix::compass_point::OrdinalMap` and `cdshealpix::compass_point::OrdinalSet` in `moc::range`
 
 

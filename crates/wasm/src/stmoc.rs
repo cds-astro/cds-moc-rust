@@ -206,7 +206,7 @@ impl STMOC {
   ///   Else use the `accept_mime_types` option to set the `Accept` HTTP request parameter, with e.g:
   ///   * `application/fits` (default value)
   ///   * `application/fits, application/octet-stream`
-  #[wasm_bindgen(js_name = "fromFitsUrl")]
+  #[wasm_bindgen(js_name = "fromFitsUrl", catch)]
   pub async fn from_fits_url(
     url: String,
     accept_mime_types: Option<String>,
