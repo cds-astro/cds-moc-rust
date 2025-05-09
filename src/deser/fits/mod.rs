@@ -72,6 +72,7 @@ pub enum MocQtyType<T: Idx, R: BufRead> {
   Hpx(MocType<T, Hpx<T>, R>),
   Time(MocType<T, Time<T>, R>),
   TimeHpx(STMocType<T, R>),
+  FreqHpx(RangeMoc2DIterFromFits<T, R, Frequency<T>, Hpx<T>>),
   Freq(MocType<T, Frequency<T>, R>),
 }
 impl<T: Idx, R: BufRead> MocQtyType<T, R> {
@@ -80,6 +81,7 @@ impl<T: Idx, R: BufRead> MocQtyType<T, R> {
       MocQtyType::Hpx(moc_type) => moc_type.to_fits_ivoa(write),
       MocQtyType::Time(moc_type) => moc_type.to_fits_ivoa(write),
       MocQtyType::TimeHpx(moc_type) => moc_type.to_fits_ivoa(write),
+      MocQtyType::FreqHpx(moc2d) => ranges_sf_to_fits_ivoa(moc2d, None, None, write),
       MocQtyType::Freq(moc_type) => moc_type.to_fits_ivoa(write),
     }
   }
@@ -121,14 +123,14 @@ impl<T: Idx, Q: MocQty<T>, R: BufRead> MocType<T, Q, R> {
 
 #[derive(Debug)]
 pub enum STMocType<T: Idx, R: BufRead> {
-  V2(RangeMoc2DIterFromFits<T, R>),
+  V2(RangeMoc2DIterFromFits<T, R, Time<T>, Hpx<T>>),
   PreV2(RangeMoc2DPreV2IterFromFits<T, R>),
 }
 impl<T: Idx, R: BufRead> STMocType<T, R> {
   pub fn to_fits_ivoa<W: Write>(self, write: W) -> Result<(), FitsError> {
     match self {
-      STMocType::V2(ranges2) => ranges2d_to_fits_ivoa(ranges2, None, None, write),
-      STMocType::PreV2(ranges2) => ranges2d_to_fits_ivoa(ranges2, None, None, write),
+      STMocType::V2(ranges2) => ranges_st_to_fits_ivoa(ranges2, None, None, write),
+      STMocType::PreV2(ranges2) => ranges_st_to_fits_ivoa(ranges2, None, None, write),
     }
   }
 }
@@ -403,7 +405,7 @@ where
   }
 }
 
-pub fn rangemoc2d_to_fits_ivoa<T: Idx, W: Write>(
+pub fn range_stmoc_to_fits_ivoa<T: Idx, W: Write>(
   moc: &RangeMOC2<T, Time<T>, T, Hpx<T>>,
   moc_id: Option<String>,
   moc_type: Option<keywords::MocType>,
@@ -412,8 +414,33 @@ pub fn rangemoc2d_to_fits_ivoa<T: Idx, W: Write>(
   let depth_max_time = moc.depth_max_1();
   let depth_max_hpx = moc.depth_max_2();
   let n_ranges = moc.compute_n_ranges();
-  let moc_kw_map = build_range_moc2d_keywords(
+  let moc_kw_map = build_range_stmoc_keywords(
     depth_max_time,
+    depth_max_hpx,
+    moc_id,
+    moc_type,
+    PhantomData::<T>,
+  );
+  write_fits_header(&mut writer, T::N_BYTES, n_ranges << 1, moc_kw_map)?;
+  let n_ranges_written = write_ranges2d_data(moc.into_range_moc2_iter(), writer)?;
+  if n_ranges != n_ranges_written as u64 {
+    Err(FitsError::UnexpectedWrittenSize)
+  } else {
+    Ok(())
+  }
+}
+
+pub fn range_sfmoc_to_fits_ivoa<T: Idx, W: Write>(
+  moc: &RangeMOC2<T, Frequency<T>, T, Hpx<T>>,
+  moc_id: Option<String>,
+  moc_type: Option<keywords::MocType>,
+  mut writer: W,
+) -> Result<(), FitsError> {
+  let depth_max_freq = moc.depth_max_1();
+  let depth_max_hpx = moc.depth_max_2();
+  let n_ranges = moc.compute_n_ranges();
+  let moc_kw_map = build_range_sfmoc_keywords(
+    depth_max_freq,
     depth_max_hpx,
     moc_id,
     moc_type,
@@ -433,7 +460,7 @@ pub fn rangemoc2d_to_fits_ivoa<T: Idx, W: Write>(
 /// * If the number of elements in the iterator is not known in advance, a collect is necessary
 /// * Compatible with the MOC2.0 IVOA standard
 /// * For best performances when writing in a file, use a `BufWriter` in input.
-pub fn ranges2d_to_fits_ivoa<T, I, J, K, L, W>(
+pub fn ranges_st_to_fits_ivoa<T, I, J, K, L, W>(
   moc_it: L,
   moc_id: Option<String>,
   moc_type: Option<keywords::MocType>,
@@ -443,13 +470,53 @@ where
   T: Idx,
   I: RangeMOCIterator<T, Qty = Time<T>>,
   J: RangeMOCIterator<T, Qty = Hpx<T>>,
-  K: RangeMOC2ElemIt<T, Time<T>, T, Hpx<T>, It1 = I, It2 = J>,
-  L: RangeMOC2Iterator<T, Time<T>, I, T, Hpx<T>, J, K>,
+  K: RangeMOC2ElemIt<T, I::Qty, T, J::Qty, It1 = I, It2 = J>,
+  L: RangeMOC2Iterator<T, I::Qty, I, T, J::Qty, J, K>,
   W: Write,
 {
   let depth_max_time = moc_it.depth_max_1();
   let depth_max_hpx = moc_it.depth_max_2();
-  let moc_kw_map = build_range_moc2d_keywords(
+  let moc_kw_map = build_range_stmoc_keywords(
+    depth_max_time,
+    depth_max_hpx,
+    moc_id,
+    moc_type,
+    PhantomData::<T>,
+  );
+  let mut mem_writter: Vec<u8> = Vec::with_capacity(1024); // 1kB
+  let n_ranges_written = write_ranges2d_data(moc_it, &mut mem_writter)?;
+  write_fits_header(
+    &mut writer,
+    T::N_BYTES,
+    (n_ranges_written as u64) << 1,
+    moc_kw_map,
+  )?;
+  writer.write_all(&mem_writter)?;
+  Ok(())
+}
+
+///
+/// # Info
+/// * If the number of elements in the iterator is not known in advance, a collect is necessary
+/// * Compatible with the MOC2.0 IVOA standard
+/// * For best performances when writing in a file, use a `BufWriter` in input.
+pub fn ranges_sf_to_fits_ivoa<T, I, J, K, L, W>(
+  moc_it: L,
+  moc_id: Option<String>,
+  moc_type: Option<keywords::MocType>,
+  mut writer: W,
+) -> Result<(), FitsError>
+where
+  T: Idx,
+  I: RangeMOCIterator<T, Qty = Frequency<T>>,
+  J: RangeMOCIterator<T, Qty = Hpx<T>>,
+  K: RangeMOC2ElemIt<T, I::Qty, T, J::Qty, It1 = I, It2 = J>,
+  L: RangeMOC2Iterator<T, I::Qty, I, T, J::Qty, J, K>,
+  W: Write,
+{
+  let depth_max_time = moc_it.depth_max_1();
+  let depth_max_hpx = moc_it.depth_max_2();
+  let moc_kw_map = build_range_stmoc_keywords(
     depth_max_time,
     depth_max_hpx,
     moc_id,
@@ -472,10 +539,10 @@ where
 fn write_ranges2d_data<T, I, J, K, L, W>(moc2_it: L, mut writer: W) -> Result<usize, FitsError>
 where
   T: Idx,
-  I: RangeMOCIterator<T, Qty = Time<T>>,
-  J: RangeMOCIterator<T, Qty = Hpx<T>>,
-  K: RangeMOC2ElemIt<T, Time<T>, T, Hpx<T>, It1 = I, It2 = J>,
-  L: RangeMOC2Iterator<T, Time<T>, I, T, Hpx<T>, J, K>,
+  I: RangeMOCIterator<T>,
+  J: RangeMOCIterator<T>,
+  K: RangeMOC2ElemIt<T, I::Qty, T, J::Qty, It1 = I, It2 = J>,
+  L: RangeMOC2Iterator<T, I::Qty, I, T, J::Qty, J, K>,
   W: Write,
 {
   let mut n_ranges_written = 0_usize;
@@ -503,8 +570,8 @@ where
 }
 
 // Only implemented for ST-MOC so far but easy to generalize.
-// Same Idx type for both ime and Space.
-fn build_range_moc2d_keywords<T: Idx>(
+// Same Idx type for both Time and Space.
+fn build_range_stmoc_keywords<T: Idx>(
   depth_max_time: u8,
   depth_max_hpx: u8,
   moc_id: Option<String>,
@@ -522,6 +589,39 @@ fn build_range_moc2d_keywords<T: Idx>(
   moc_kws.insert(MocKeywords::TimeSys(TimeSys::TCB));
   moc_kws.insert(MocKeywords::MOCOrdT(MocOrdT {
     depth: depth_max_time,
+  }));
+  if let Some(id) = moc_id {
+    moc_kws.insert(MocKeywords::MOCId(MocId { id }));
+  }
+  moc_kws.insert(MocKeywords::MOCTool(MocTool {
+    tool: String::from("CDS MOC Rust lib"),
+  }));
+  if let Some(mtype) = moc_type {
+    moc_kws.insert(MocKeywords::MOCType(mtype));
+  }
+  // BINTABLE specific
+  moc_kws.insert(MocKeywords::TForm1(T::TFORM));
+  // No ttype
+  moc_kws
+}
+
+fn build_range_sfmoc_keywords<T: Idx>(
+  depth_max_freq: u8,
+  depth_max_hpx: u8,
+  moc_id: Option<String>,
+  moc_type: Option<keywords::MocType>,
+  _t_type: PhantomData<T>,
+) -> MocKeywordsMap {
+  let mut moc_kws = MocKeywordsMap::new();
+  moc_kws.insert(MocKeywords::MOCVers(MocVers::V2_0));
+  moc_kws.insert(MocKeywords::MOCDim(MocDim::FrequencySpace)); // To be changed for generalization
+  moc_kws.insert(MocKeywords::Ordering(Ordering::Range));
+  moc_kws.insert(MocKeywords::CoordSys(CoordSys::ICRS));
+  moc_kws.insert(MocKeywords::MOCOrdS(MocOrdS {
+    depth: depth_max_hpx,
+  }));
+  moc_kws.insert(MocKeywords::MOCOrdF(MocOrdF {
+    depth: depth_max_freq,
   }));
   if let Some(id) = moc_id {
     moc_kws.insert(MocKeywords::MOCId(MocId { id }));
@@ -736,6 +836,40 @@ pub fn from_fits_ivoa_custom<R: BufRead>(
             _ => Err(FitsError::MissingKeyword(Ordering::keyword_string())),
           }
         }
+        Some(MocKeywords::MOCDim(MocDim::FrequencySpace)) => {
+          let depth_max_freq = match moc_kws.get::<MocOrdF>() {
+            Some(MocKeywords::MOCOrdF(MocOrdF { depth })) => *depth,
+            _ => return Err(FitsError::MissingKeyword(MocOrdF::keyword_string())),
+          };
+          let depth_max_hpx = match moc_kws.get::<MocOrdS>() {
+            Some(MocKeywords::MOCOrdS(MocOrdS { depth })) => *depth,
+            _ => return Err(FitsError::MissingKeyword(MocOrdS::keyword_string())),
+          };
+          match moc_kws.get::<Ordering>() {
+            Some(MocKeywords::Ordering(Ordering::Nuniq)) => {
+              Err(FitsError::UncompatibleKeywordContent(
+                String::from("MOCDIM  = 'TREQUENCY.SPACE'"),
+                String::from("ORDERING= 'NUNIQ'"),
+              ))
+            }
+            Some(MocKeywords::Ordering(Ordering::Range)) => load_sf_moc_range(
+              reader,
+              n_bytes,
+              n_elems,
+              depth_max_freq,
+              depth_max_hpx,
+              &moc_kws,
+            ),
+            Some(MocKeywords::Ordering(Ordering::Range29)) => {
+              Err(FitsError::UncompatibleKeywordContent(
+                String::from("ORDERING  = 'RANGE29'"),
+                String::from("MOCVERS= '2.0'"),
+              ))
+            }
+            // ADD GUNIQ? RUNIQ? RMIXED?
+            _ => Err(FitsError::MissingKeyword(Ordering::keyword_string())),
+          }
+        }
         _ => Err(FitsError::MissingKeyword(MocDim::keyword_string())),
       }
     }
@@ -938,21 +1072,30 @@ fn load_st_moc_range<R: BufRead>(
 ) -> Result<MocIdxType<R>, FitsError> {
   let n_ranges = n_elems >> 1;
   match (moc_kws.get::<TForm1>(), n_bytes) {
-    (Some(MocKeywords::TForm1(TForm1::OneI)), u16::N_BYTES) => {
-      Ok(MocIdxType::U16(MocQtyType::TimeHpx(STMocType::V2(
-        from_fits_range2d::<u16, _>(reader, depth_max_time, depth_max_hpx, n_ranges)?,
-      ))))
-    }
-    (Some(MocKeywords::TForm1(TForm1::OneJ)), u32::N_BYTES) => {
-      Ok(MocIdxType::U32(MocQtyType::TimeHpx(STMocType::V2(
-        from_fits_range2d::<u32, _>(reader, depth_max_time, depth_max_hpx, n_ranges)?,
-      ))))
-    }
-    (Some(MocKeywords::TForm1(TForm1::OneK)), u64::N_BYTES) => {
-      Ok(MocIdxType::U64(MocQtyType::TimeHpx(STMocType::V2(
-        from_fits_range2d::<u64, _>(reader, depth_max_time, depth_max_hpx, n_ranges)?,
-      ))))
-    }
+    (Some(MocKeywords::TForm1(TForm1::OneI)), u16::N_BYTES) => Ok(MocIdxType::U16(
+      MocQtyType::TimeHpx(STMocType::V2(from_fits_range2d::<u16, _, Time<_>, Hpx<_>>(
+        reader,
+        depth_max_time,
+        depth_max_hpx,
+        n_ranges,
+      )?)),
+    )),
+    (Some(MocKeywords::TForm1(TForm1::OneJ)), u32::N_BYTES) => Ok(MocIdxType::U32(
+      MocQtyType::TimeHpx(STMocType::V2(from_fits_range2d::<u32, _, Time<_>, Hpx<_>>(
+        reader,
+        depth_max_time,
+        depth_max_hpx,
+        n_ranges,
+      )?)),
+    )),
+    (Some(MocKeywords::TForm1(TForm1::OneK)), u64::N_BYTES) => Ok(MocIdxType::U64(
+      MocQtyType::TimeHpx(STMocType::V2(from_fits_range2d::<u64, _, Time<_>, Hpx<_>>(
+        reader,
+        depth_max_time,
+        depth_max_hpx,
+        n_ranges,
+      )?)),
+    )),
     /*(Some(MocKeywords::TForm1(TForm1::OneB)), u8::N_BYTES) =>
       Ok(MocIdxType::U8(MocQtyType::TimeHpx(STMocType::V2(
         from_fits_range2d::<u8, _>(reader, depth_max_time, depth_max_hpx, n_ranges)?
@@ -984,6 +1127,64 @@ fn load_st_moc_range29<R: BufRead>(
       Ok(MocIdxType::U64(MocQtyType::TimeHpx(STMocType::PreV2(
         from_fits_range2d_29::<_>(reader, depth_max_time, depth_max_hpx, n_ranges)?,
       ))))
+    }
+    (Some(MocKeywords::TForm1(tform)), nb) => Err(FitsError::UncompatibleKeywordContent(
+      format!("NAXIS1  = {}", nb),
+      tform.to_string(),
+    )),
+    (None, _) => Err(FitsError::MissingKeyword(TForm1::keyword_string())),
+    _ => unreachable!(),
+  }
+}
+
+fn load_sf_moc_range<R: BufRead>(
+  reader: R,
+  n_bytes: u8,
+  n_elems: u64,
+  depth_max_freq: u8,
+  depth_max_hpx: u8,
+  moc_kws: &MocKeywordsMap,
+) -> Result<MocIdxType<R>, FitsError> {
+  let n_ranges = n_elems >> 1;
+  match (moc_kws.get::<TForm1>(), n_bytes) {
+    (Some(MocKeywords::TForm1(TForm1::OneI)), u16::N_BYTES) => {
+      Ok(MocIdxType::U16(MocQtyType::FreqHpx(from_fits_range2d::<
+        u16,
+        _,
+        Frequency<_>,
+        Hpx<_>,
+      >(
+        reader,
+        depth_max_freq,
+        depth_max_hpx,
+        n_ranges,
+      )?)))
+    }
+    (Some(MocKeywords::TForm1(TForm1::OneJ)), u32::N_BYTES) => {
+      Ok(MocIdxType::U32(MocQtyType::FreqHpx(from_fits_range2d::<
+        u32,
+        _,
+        Frequency<_>,
+        Hpx<_>,
+      >(
+        reader,
+        depth_max_freq,
+        depth_max_hpx,
+        n_ranges,
+      )?)))
+    }
+    (Some(MocKeywords::TForm1(TForm1::OneK)), u64::N_BYTES) => {
+      Ok(MocIdxType::U64(MocQtyType::FreqHpx(from_fits_range2d::<
+        u64,
+        _,
+        Frequency<_>,
+        Hpx<_>,
+      >(
+        reader,
+        depth_max_freq,
+        depth_max_hpx,
+        n_ranges,
+      )?)))
     }
     (Some(MocKeywords::TForm1(tform)), nb) => Err(FitsError::UncompatibleKeywordContent(
       format!("NAXIS1  = {}", nb),
@@ -1138,66 +1339,88 @@ impl<T: Idx, Q: MocQty<T>, R: BufRead> RangeMOCIterator<T> for RangeMocIterFromF
   }
 }
 
-// st-moc read iterator
+// 2D-moc read iterator
 
-fn from_fits_range2d<T, R>(
+fn from_fits_range2d<T, R, Q1: MocQty<T>, Q2: MocQty<T>>(
   reader: R,
-  depth_max_time: u8,
-  depth_max_hpx: u8,
+  depth_max_dim1: u8,
+  depth_max_dim2: u8,
   n_ranges: u64,
-) -> Result<RangeMoc2DIterFromFits<T, R>, FitsError>
+) -> Result<RangeMoc2DIterFromFits<T, R, Q1, Q2>, FitsError>
 where
   T: Idx,
   R: BufRead,
 {
   Ok(RangeMoc2DIterFromFits::new(
-    depth_max_time,
-    depth_max_hpx,
+    depth_max_dim1,
+    depth_max_dim2,
     reader,
     n_ranges,
   ))
 }
 
 #[derive(Debug)]
-pub struct RangeMoc2DIterFromFits<T: Idx, R: BufRead> {
-  depth_max_time: u8,
-  depth_max_hpx: u8,
+pub struct RangeMoc2DIterFromFits<T: Idx, R: BufRead, Q1: MocQty<T>, Q2: MocQty<T>> {
+  depth_max_dim1: u8,
+  depth_max_dim2: u8,
   reader: R,
   n_ranges: u64,
   _t_type: PhantomData<T>,
+  _dim1_type: PhantomData<Q1>,
+  _dim2_type: PhantomData<Q2>,
   prev_t: Option<Range<T>>,
 }
+impl<T: Idx, R: BufRead> RangeMoc2DIterFromFits<T, R, Time<T>, Hpx<T>> {
+  pub fn new_space_time(depth_max_time: u8, depth_max_space: u8, reader: R, n_ranges: u64) -> Self {
+    Self::new(depth_max_time, depth_max_space, reader, n_ranges)
+  }
+}
+impl<T: Idx, R: BufRead> RangeMoc2DIterFromFits<T, R, Frequency<T>, Hpx<T>> {
+  pub fn new_space_freq(depth_max_freq: u8, depth_max_space: u8, reader: R, n_ranges: u64) -> Self {
+    Self::new(depth_max_freq, depth_max_space, reader, n_ranges)
+  }
+}
 
-impl<T: Idx, R: BufRead> RangeMoc2DIterFromFits<T, R> {
-  fn new(
-    depth_max_time: u8,
-    depth_max_hpx: u8,
-    reader: R,
-    n_ranges: u64,
-  ) -> RangeMoc2DIterFromFits<T, R> {
+impl<T: Idx, R: BufRead, Q1: MocQty<T>, Q2: MocQty<T>> RangeMoc2DIterFromFits<T, R, Q1, Q2> {
+  fn new(depth_max_dim1: u8, depth_max_dim2: u8, reader: R, n_ranges: u64) -> Self {
     RangeMoc2DIterFromFits {
-      depth_max_time,
-      depth_max_hpx,
+      depth_max_dim1,
+      depth_max_dim2,
       reader,
       n_ranges,
       _t_type: PhantomData,
+      _dim1_type: PhantomData,
+      _dim2_type: PhantomData,
       prev_t: None,
     }
   }
 }
-impl<T: Idx, R: BufRead> HasTwoMaxDepth for RangeMoc2DIterFromFits<T, R> {
+impl<T: Idx, R: BufRead, Q1: MocQty<T>, Q2: MocQty<T>> HasTwoMaxDepth
+  for RangeMoc2DIterFromFits<T, R, Q1, Q2>
+{
   fn depth_max_1(&self) -> u8 {
-    self.depth_max_time
+    self.depth_max_dim1
   }
   fn depth_max_2(&self) -> u8 {
-    self.depth_max_hpx
+    self.depth_max_dim2
   }
 }
-impl<T: Idx, R: BufRead> ZSorted for RangeMoc2DIterFromFits<T, R> {}
-impl<T: Idx, R: BufRead> NonOverlapping for RangeMoc2DIterFromFits<T, R> {}
-impl<T: Idx, R: BufRead> MOC2Properties for RangeMoc2DIterFromFits<T, R> {}
-impl<T: Idx, R: BufRead> Iterator for RangeMoc2DIterFromFits<T, R> {
-  type Item = RangeMOC2Elem<T, Time<T>, T, Hpx<T>>;
+impl<T: Idx, R: BufRead, Q1: MocQty<T>, Q2: MocQty<T>> ZSorted
+  for RangeMoc2DIterFromFits<T, R, Q1, Q2>
+{
+}
+impl<T: Idx, R: BufRead, Q1: MocQty<T>, Q2: MocQty<T>> NonOverlapping
+  for RangeMoc2DIterFromFits<T, R, Q1, Q2>
+{
+}
+impl<T: Idx, R: BufRead, Q1: MocQty<T>, Q2: MocQty<T>> MOC2Properties
+  for RangeMoc2DIterFromFits<T, R, Q1, Q2>
+{
+}
+impl<T: Idx, R: BufRead, Q1: MocQty<T>, Q2: MocQty<T>> Iterator
+  for RangeMoc2DIterFromFits<T, R, Q1, Q2>
+{
+  type Item = RangeMOC2Elem<T, Q1, T, Q2>;
   fn next(&mut self) -> Option<Self::Item> {
     let mut tranges: Vec<Range<T>> = Vec::with_capacity(1000);
     if let Some(trange) = self.prev_t.take() {
@@ -1246,24 +1469,24 @@ impl<T: Idx, R: BufRead> Iterator for RangeMoc2DIterFromFits<T, R> {
       None
     } else {
       Some(RangeMOC2Elem::new(
-        RangeMOC::new(self.depth_max_time, MocRanges::new_unchecked(tranges)),
-        RangeMOC::new(self.depth_max_hpx, MocRanges::new_unchecked(sranges)),
+        RangeMOC::new(self.depth_max_dim1, MocRanges::new_unchecked(tranges)),
+        RangeMOC::new(self.depth_max_dim2, MocRanges::new_unchecked(sranges)),
       ))
     }
   }
   // No size int because should be the number of RangeMOC2Elem instead of the
   // total number of ranges...
 }
-impl<T: Idx, R: BufRead>
+impl<T: Idx, R: BufRead, Q1: MocQty<T>, Q2: MocQty<T>>
   RangeMOC2Iterator<
     T,
-    Time<T>,
-    RangeMocIter<T, Time<T>>,
+    Q1,
+    RangeMocIter<T, Q1>,
     T,
-    Hpx<T>,
-    RangeMocIter<T, Hpx<T>>,
-    RangeMOC2Elem<T, Time<T>, T, Hpx<T>>,
-  > for RangeMoc2DIterFromFits<T, R>
+    Q2,
+    RangeMocIter<T, Q2>,
+    RangeMOC2Elem<T, Q1, T, Q2>,
+  > for RangeMoc2DIterFromFits<T, R, Q1, Q2>
 {
 }
 

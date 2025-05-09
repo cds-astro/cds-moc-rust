@@ -12,7 +12,7 @@ use crate::{
 };
 
 use super::{
-  common::{InternalMoc, FMOC, SMOC, STMOC, TMOC},
+  common::{InternalMoc, FMOC, SFMOC, SMOC, STMOC, TMOC},
   store,
 };
 
@@ -95,6 +95,28 @@ impl Op1 {
       )),
     }
   }
+  fn perform_op_on_sfmoc(self, _moc: &SFMOC) -> Result<SFMOC, String> {
+    match self {
+      Op1::Complement => Err(String::from(
+        "Complement not implemented (yet) for ST-MOCs.",
+      )),
+      Op1::Degrade { new_depth: _ } => {
+        Err(String::from("Degrade not implemented (yet) for ST-MOCs."))
+      }
+      Op1::Extend => Err(String::from(
+        "Extend border not implemented (yet) for ST-MOCs.",
+      )),
+      Op1::Contract => Err(String::from(
+        "Contract border not implemented (yet) for ST-MOCs.",
+      )),
+      Op1::ExtBorder => Err(String::from(
+        "External border not implemented (yet) for ST-MOCs.",
+      )),
+      Op1::IntBorder => Err(String::from(
+        "Internal border not implemented (yet) for ST-MOCs.",
+      )),
+    }
+  }
 
   /// Performs the given operation on the given MOC and store the resulting MOC in the store,
   /// returning its index.
@@ -104,6 +126,7 @@ impl Op1 {
       InternalMoc::Time(m) => self.perform_op_on_tmoc(m).map(InternalMoc::Time),
       InternalMoc::Frequency(m) => self.perform_op_on_fmoc(m).map(InternalMoc::Frequency),
       InternalMoc::TimeSpace(m) => self.perform_op_on_stmoc(m).map(InternalMoc::TimeSpace),
+      InternalMoc::FreqSpace(m) => self.perform_op_on_sfmoc(m).map(InternalMoc::FreqSpace),
     })
   }
 }
@@ -141,6 +164,9 @@ impl Op1MultiRes {
   fn perform_op_on_stmoc(self, _moc: &STMOC) -> Result<Vec<InternalMoc>, String> {
     Err(String::from("Split not implemented for ST-MOCs."))
   }
+  fn perform_op_on_sfmoc(self, _moc: &SFMOC) -> Result<Vec<InternalMoc>, String> {
+    Err(String::from("Split not implemented for SF-MOCs."))
+  }
 
   /// Performs the given operation on the given MOC and store the resulting MOC in the store,
   /// returning its index.
@@ -150,6 +176,7 @@ impl Op1MultiRes {
       InternalMoc::Time(m) => self.perform_op_on_tmoc(m),
       InternalMoc::Frequency(m) => self.perform_op_on_fmoc(m),
       InternalMoc::TimeSpace(m) => self.perform_op_on_stmoc(m),
+      InternalMoc::FreqSpace(m) => self.perform_op_on_sfmoc(m),
     })
   }
 }
@@ -161,6 +188,7 @@ pub(crate) fn op1_moc_barycenter(index: usize) -> Result<(f64, f64), String> {
     InternalMoc::Time(_) => Err(String::from("Barycenter not implemented for T-MOCs.")),
     InternalMoc::Frequency(_) => Err(String::from("Barycenter not implemented for F-MOCs.")),
     InternalMoc::TimeSpace(_) => Err(String::from("Barycenter not implemented for ST-MOCs.")),
+    InternalMoc::FreqSpace(_) => Err(String::from("Barycenter not implemented for SF-MOCs.")),
   })
 }
 
@@ -180,6 +208,7 @@ pub(crate) fn op1_moc_largest_distance_from_coo_to_moc_vertices(
     InternalMoc::Time(_) => Err(String::from("Barycenter not implemented for T-MOCs.")),
     InternalMoc::Frequency(_) => Err(String::from("Barycenter not implemented for F-MOCs.")),
     InternalMoc::TimeSpace(_) => Err(String::from("Barycenter not implemented for ST-MOCs.")),
+    InternalMoc::FreqSpace(_) => Err(String::from("Barycenter not implemented for SF-MOCs.")),
   })
 }
 
@@ -189,8 +218,8 @@ pub(crate) fn op1_flatten_to_moc_depth(index: usize) -> Result<Vec<u64>, String>
     InternalMoc::Space(m) => Ok(m.flatten_to_fixed_depth_cells().collect()),
     InternalMoc::Time(m) => Ok(m.flatten_to_fixed_depth_cells().collect()),
     InternalMoc::Frequency(m) => Ok(m.flatten_to_fixed_depth_cells().collect()),
-    InternalMoc::TimeSpace(_) => Err(String::from(
-      "Flatten to MOC depth not implemented for ST-MOCs.",
+    InternalMoc::TimeSpace(_) | InternalMoc::FreqSpace(_) => Err(String::from(
+      "Flatten to MOC depth not implemented for 2D-MOCs.",
     )),
   })
 }
@@ -216,8 +245,8 @@ pub(crate) fn op1_flatten_to_depth(index: usize, depth: u8) -> Result<Vec<u64>, 
         .flatten_to_fixed_depth_cells()
         .collect(),
     ),
-    InternalMoc::TimeSpace(_) => Err(String::from(
-      "Flatten to depth not implemented for ST-MOCs.",
+    InternalMoc::TimeSpace(_) | InternalMoc::FreqSpace(_) => Err(String::from(
+      "Flatten to depth not implemented for 2D-MOCs.",
     )),
   })
 }
@@ -234,6 +263,9 @@ pub(crate) fn op1_border_elementary_edges_vertices(index: usize) -> Result<Vec<[
     InternalMoc::TimeSpace(_) => Err(String::from(
       "Border elementary edges vertices not implemented for ST-MOCs.",
     )),
+    InternalMoc::FreqSpace(_) => Err(String::from(
+      "Border elementary edges vertices not implemented for SF-MOCs.",
+    )),
   })
 }
 
@@ -243,6 +275,7 @@ pub(crate) fn op1_count_split(index: usize, indirect_neigh: bool) -> Result<u32,
     InternalMoc::Time(_) => Err(String::from("Split not implemented for T-MOCs.")),
     InternalMoc::Frequency(_) => Err(String::from("Split not implemented for F-MOCs.")),
     InternalMoc::TimeSpace(_) => Err(String::from("Split not implemented for ST-MOCs.")),
+    InternalMoc::FreqSpace(_) => Err(String::from("Split not implemented for SF-MOCs.")),
   })
 }
 
@@ -253,6 +286,7 @@ pub(crate) fn op1_1st_axis_min(index: usize) -> Result<Option<u64>, String> {
       InternalMoc::Time(moc) => moc.first_index(),
       InternalMoc::Frequency(moc) => moc.first_index(),
       InternalMoc::TimeSpace(stmoc) => stmoc.min_index_left(),
+      InternalMoc::FreqSpace(sfmoc) => sfmoc.min_index_left(),
     })
   })
 }
@@ -264,6 +298,7 @@ pub(crate) fn op1_1st_axis_max(index: usize) -> Result<Option<u64>, String> {
       InternalMoc::Time(moc) => moc.last_index(),
       InternalMoc::Frequency(moc) => moc.last_index(),
       InternalMoc::TimeSpace(stmoc) => stmoc.max_index_left(),
+      InternalMoc::FreqSpace(sfmoc) => sfmoc.max_index_left(),
     })
   })
 }
@@ -280,6 +315,7 @@ where
     InternalMoc::Time(_) => Err(String::from("MOM Sum not implemented for T-MOCs.")),
     InternalMoc::Frequency(_) => Err(String::from("MOM Sum not implemented for F-MOCs.")),
     InternalMoc::TimeSpace(_) => Err(String::from("MOM Sum not implemented for ST-MOCs.")),
+    InternalMoc::FreqSpace(_) => Err(String::from("MOM Sum not implemented for SF-MOCs.")),
   })
 }
 
@@ -296,6 +332,7 @@ pub(crate) fn op1_mom_sum_from_path<P: AsRef<Path>>(
     InternalMoc::Time(_) => Err(String::from("MOM Sum not implemented for T-MOCs.")),
     InternalMoc::Frequency(_) => Err(String::from("MOM Sum not implemented for F-MOCs.")),
     InternalMoc::TimeSpace(_) => Err(String::from("MOM Sum not implemented for ST-MOCs.")),
+    InternalMoc::FreqSpace(_) => Err(String::from("MOM Sum not implemented for SF-MOCs.")),
   })
 }
 
@@ -308,6 +345,7 @@ pub(crate) fn op1_mom_sum_from_data(index: usize, mom_data: &[u8]) -> Result<f64
     InternalMoc::Time(_) => Err(String::from("MOM Sum not implemented for T-MOCs.")),
     InternalMoc::Frequency(_) => Err(String::from("MOM Sum not implemented for F-MOCs.")),
     InternalMoc::TimeSpace(_) => Err(String::from("MOM Sum not implemented for ST-MOCs.")),
+    InternalMoc::FreqSpace(_) => Err(String::from("MOM Sum not implemented for SF-MOCs.")),
   })
 }
 
@@ -324,6 +362,7 @@ where
     InternalMoc::Time(_) => Err(String::from("MOM Filter not implemented for T-MOCs.")),
     InternalMoc::Frequency(_) => Err(String::from("MOM Filter not implemented for F-MOCs.")),
     InternalMoc::TimeSpace(_) => Err(String::from("MOM Filter not implemented for ST-MOCs.")),
+    InternalMoc::FreqSpace(_) => Err(String::from("MOM Filter not implemented for SF-MOCs.")),
   })
 }
 
@@ -359,5 +398,6 @@ where
     InternalMoc::Time(_) => Err(String::from("MOM Filter not implemented for T-MOCs.")),
     InternalMoc::Frequency(_) => Err(String::from("MOM Filter not implemented for F-MOCs.")),
     InternalMoc::TimeSpace(_) => Err(String::from("MOM Filter not implemented for ST-MOCs.")),
+    InternalMoc::FreqSpace(_) => Err(String::from("MOM Filter not implemented for SF-MOCs.")),
   })
 }

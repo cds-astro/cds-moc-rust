@@ -62,8 +62,8 @@ use self::{
     HALF_PI, PI, SMOC, STMOC, TMOC,
   },
   load::{
-    fmoc_from_fits_gen, from_fits_gen, from_fits_u64, smoc_from_fits_gen, stmoc_from_fits_u64,
-    tmoc_from_fits_gen,
+    fmoc_from_fits_gen, from_fits_gen, from_fits_u64, sfmoc_from_fits_u64, smoc_from_fits_gen,
+    stmoc_from_fits_u64, tmoc_from_fits_gen,
   },
   op1::{
     op1_1st_axis_max, op1_1st_axis_min, op1_border_elementary_edges_vertices, op1_count_split,
@@ -217,6 +217,10 @@ impl U64MocStore {
 
   pub fn get_stmoc_depths(&self, index: usize) -> Result<(u8, u8), String> {
     store::exec_on_one_readonly_moc(index, InternalMoc::get_stmoc_time_and_space_depths)
+  }
+
+  pub fn get_sfmoc_depths(&self, index: usize) -> Result<(u8, u8), String> {
+    store::exec_on_one_readonly_moc(index, InternalMoc::get_sfmoc_freq_and_space_depths)
   }
 
   pub fn is_empty(&self, index: usize) -> Result<bool, String> {
@@ -422,6 +426,38 @@ impl U64MocStore {
           MocIdxType::U16(_) => Err(String::from("Only u64 ST-MOCs are supported").into()),
           MocIdxType::U32(_) => Err(String::from("Only u64 ST-MOCs are supported").into()),
           MocIdxType::U64(moc) => stmoc_from_fits_u64(moc),
+        }
+        .map_err(|e| e.to_string())
+      })
+      .and_then(store::add)
+  }
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_sfmoc_from_fits_file<P: AsRef<Path>>(&self, source: P) -> Result<usize, String> {
+    let file = File::open(&source).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    self.load_sfmoc_from_fits(reader)
+  }
+
+  /// Load a MOC from the pre-loaded content of a FITS file, and put it in the store
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn load_sfmoc_from_fits_buff(&self, content: &[u8]) -> Result<usize, String> {
+    self.load_sfmoc_from_fits(Cursor::new(content))
+  }
+
+  pub fn load_sfmoc_from_fits<R: BufRead>(&self, reader: R) -> Result<usize, String> {
+    from_fits_ivoa(reader)
+      .map_err(|e| e.to_string())
+      .and_then(|moc| {
+        match moc {
+          MocIdxType::U16(_) => Err(String::from("Only u64 ST-MOCs are supported").into()),
+          MocIdxType::U32(_) => Err(String::from("Only u64 ST-MOCs are supported").into()),
+          MocIdxType::U64(moc) => sfmoc_from_fits_u64(moc),
         }
         .map_err(|e| e.to_string())
       })

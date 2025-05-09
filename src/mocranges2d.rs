@@ -1,21 +1,22 @@
-use std::marker::PhantomData;
-use std::ops::Range;
+use std::{marker::PhantomData, ops::Range};
 
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
-use crate::elemset::range::MocRanges;
-use crate::idx::Idx;
-use crate::qty::MocQty;
-use crate::ranges::{
-  ranges2d::{Ranges2D, SNORanges2D},
-  Ranges,
+use crate::{
+  elemset::range::MocRanges,
+  idx::Idx,
+  moc::{range::RangeMocIter, RangeMOCIntoIterator, RangeMOCIterator},
+  moc2d::{range::RangeMOC2Elem, RangeMOC2ElemIt, RangeMOC2Iterator},
+  qty::MocQty,
+  ranges::{
+    ranges2d::{Ranges2D, SNORanges2D},
+    Ranges,
+  },
 };
 
-// Declaration of the ST-MOC type mage in hpxranges2d
-// pub type TimeSpaceMoc<T, S> = Moc2DRanges::<T, Time<T>, S, Hpx<S>>;
+// Declaration of the ST-MOC and FS-MOC types made in hpxranges2d
 
-// only removing the depth() from Ranges2D<T, S> and let it in Moc2DRanges<TT, T, ST, S>
 #[derive(Debug)]
 pub struct Moc2DRanges<TT, T, ST, S>
 where
@@ -108,12 +109,79 @@ where
   /// # Precondition
   ///
   /// ``t`` and ``s`` must have the same length.
-  pub fn new(t: Vec<Range<TT>>, s: Vec<Ranges<ST>>) -> Moc2DRanges<TT, T, ST, S> {
-    Moc2DRanges {
+  pub fn new(t: Vec<Range<TT>>, s: Vec<Ranges<ST>>) -> Self {
+    Self {
       ranges2d: Ranges2D::new(t, s),
       _t_type: PhantomData,
       _s_type: PhantomData,
     }
+  }
+
+  pub fn from_ranges_it<I>(it: I) -> Self
+  where
+    I: RangeMOC2Iterator<
+      TT,
+      T,
+      RangeMocIter<TT, T>,
+      ST,
+      S,
+      RangeMocIter<ST, S>,
+      RangeMOC2Elem<TT, T, ST, S>,
+    >,
+  {
+    let mut f = Vec::<Range<TT>>::new(); // 'f' for 'first'
+    let mut s = Vec::<Ranges<ST>>::new(); // 's' for 'second'
+    for elem in it {
+      let (moc_f, moc_s) = elem.mocs();
+      /* Simpler but we want to avoid the copy of the secondary_moc for the last first_range
+      for range_f in moc_f.into_range_moc_iter() {
+          f.push(range_f);
+          s.push(moc_s.moc_ranges().ranges().clone())
+      }*/
+      let mut it = moc_f.into_range_moc_iter().peekable();
+      while it.peek().is_some() {
+        let range_t = it.next().unwrap();
+        f.push(range_t);
+        s.push(moc_s.moc_ranges().ranges().clone())
+      }
+      if let Some(range_t) = it.next() {
+        f.push(range_t);
+        s.push(moc_s.into_moc_ranges().into_ranges())
+      }
+    }
+    Self::new(f, s)
+  }
+
+  pub fn from_ranges_it_gen<I, J, K, L>(it: L) -> Self
+  where
+    I: RangeMOCIterator<TT, Qty = T>,
+    J: RangeMOCIterator<ST, Qty = S>,
+    K: RangeMOC2ElemIt<TT, T, ST, S, It1 = I, It2 = J>,
+    L: RangeMOC2Iterator<TT, T, I, ST, S, J, K>,
+  {
+    let mut f = Vec::<Range<TT>>::new(); // 'f' for 'first'
+    let mut s = Vec::<Ranges<ST>>::new(); // 's' for 'second'
+    for elem in it {
+      let (moc_f_it, moc_s_it) = elem.range_mocs_it();
+      let moc_f = moc_f_it.into_range_moc();
+      let moc_s = moc_s_it.into_range_moc();
+      /* Simpler but we want to avoid the copy of the s_moc for the last f_range
+      for range_f in moc_f.into_range_moc_iter() {
+          t.push(range_f);
+          s.push(moc_s.moc_ranges().ranges().clone())
+      }*/
+      let mut it = moc_f.into_range_moc_iter().peekable();
+      while it.peek().is_some() {
+        let range_f = it.next().unwrap();
+        f.push(range_f);
+        s.push(moc_s.moc_ranges().ranges().clone())
+      }
+      if let Some(range_f) = it.next() {
+        f.push(range_f);
+        s.push(moc_s.into_moc_ranges().into_ranges())
+      }
+    }
+    Self::new(f, s)
   }
 
   /// Compute the smallest possible depth of the coverage

@@ -94,6 +94,7 @@ impl OpN {
         self.perform_op_on_fmoc(mocs).map(InternalMoc::Frequency)
       }
       Some(InternalMoc::TimeSpace(_)) => Err(String::from("No opN operations for ST-MOCs")),
+      Some(InternalMoc::FreqSpace(_)) => Err(String::from("No opN operations for SF-MOCs")),
       None => Err(String::from("Empty MOC list")),
     })
   }

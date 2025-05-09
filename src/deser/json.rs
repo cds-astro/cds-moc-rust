@@ -1,18 +1,19 @@
-use std::error::Error;
-use std::io::Write;
+use std::{error::Error, io::Write};
 
 use byteorder::WriteBytesExt;
 use serde_json::{self, value::Value::Array, Value};
 
-use crate::elem::cell::Cell;
-use crate::elemset::cell::{Cells, MocCells};
-use crate::idx::Idx;
-use crate::moc::{cell::CellMOC, CellMOCIterator, HasMaxDepth};
-use crate::moc2d::{
-  cell::{CellMOC2, CellMOC2Elem},
-  CellMOC2ElemIt, CellMOC2Iterator,
+use crate::{
+  elem::cell::Cell,
+  elemset::cell::{Cells, MocCells},
+  idx::Idx,
+  moc::{cell::CellMOC, CellMOCIterator, HasMaxDepth},
+  moc2d::{
+    cell::{CellMOC2, CellMOC2Elem},
+    CellMOC2ElemIt, CellMOC2Iterator,
+  },
+  qty::MocQty,
 };
-use crate::qty::MocQty;
 
 /// Write a JSON following the Aladin JSON format.
 pub fn to_json_aladin<T, Q, I, W>(

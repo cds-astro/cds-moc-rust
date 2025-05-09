@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-  deser::fits::ranges2d_to_fits_ivoa,
+  deser::fits::{ranges_sf_to_fits_ivoa, ranges_st_to_fits_ivoa},
   moc::{
     range::RangeMOC, CellHpxMOCIterator, CellMOCIterator, CellOrCellRangeMOCIterator,
     RangeMOCIntoIterator, RangeMOCIterator,
@@ -34,6 +34,8 @@ pub(crate) type TMOC = RangeMOC<u64, Time<u64>>;
 pub(crate) type FMOC = RangeMOC<u64, Frequency<u64>>;
 /// Convenient type for SpaceTime-MOCs
 pub(crate) type STMOC = RangeMOC2<u64, Time<u64>, u64, Hpx<u64>>;
+/// Convenient type for FerqTime-MOCs
+pub(crate) type SFMOC = RangeMOC2<u64, Frequency<u64>, u64, Hpx<u64>>;
 
 #[derive(Copy, Clone)]
 pub enum MocQType {
@@ -41,6 +43,7 @@ pub enum MocQType {
   Time,
   Frequency,
   TimeSpace,
+  FreqSpace,
 }
 
 #[derive(Debug)]
@@ -49,6 +52,7 @@ pub(crate) enum InternalMoc {
   Time(TMOC),
   Frequency(FMOC),
   TimeSpace(STMOC),
+  FreqSpace(SFMOC),
 }
 
 impl PartialEq for InternalMoc {
@@ -58,6 +62,7 @@ impl PartialEq for InternalMoc {
       (InternalMoc::Time(l), InternalMoc::Time(r)) => r == l,
       (InternalMoc::Frequency(l), InternalMoc::Frequency(r)) => r == l,
       (InternalMoc::TimeSpace(l), InternalMoc::TimeSpace(r)) => r == l,
+      (InternalMoc::FreqSpace(l), InternalMoc::FreqSpace(r)) => r == l,
       _ => false,
     }
   }
@@ -87,6 +92,12 @@ impl From<STMOC> for InternalMoc {
   }
 }
 
+impl From<SFMOC> for InternalMoc {
+  fn from(value: SFMOC) -> Self {
+    InternalMoc::FreqSpace(value)
+  }
+}
+
 impl InternalMoc {
   pub(crate) fn get_qty_type(&self) -> Result<MocQType, String> {
     match self {
@@ -94,6 +105,7 @@ impl InternalMoc {
       InternalMoc::Time(_) => Ok(MocQType::Time),
       InternalMoc::Frequency(_) => Ok(MocQType::Frequency),
       InternalMoc::TimeSpace(_) => Ok(MocQType::TimeSpace),
+      InternalMoc::FreqSpace(_) => Ok(MocQType::FreqSpace),
     }
   }
 
@@ -108,6 +120,9 @@ impl InternalMoc {
       )),
       InternalMoc::TimeSpace(_) => Err(String::from(
         "Wrong MOC type. Expected: Space. Actual: Space-Time",
+      )),
+      InternalMoc::FreqSpace(_) => Err(String::from(
+        "Wrong MOC type. Expected: Space. Actual: Space-Frequency",
       )),
     }
   }
@@ -124,6 +139,9 @@ impl InternalMoc {
       InternalMoc::TimeSpace(_) => Err(String::from(
         "Wrong MOC type. Expected: Space. Actual: Space-Time",
       )),
+      InternalMoc::FreqSpace(_) => Err(String::from(
+        "Wrong MOC type. Expected: Space. Actual: Space-Frequency",
+      )),
     }
   }
 
@@ -138,6 +156,9 @@ impl InternalMoc {
       )),
       InternalMoc::TimeSpace(_) => Err(String::from(
         "Wrong MOC type. Expected: Time. Actual: Space-Time",
+      )),
+      InternalMoc::FreqSpace(_) => Err(String::from(
+        "Wrong MOC type. Expected: Time. Actual: Space-Frequency",
       )),
     }
   }
@@ -154,6 +175,9 @@ impl InternalMoc {
       InternalMoc::TimeSpace(_) => Err(String::from(
         "Wrong MOC type. Expected: Frequency. Actual: Space-Time",
       )),
+      InternalMoc::FreqSpace(_) => Err(String::from(
+        "Wrong MOC type. Expected: Frequency. Actual: Space-Frequency",
+      )),
     }
   }
 
@@ -169,6 +193,27 @@ impl InternalMoc {
         "Wrong MOC type. Expected: Space-Time. Actual: Frequency",
       )),
       InternalMoc::TimeSpace(moc2) => Ok((moc2.depth_max_1(), moc2.depth_max_2())),
+      InternalMoc::FreqSpace(_) => Err(String::from(
+        "Wrong MOC type. Expected: Space-Time. Actual: Space-Frequency",
+      )),
+    }
+  }
+
+  pub(crate) fn get_sfmoc_freq_and_space_depths(&self) -> Result<(u8, u8), String> {
+    match self {
+      InternalMoc::Space(_) => Err(String::from(
+        "Wrong MOC type. Expected: Space-Frequency. Actual: Space",
+      )),
+      InternalMoc::Time(_) => Err(String::from(
+        "Wrong MOC type. Expected: Space-Frequency. Actual: Time",
+      )),
+      InternalMoc::Frequency(_) => Err(String::from(
+        "Wrong MOC type. Expected: Space-Frequency. Actual: Frequency",
+      )),
+      InternalMoc::TimeSpace(_) => Err(String::from(
+        "Wrong MOC type. Expected: Space-Frequency. Actual: Space-Time",
+      )),
+      InternalMoc::FreqSpace(moc2) => Ok((moc2.depth_max_1(), moc2.depth_max_2())),
     }
   }
 
@@ -178,6 +223,7 @@ impl InternalMoc {
       InternalMoc::Time(moc) => moc.is_empty(),
       InternalMoc::Frequency(moc) => moc.is_empty(),
       InternalMoc::TimeSpace(moc) => moc.is_empty(),
+      InternalMoc::FreqSpace(moc) => moc.is_empty(),
     })
   }
 
@@ -187,6 +233,7 @@ impl InternalMoc {
       InternalMoc::Time(moc) => moc.len() as u32,
       InternalMoc::Frequency(moc) => moc.len() as u32,
       InternalMoc::TimeSpace(moc2) => moc2.compute_n_ranges() as u32,
+      InternalMoc::FreqSpace(moc2) => moc2.compute_n_ranges() as u32,
     })
   }
 
@@ -195,7 +242,9 @@ impl InternalMoc {
       InternalMoc::Space(moc) => Ok(moc.range_sum()),
       InternalMoc::Time(moc) => Ok(moc.range_sum()),
       InternalMoc::Frequency(moc) => Ok(moc.range_sum()),
-      InternalMoc::TimeSpace(_) => Err(String::from("Range sum not implemented for ST-MOC")),
+      InternalMoc::TimeSpace(_) | InternalMoc::FreqSpace(_) => {
+        Err(String::from("Range sum not implemented for 2D MOCs"))
+      }
     }
   }
 
@@ -204,7 +253,7 @@ impl InternalMoc {
       InternalMoc::Space(moc) => Some(moc.coverage_percentage() * 100.0),
       InternalMoc::Time(moc) => Some(moc.coverage_percentage() * 100.0),
       InternalMoc::Frequency(moc) => Some(moc.coverage_percentage() * 100.0),
-      InternalMoc::TimeSpace(_) => None,
+      InternalMoc::TimeSpace(_) | InternalMoc::FreqSpace(_) => None,
     }
   }
 
@@ -220,6 +269,9 @@ impl InternalMoc {
       InternalMoc::Time(_) => Err(String::from("Uniq HPX not possible with Time MOC")),
       InternalMoc::Frequency(_) => Err(String::from("Uniq HPX not possible with Frequency MOC")),
       InternalMoc::TimeSpace(_) => Err(String::from("Uniq HPX not possible with Time-Space MOCs")),
+      InternalMoc::FreqSpace(_) => Err(String::from(
+        "Uniq HPX not possible with Frequency-Space MOCs",
+      )),
     }
   }
 
@@ -246,7 +298,9 @@ impl InternalMoc {
           .map(|cell| cell.uniq::<Frequency<u64>>())
           .collect(),
       ),
-      InternalMoc::TimeSpace(_) => Err(String::from("Uniq gen not possible with Time-Space MOCs")),
+      InternalMoc::TimeSpace(_) | InternalMoc::FreqSpace(_) => {
+        Err(String::from("Uniq gen not possible with 2D MOCs"))
+      }
     }
   }
 
@@ -273,9 +327,9 @@ impl InternalMoc {
           .map(|cell| cell.zuniq::<Frequency<u64>>())
           .collect(),
       ),
-      InternalMoc::TimeSpace(_) => Err(String::from(
-        "Uniq Zorder not possible with Time-Space MOCs",
-      )),
+      InternalMoc::TimeSpace(_) | InternalMoc::FreqSpace(_) => {
+        Err(String::from("Uniq Zorder not possible with 2D MOCs"))
+      }
     }
   }
 
@@ -284,7 +338,9 @@ impl InternalMoc {
       InternalMoc::Space(moc) => Ok(moc.into_range_moc_iter().collect()),
       InternalMoc::Time(moc) => Ok(moc.into_range_moc_iter().collect()),
       InternalMoc::Frequency(moc) => Ok(moc.into_range_moc_iter().collect()),
-      InternalMoc::TimeSpace(_) => Err(String::from("Get ranges not possible for Time-Space MOCs")),
+      InternalMoc::TimeSpace(_) | InternalMoc::FreqSpace(_) => {
+        Err(String::from("Get ranges not possible for 2D MOCs"))
+      }
     }
   }
 
@@ -330,6 +386,11 @@ impl InternalMoc {
         .into_cellcellrange_moc2_iter()
         .to_ascii_ivoa(fold, false, writer)
         .map_err(|e| e.to_string()),
+      InternalMoc::FreqSpace(moc) => moc
+        .into_range_moc2_iter()
+        .into_cellcellrange_moc2_iter()
+        .to_ascii_ivoa(fold, false, writer)
+        .map_err(|e| e.to_string()),
     }
   }
 
@@ -368,6 +429,10 @@ impl InternalMoc {
         .cells()
         .to_json_aladin(fold, writer),
       InternalMoc::TimeSpace(moc) => moc
+        .into_range_moc2_iter()
+        .into_cell_moc2_iter()
+        .to_json_aladin(&fold, writer),
+      InternalMoc::FreqSpace(moc) => moc
         .into_range_moc2_iter()
         .into_cell_moc2_iter()
         .to_json_aladin(&fold, writer),
@@ -413,7 +478,10 @@ impl InternalMoc {
       InternalMoc::Time(moc) => moc.into_range_moc_iter().to_fits_ivoa(None, None, writer),
       InternalMoc::Frequency(moc) => moc.into_range_moc_iter().to_fits_ivoa(None, None, writer),
       InternalMoc::TimeSpace(moc) => {
-        ranges2d_to_fits_ivoa(moc.into_range_moc2_iter(), None, None, writer)
+        ranges_st_to_fits_ivoa(moc.into_range_moc2_iter(), None, None, writer)
+      }
+      InternalMoc::FreqSpace(moc) => {
+        ranges_sf_to_fits_ivoa(moc.into_range_moc2_iter(), None, None, writer)
       }
     }
     .map_err(|e| e.to_string())

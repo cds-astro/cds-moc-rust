@@ -1,5 +1,6 @@
 use std::{error::Error, io::BufRead};
 
+use crate::deser::fits::RangeMoc2DIterFromFits;
 use crate::{
   deser::fits::{MocQtyType, MocType, STMocType},
   idx::Idx,
@@ -22,6 +23,7 @@ pub(crate) fn from_fits_gen<T: Idx, R: BufRead>(
     MocQtyType::Time(moc) => from_fits_time(moc),
     MocQtyType::Freq(moc) => from_fits_freq(moc),
     MocQtyType::TimeHpx(_) => Err(String::from("Only u64 ST-MOCs supported").into()),
+    MocQtyType::FreqHpx(_) => Err(String::from("Only u64 SF-MOCs supported").into()),
   }
 }
 
@@ -38,6 +40,9 @@ pub(crate) fn smoc_from_fits_gen<T: Idx, R: BufRead>(
     }
     MocQtyType::TimeHpx(_) => {
       Err(String::from("Wrong MOC type. Expected: S-MOCs. Actual: ST-MOC").into())
+    }
+    MocQtyType::FreqHpx(_) => {
+      Err(String::from("Wrong MOC type. Expected: S-MOCs. Actual: SF-MOC").into())
     }
   }
 }
@@ -56,6 +61,9 @@ pub(crate) fn tmoc_from_fits_gen<T: Idx, R: BufRead>(
     MocQtyType::TimeHpx(_) => {
       Err(String::from("Wrong MOC type. Expected: T-MOCs. Actual: ST-MOC").into())
     }
+    MocQtyType::FreqHpx(_) => {
+      Err(String::from("Wrong MOC type. Expected: T-MOCs. Actual: SF-MOC").into())
+    }
   }
 }
 
@@ -71,7 +79,10 @@ pub(crate) fn fmoc_from_fits_gen<T: Idx, R: BufRead>(
     }
     MocQtyType::Freq(moc) => from_fits_freq(moc),
     MocQtyType::TimeHpx(_) => {
-      Err(String::from("Wrong MOC type. Expected: T-MOCs. Actual: ST-MOC").into())
+      Err(String::from("Wrong MOC type. Expected: F-MOCs. Actual: ST-MOC").into())
+    }
+    MocQtyType::FreqHpx(_) => {
+      Err(String::from("Wrong MOC type. Expected: F-MOCs. Actual: ST-MOC").into())
     }
   }
 }
@@ -90,6 +101,29 @@ pub(crate) fn stmoc_from_fits_u64<R: BufRead>(
       Err(String::from("Wrong MOC type. Expected: ST-MOCs. Actual: T-MOC").into())
     }
     MocQtyType::TimeHpx(moc2) => from_fits_spacetime(moc2),
+    MocQtyType::FreqHpx(_) => {
+      Err(String::from("Wrong MOC type. Expected: ST-MOCs. Actual: SF-MOC").into())
+    }
+  }
+}
+
+pub(crate) fn sfmoc_from_fits_u64<R: BufRead>(
+  moc: MocQtyType<u64, R>,
+) -> Result<InternalMoc, Box<dyn Error>> {
+  match moc {
+    MocQtyType::Hpx(_) => {
+      Err(String::from("Wrong MOC type. Expected: ST-MOCs. Actual: S-MOC").into())
+    }
+    MocQtyType::Time(_) => {
+      Err(String::from("Wrong MOC type. Expected: ST-MOCs. Actual: T-MOC").into())
+    }
+    MocQtyType::Freq(_) => {
+      Err(String::from("Wrong MOC type. Expected: ST-MOCs. Actual: T-MOC").into())
+    }
+    MocQtyType::TimeHpx(_) => {
+      Err(String::from("Wrong MOC type. Expected: SF-MOCs. Actual: ST-MOC").into())
+    }
+    MocQtyType::FreqHpx(moc2) => from_fits_spacefreq(moc2),
   }
 }
 
@@ -103,6 +137,7 @@ pub(crate) fn from_fits_u64<R: BufRead>(
     MocQtyType::Time(moc) => from_fits_time(moc),
     MocQtyType::Freq(moc) => from_fits_freq(moc),
     MocQtyType::TimeHpx(moc2) => from_fits_spacetime(moc2),
+    MocQtyType::FreqHpx(moc2) => from_fits_spacefreq(moc2),
   }
 }
 
@@ -160,4 +195,13 @@ fn from_fits_spacetime<R: BufRead>(moc2: STMocType<u64, R>) -> Result<InternalMo
     }
   };
   Ok(InternalMoc::TimeSpace(moc2))
+}
+
+fn from_fits_spacefreq<R: BufRead>(
+  moc2: RangeMoc2DIterFromFits<u64, R, Frequency<u64>, Hpx<u64>>,
+) -> Result<InternalMoc, Box<dyn Error>> {
+  let depth_max_1 = moc2.depth_max_1();
+  let depth_max_2 = moc2.depth_max_2();
+  let moc2 = RangeMOC2::new(depth_max_1, depth_max_2, moc2.collect());
+  Ok(InternalMoc::FreqSpace(moc2))
 }

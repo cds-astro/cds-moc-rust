@@ -1,5 +1,6 @@
 use std::{cmp::Ordering, ops::Range, slice, vec::IntoIter};
 
+use crate::qty::Frequency;
 use crate::{
   idx::Idx,
   moc::{
@@ -282,6 +283,57 @@ impl RangeMOC2<u64, Time<u64>, u64, Hpx<u64>> {
       depth_hpx,
       val_it
         .map(move |(us_since_jd0, lon_rad, lat_rad)| (us_since_jd0, layer.hash(lon_rad, lat_rad))),
+      buf_capacity,
+    )
+  }
+}
+
+impl RangeMOC2<u64, Frequency<u64>, u64, Hpx<u64>> {
+  pub fn new_empty(depth_freq: u8, depth_hpx: u8) -> Self {
+    Self::new(depth_freq, depth_hpx, Default::default())
+  }
+
+  /// Frequency in Hz
+  /// (Lon, Lat) in radians
+  pub fn from_freq_in_hz_and_coos<I: Iterator<Item = (f64, (f64, f64))>>(
+    depth_freq: u8,
+    depth_hpx: u8,
+    val_it: I,
+    buf_capacity: Option<usize>,
+  ) -> Self {
+    let layer = healpix::nested::get(depth_hpx);
+    Self::from_fixed_depth_cells(
+      depth_freq,
+      depth_hpx,
+      val_it.map(move |(freq_hz, (lon_rad, lat_rad))| {
+        (
+          Frequency::<u64>::freq2hash(freq_hz),
+          layer.hash(lon_rad, lat_rad),
+        )
+      }),
+      buf_capacity,
+    )
+  }
+
+  /// Frequency in Hz
+  /// (Lon, Lat) in radians
+  pub fn from_freqranges_in_hz_and_coos<I: Iterator<Item = (Range<f64>, (f64, f64))>>(
+    depth_freq: u8,
+    depth_hpx: u8,
+    val_it: I,
+    buf_capacity: Option<usize>,
+  ) -> Self {
+    let layer = healpix::nested::get(depth_hpx);
+    Self::from_ranges_and_fixed_depth_cells(
+      depth_freq,
+      depth_hpx,
+      val_it.map(move |(freq_hz_range, (lon_rad, lat_rad))| {
+        (
+          Frequency::<u64>::freq2hash(freq_hz_range.start)
+            ..Frequency::<u64>::freq2hash(freq_hz_range.end),
+          layer.hash(lon_rad, lat_rad),
+        )
+      }),
       buf_capacity,
     )
   }
