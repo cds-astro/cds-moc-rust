@@ -1,15 +1,14 @@
-use std::error::Error;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::PathBuf;
+use std::{error::Error, fs::File, io::BufReader, path::PathBuf};
 
 use structopt::StructOpt;
 
-use moclib::deser::fits::{MocIdxType, MocQtyType, MocType, STMocType};
-use moclib::idx::Idx;
-use moclib::moc::{range::RangeMocIter, CellMOCIntoIterator, CellMOCIterator, RangeMOCIterator};
-use moclib::moc2d::{range::RangeMOC2Elem, RangeMOC2Iterator};
-use moclib::qty::{Hpx, MocQty, Time};
+use moclib::{
+  deser::fits::{MocIdxType, MocQtyType, MocType, STMocType},
+  idx::Idx,
+  moc::{range::RangeMocIter, CellMOCIntoIterator, CellMOCIterator, RangeMOCIterator},
+  moc2d::{range::RangeMOC2Elem, RangeMOC2Iterator},
+  qty::MocQty,
+};
 
 use super::input::from_fits_file;
 
@@ -43,8 +42,9 @@ fn print_info_qty<T: Idx>(
   match moc {
     MocQtyType::Hpx(moc) => print_moc_info_type(idx_type, "SPACE", moc),
     MocQtyType::Time(moc) => print_moc_info_type(idx_type, "TIME", moc),
-    MocQtyType::TimeHpx(moc) => print_moc2_info_type(idx_type, "TIME-SPACE", moc),
     MocQtyType::Freq(moc) => print_moc_info_type(idx_type, "FREQUENCY", moc),
+    MocQtyType::TimeHpx(moc) => print_moc2_info_type(idx_type, "TIME-SPACE", moc),
+    MocQtyType::FreqHpx(moc) => print_moc2_info(idx_type, "FREQUENCY-SPACE", moc),
   }
 }
 
@@ -84,28 +84,45 @@ fn print_moc2_info_type<T: Idx>(
   }
 }
 
-fn print_moc2_info<T: Idx, R>(idx_type: &str, qty_type: &str, moc2: R) -> Result<(), Box<dyn Error>>
+fn print_moc2_info<T: Idx, Q1: MocQty<T>, Q2: MocQty<T>, R>(
+  idx_type: &str,
+  qty_type: &str,
+  moc2: R,
+) -> Result<(), Box<dyn Error>>
 where
   T: Idx,
   R: RangeMOC2Iterator<
     T,
-    Time<T>,
-    RangeMocIter<T, Time<T>>,
+    Q1,
+    RangeMocIter<T, Q1>,
     T,
-    Hpx<T>,
-    RangeMocIter<T, Hpx<T>>,
-    RangeMOC2Elem<T, Time<T>, T, Hpx<T>>,
+    Q2,
+    RangeMocIter<T, Q2>,
+    RangeMOC2Elem<T, Q1, T, Q2>,
   >,
 {
-  let max_depth_hpx = moc2.depth_max_1();
-  let max_depth_time = moc2.depth_max_2();
+  let name_lowercase_dim1 = Q1::NAME.to_lowercase().to_string();
+  let name_lowercase_dim2 = Q2::NAME.to_lowercase().to_string();
+  let prefix_uppercase_dim1 = Q1::PREFIX.to_uppercase().to_string();
+  let prefix_uppercase_dim2 = Q2::PREFIX.to_uppercase().to_string();
+  let max_depth_dim1 = moc2.depth_max_1();
+  let max_depth_dim2 = moc2.depth_max_2();
   let (n_elems, n_1, n_2) = moc2.stats();
   println!("MOC type: {}", qty_type);
   println!("MOC index type: {}", idx_type);
-  println!("MOC hpx  depth: {}", max_depth_hpx);
-  println!("MOC time depth: {}", max_depth_time);
-  println!("MOC number of (T-MOC, S-MOC) tuples: {}", n_elems);
-  println!("Tot number of T-MOC ranges: {}", n_1);
-  println!("Tot Number of T-MOC ranges: {}", n_2);
+  println!("MOC {} depth: {}", name_lowercase_dim1, max_depth_dim1);
+  println!("MOC {} depth: {}", name_lowercase_dim2, max_depth_dim2);
+  println!(
+    "MOC number of ({}-MOC, {}-MOC) tuples: {}",
+    prefix_uppercase_dim1, prefix_uppercase_dim2, n_elems
+  );
+  println!(
+    "Tot number of {}-MOC ranges: {}",
+    prefix_uppercase_dim1, n_1
+  );
+  println!(
+    "Tot Number of {}-MOC ranges: {}",
+    prefix_uppercase_dim2, n_2
+  );
   Ok(())
 }

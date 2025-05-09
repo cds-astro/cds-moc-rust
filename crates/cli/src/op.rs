@@ -2,13 +2,18 @@ use std::{error::Error, fs::File, io::BufReader, path::PathBuf};
 
 use structopt::StructOpt;
 
+use crate::{
+  input::{self, ReducedInputFormat},
+  output::OutputFormat,
+};
+use moclib::hpxranges2d::HpxRanges2D;
 use moclib::{
   deser::fits::{
     from_fits_ivoa, multiordermap::sum_from_fits_multiordermap, MocIdxType, MocQtyType, MocType,
-    STMocType,
+    RangeMoc2DIterFromFits, STMocType,
   },
   elemset::range::MocRanges,
-  hpxranges2d::TimeSpaceMoc,
+  hpxranges2d::{FreqSpaceMoc, TimeSpaceMoc},
   idx::Idx,
   moc::{
     range::{RangeMOC, RangeMocIter},
@@ -16,11 +21,6 @@ use moclib::{
   },
   moc2d::{range::RangeMOC2Elem, RangeMOC2Iterator},
   qty::{Frequency, Hpx, MocQty, Time},
-};
-
-use crate::{
-  input::{self, ReducedInputFormat},
-  output::OutputFormat,
 };
 
 #[derive(StructOpt, Debug)]
@@ -95,13 +95,15 @@ pub enum Op {
   /// Performs the logical operation 'AND(left, NOT(right))' between 2 MOCs (= left minus right)
   Minus(Op2Args),
   // MultiUnion OpNArgs (only FITS files?)
+  #[structopt(name = "sfold")]
+  /// Returns the union of the T- or F-MOCs associated to S-MOCs intersecting the given S-MOC. Left: S-MOC, right: ST-MOC or SF-MOC, res: T-MOC or F-MOC.
+  SpaceFold(Op2Args),
   #[structopt(name = "tfold")]
   /// Returns the union of the S-MOCs associated to T-MOCs intersecting the given T-MOC. Left: T-MOC, right: ST-MOC, res: S-MOC.
   TimeFold(Op2Args),
-  #[structopt(name = "sfold")]
-  /// Returns the union of the T-MOCs associated to S-MOCs intersecting the given S-MOC. Left: S-MOC, right: ST-MOC, res: T-MOC.
-  SpaceFold(Op2Args),
-
+  #[structopt(name = "ffold")]
+  /// Returns the union of the S-MOCs associated to F-MOCs intersecting the given F-MOC. Left: F-MOC, right: SF-MOC, res: S-MOC.
+  FreqFold(Op2Args),
   #[structopt(name = "momsum")]
   /// Returns the sum of the values of the given Multi-Order Map which are in the given MOC.
   MultiOrderMapSum {
@@ -143,8 +145,9 @@ impl Op {
       Op::Union(op) => op.exec(Op2::Union),
       Op::SymmetricDifference(op) => op.exec(Op2::SymmetricDifference),
       Op::Minus(op) => op.exec(Op2::Minus),
-      Op::TimeFold(op) => op.exec(Op2::TimeFold),
       Op::SpaceFold(op) => op.exec(Op2::SpaceFold),
+      Op::TimeFold(op) => op.exec(Op2::TimeFold),
+      Op::FreqFold(op) => op.exec(Op2::FreqFold),
       Op::MultiOrderMapSum { mom, moc } => input::from_fits_file(moc).and_then(|moc| {
         let moc = match moc {
           MocIdxType::U16(moc) => match moc {
@@ -218,8 +221,9 @@ fn op1_exec_on_fits_qty<T: Idx>(
   match moc {
     MocQtyType::Hpx(moc) => op1_exec_on_fits_hpx(op1, moc, output),
     MocQtyType::Time(moc) => op1_exec_on_fits_time(op1, moc, output),
-    MocQtyType::TimeHpx(moc) => op1_exec_on_fits_timehpx(op1, moc, output),
     MocQtyType::Freq(moc) => op1_exec_on_fits_freq(op1, moc, output),
+    MocQtyType::TimeHpx(moc) => op1_exec_on_fits_timehpx(op1, moc, output),
+    MocQtyType::FreqHpx(moc) => op1_exec_on_fits_freqhpx(op1, moc, output),
   }
 }
 
@@ -250,17 +254,6 @@ fn op1_exec_on_fits_time<T: Idx>(
   }
 }
 
-fn op1_exec_on_fits_timehpx<T: Idx>(
-  op1: Op1,
-  moc: STMocType<T, BufReader<File>>,
-  output: OutputFormat,
-) -> Result<(), Box<dyn Error>> {
-  match moc {
-    STMocType::V2(stmoc) => op1.perform_op_on_strangemoc_iter(stmoc, output),
-    STMocType::PreV2(stmoc) => op1.perform_op_on_strangemoc_iter(stmoc, output),
-  }
-}
-
 fn op1_exec_on_fits_freq<T: Idx>(
   op1: Op1,
   moc: MocType<T, Frequency<T>, BufReader<File>>,
@@ -273,6 +266,25 @@ fn op1_exec_on_fits_freq<T: Idx>(
       op1.perform_op_on_frangemoc_iter(moc.into_cell_moc_iter().ranges(), output)
     }
   }
+}
+
+fn op1_exec_on_fits_timehpx<T: Idx>(
+  op1: Op1,
+  moc: STMocType<T, BufReader<File>>,
+  output: OutputFormat,
+) -> Result<(), Box<dyn Error>> {
+  match moc {
+    STMocType::V2(stmoc) => op1.perform_op_on_2drangemoc_iter(stmoc, output),
+    STMocType::PreV2(stmoc) => op1.perform_op_on_2drangemoc_iter(stmoc, output),
+  }
+}
+
+fn op1_exec_on_fits_freqhpx<T: Idx>(
+  op1: Op1,
+  moc: RangeMoc2DIterFromFits<T, BufReader<File>, Frequency<T>, Hpx<T>>,
+  output: OutputFormat,
+) -> Result<(), Box<dyn Error>> {
+  op1.perform_op_on_2drangemoc_iter(moc, output)
 }
 
 pub enum Op1 {
@@ -416,7 +428,7 @@ impl Op1 {
     }
   }
 
-  pub fn perform_op_on_strangemoc_iter<T, R>(
+  pub fn perform_op_on_2drangemoc_iter<T, Q1: MocQty<T>, Q2: MocQty<T>, R>(
     self,
     /*moc2: HpxRanges2D<T, Time<T>, T>*/ _moc_it: R,
     _out: OutputFormat,
@@ -425,29 +437,31 @@ impl Op1 {
     T: Idx,
     R: RangeMOC2Iterator<
       T,
-      Time<T>,
-      RangeMocIter<T, Time<T>>,
+      Q1,
+      RangeMocIter<T, Q1>,
       T,
-      Hpx<T>,
-      RangeMocIter<T, Hpx<T>>,
-      RangeMOC2Elem<T, Time<T>, T, Hpx<T>>,
+      Q2,
+      RangeMocIter<T, Q2>,
+      RangeMOC2Elem<T, Q1, T, Q2>,
     >,
   {
-    //let moc2:  HpxRanges2D<T, Time<T>, T> = HpxRanges2D::from_ranges_it(moc_it);
+    let prefix_uppercase_dim1 = Q1::PREFIX.to_uppercase().to_string();
+    let prefix_uppercase_dim2 = Q2::PREFIX.to_uppercase().to_string();
+    let moc_type = format!("{}{}-MOC", prefix_uppercase_dim1, prefix_uppercase_dim2);
     match self {
       Op1::Complement => todo!(), // Not yet implemented on ST-MOC!! Do we add time ranges with full space S-MOCs?
-      Op1::Degrade { .. } => todo!(), // Not yet implemented on ST-MOC!! Degrade on T, on S, on both (take two paramaeters)?
-      Op1::Split { .. } => Err(String::from("No 'split' operation on ST-MOCs.").into()),
+      Op1::Degrade { .. } => todo!(), // Not yet implemented on ST-MOC!! Degrade on T, on S, on both (take two parameters)?
+      Op1::Split { .. } => Err(format!("No 'split' operation on {}s.", moc_type).into()),
       Op1::FillHolesExceptLargest { .. } => {
-        Err(String::from("No 'fillexcept' operation on ST-MOCs.").into())
+        Err(format!("No 'fillexcept' operation on {}-MOCs.", moc_type).into())
       }
       Op1::FillHolesSmallerThan { .. } => {
-        Err(String::from("No 'fillholes' operation on ST-MOCs.").into())
+        Err(format!("No 'fillholes' operation on {}-MOCs.", moc_type).into())
       }
-      Op1::Extend => Err(String::from("No 'extend' operation on ST-MOCs.").into()),
-      Op1::Contract => Err(String::from("No 'contract' operation on ST-MOCs.").into()),
-      Op1::ExtBorder => Err(String::from("No 'extborder' operation on ST-MOCs.").into()),
-      Op1::IntBorder => Err(String::from("No 'intborder' operation on ST-MOCs.").into()),
+      Op1::Extend => Err(format!("No 'extend' operation on {}-MOCs.", moc_type).into()),
+      Op1::Contract => Err(format!("No 'contract' operation on {}-MOCs.", moc_type).into()),
+      Op1::ExtBorder => Err(format!("No 'extborder' operation on {}-MOCs.", moc_type).into()),
+      Op1::IntBorder => Err(format!("No 'intborder' operation on {}-MOCs.", moc_type).into()),
     }
   }
 }
@@ -537,53 +551,86 @@ fn op2_exec_on_fits_qty<T: Idx>(
   output: OutputFormat,
 ) -> Result<(), Box<dyn Error>> {
   match (left_moc, right_moc) {
+    // Same type of MOCs
     (MocQtyType::Hpx(left_moc), MocQtyType::Hpx(right_moc)) => {
       op2_exec_on_fits_moc(op2, left_moc, right_moc, output)
     }
     (MocQtyType::Time(left_moc), MocQtyType::Time(right_moc)) => {
       op2_exec_on_fits_moc(op2, left_moc, right_moc, output)
     }
-    (MocQtyType::TimeHpx(left_moc), MocQtyType::TimeHpx(right_moc)) => {
-      op2_exec_on_fits_moc2(op2, left_moc, right_moc, output)
-    }
-    (MocQtyType::Hpx(left_moc), MocQtyType::TimeHpx(right_moc)) => {
-      op2_exec_on_fits_smoc_stmoc(op2, left_moc, right_moc, output)
-    }
-    (MocQtyType::TimeHpx(_), MocQtyType::Hpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into())
-    }
-    (MocQtyType::Time(left_moc), MocQtyType::TimeHpx(right_moc)) => {
-      op2_exec_on_fits_tmoc_stmoc(op2, left_moc, right_moc, output)
-    }
-    (MocQtyType::TimeHpx(_), MocQtyType::Time(_)) => {
-      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into())
-    }
-    (MocQtyType::Hpx(_), MocQtyType::Time(_)) => {
-      Err(String::from("Incompatible MOCs. Left: S-MOC. Right: T-MOC.").into())
-    }
-    (MocQtyType::Time(_), MocQtyType::Hpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: T-MOC. Right: S-MOC.").into())
-    }
-    (MocQtyType::Freq(_), MocQtyType::TimeHpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: ST-MOC.").into())
-    }
-    (MocQtyType::TimeHpx(_), MocQtyType::Freq(_)) => {
-      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: F-MOC.").into())
-    }
     (MocQtyType::Freq(left_moc), MocQtyType::Freq(right_moc)) => {
       op2_exec_on_fits_moc(op2, left_moc, right_moc, output)
+    }
+    (MocQtyType::TimeHpx(left_moc), MocQtyType::TimeHpx(right_moc)) => {
+      op2_exec_on_fits_stmoc(op2, left_moc, right_moc, output)
+    }
+    (MocQtyType::FreqHpx(left_moc), MocQtyType::FreqHpx(right_moc)) => {
+      op2_exec_on_fits_sfmoc(op2, left_moc, right_moc, output)
+    }
+    // HPX vs Other
+    (MocQtyType::Hpx(_), MocQtyType::Time(_)) => {
+      Err(String::from("Incompatible MOCs. Left: S-MOC. Right: T-MOC.").into())
     }
     (MocQtyType::Hpx(_), MocQtyType::Freq(_)) => {
       Err(String::from("Incompatible MOCs. Left: S-MOC. Right: F-MOC.").into())
     }
-    (MocQtyType::Freq(_), MocQtyType::Hpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: S-MOC.").into())
+    (MocQtyType::Hpx(left_moc), MocQtyType::TimeHpx(right_moc)) => {
+      op2_exec_on_fits_smoc_stmoc(op2, left_moc, right_moc, output)
+    }
+    (MocQtyType::Hpx(left_moc), MocQtyType::FreqHpx(right_moc)) => {
+      op2_exec_on_fits_smoc_sfmoc(op2, left_moc, right_moc, output)
+    }
+    // Time vs Other
+    (MocQtyType::Time(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: T-MOC. Right: S-MOC.").into())
     }
     (MocQtyType::Time(_), MocQtyType::Freq(_)) => {
       Err(String::from("Incompatible MOCs. Left: T-MOC. Right: F-MOC.").into())
     }
+    (MocQtyType::Time(left_moc), MocQtyType::TimeHpx(right_moc)) => {
+      op2_exec_on_fits_tmoc_stmoc(op2, left_moc, right_moc, output)
+    }
+    (MocQtyType::Time(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: T-MOC. Right: SF-MOC.").into())
+    }
+    // Freq vs Other
+    (MocQtyType::Freq(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: S-MOC.").into())
+    }
     (MocQtyType::Freq(_), MocQtyType::Time(_)) => {
       Err(String::from("Incompatible MOCs. Left: F-MOC. Right: T-MOC.").into())
+    }
+    (MocQtyType::Freq(_), MocQtyType::TimeHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: ST-MOC.").into())
+    }
+    (MocQtyType::Freq(left_moc), MocQtyType::FreqHpx(right_moc)) => {
+      op2_exec_on_fits_fmoc_sfmoc(op2, left_moc, right_moc, output)
+    }
+    // ST-MOC vs Others
+    (MocQtyType::TimeHpx(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into())
+    }
+    (MocQtyType::TimeHpx(_), MocQtyType::Time(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into())
+    }
+    (MocQtyType::TimeHpx(_), MocQtyType::Freq(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: F-MOC.").into())
+    }
+    (MocQtyType::TimeHpx(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: SF-MOC.").into())
+    }
+    // SF-MOC vs Others
+    (MocQtyType::FreqHpx(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: S-MOC.").into())
+    }
+    (MocQtyType::FreqHpx(_), MocQtyType::Time(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: T-MOC.").into())
+    }
+    (MocQtyType::FreqHpx(_), MocQtyType::Freq(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: F-MOC.").into())
+    }
+    (MocQtyType::FreqHpx(_), MocQtyType::TimeHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: ST-MOC.").into())
     }
   }
 }
@@ -618,53 +665,86 @@ fn op2_exec_on_fits_qty_with_lconv<TL: Idx, TR: Idx + From<TL>>(
   output: OutputFormat,
 ) -> Result<(), Box<dyn Error>> {
   match (left_moc, right_moc) {
+    // Same types
     (MocQtyType::Hpx(left_moc), MocQtyType::Hpx(right_moc)) => {
       op2_exec_on_fits_moc_lconv(op2, left_moc, right_moc, output)
     }
     (MocQtyType::Time(left_moc), MocQtyType::Time(right_moc)) => {
       op2_exec_on_fits_moc_lconv(op2, left_moc, right_moc, output)
     }
+    (MocQtyType::Freq(left_moc), MocQtyType::Freq(right_moc)) => {
+      op2_exec_on_fits_moc_lconv(op2, left_moc, right_moc, output)
+    }
     (MocQtyType::TimeHpx(_), MocQtyType::TimeHpx(_)) => {
       Err(String::from("Unable to convert a ST-MOCs datatype so far.").into())
     }
-    (MocQtyType::Hpx(left_moc), MocQtyType::TimeHpx(right_moc)) => {
-      op2_exec_on_fits_smoc_stmoc_lconv(op2, left_moc, right_moc, output)
+    (MocQtyType::FreqHpx(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Unable to convert a SF-MOCs datatype so far.").into())
     }
-    (MocQtyType::TimeHpx(_), MocQtyType::Hpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into())
-    }
-    (MocQtyType::Time(left_moc), MocQtyType::TimeHpx(right_moc)) => {
-      op2_exec_on_fits_tmoc_stmoc_lconv(op2, left_moc, right_moc, output)
-    }
-    (MocQtyType::TimeHpx(_), MocQtyType::Time(_)) => {
-      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into())
-    }
+    // Hpx vs other
     (MocQtyType::Hpx(_), MocQtyType::Time(_)) => {
       Err(String::from("Incompatible MOCs. Left: S-MOC. Right: T-MOC.").into())
-    }
-    (MocQtyType::Time(_), MocQtyType::Hpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: T-MOC. Right: S-MOC.").into())
-    }
-    (MocQtyType::Freq(_), MocQtyType::TimeHpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: ST-MOC.").into())
-    }
-    (MocQtyType::TimeHpx(_), MocQtyType::Freq(_)) => {
-      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: F-MOC.").into())
-    }
-    (MocQtyType::Freq(left_moc), MocQtyType::Freq(right_moc)) => {
-      op2_exec_on_fits_moc_lconv(op2, left_moc, right_moc, output)
     }
     (MocQtyType::Hpx(_), MocQtyType::Freq(_)) => {
       Err(String::from("Incompatible MOCs. Left: S-MOC. Right: F-MOC.").into())
     }
-    (MocQtyType::Freq(_), MocQtyType::Hpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: S-MOC.").into())
+    (MocQtyType::Hpx(left_moc), MocQtyType::TimeHpx(right_moc)) => {
+      op2_exec_on_fits_smoc_stmoc_lconv(op2, left_moc, right_moc, output)
+    }
+    (MocQtyType::Hpx(left_moc), MocQtyType::FreqHpx(right_moc)) => {
+      op2_exec_on_fits_smoc_sfmoc_lconv(op2, left_moc, right_moc, output)
+    }
+    // Time vs Other
+    (MocQtyType::Time(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: T-MOC. Right: S-MOC.").into())
     }
     (MocQtyType::Time(_), MocQtyType::Freq(_)) => {
       Err(String::from("Incompatible MOCs. Left: T-MOC. Right: F-MOC.").into())
     }
+    (MocQtyType::Time(left_moc), MocQtyType::TimeHpx(right_moc)) => {
+      op2_exec_on_fits_tmoc_stmoc_lconv(op2, left_moc, right_moc, output)
+    }
+    (MocQtyType::Time(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: T-MOC. Right: SF-MOC.").into())
+    }
+    // Freq vs Other
+    (MocQtyType::Freq(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: S-MOC.").into())
+    }
     (MocQtyType::Freq(_), MocQtyType::Time(_)) => {
       Err(String::from("Incompatible MOCs. Left: F-MOC. Right: T-MOC.").into())
+    }
+    (MocQtyType::Freq(_), MocQtyType::TimeHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: ST-MOC.").into())
+    }
+    (MocQtyType::Freq(left_moc), MocQtyType::FreqHpx(right_moc)) => {
+      op2_exec_on_fits_fmoc_sfmoc_lconv(op2, left_moc, right_moc, output)
+    }
+    // TimeHpx vs Other
+    (MocQtyType::TimeHpx(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into())
+    }
+    (MocQtyType::TimeHpx(_), MocQtyType::Time(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into())
+    }
+    (MocQtyType::TimeHpx(_), MocQtyType::Freq(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: F-MOC.").into())
+    }
+    (MocQtyType::TimeHpx(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: SF-MOC.").into())
+    }
+    // Freq HPX vs Other
+    (MocQtyType::FreqHpx(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: S-MOC.").into())
+    }
+    (MocQtyType::FreqHpx(_), MocQtyType::Time(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: T-MOC.").into())
+    }
+    (MocQtyType::FreqHpx(_), MocQtyType::Freq(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: F-MOC.").into())
+    }
+    (MocQtyType::FreqHpx(_), MocQtyType::TimeHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: ST-MOC.").into())
     }
   }
 }
@@ -704,53 +784,86 @@ fn op2_exec_on_fits_qty_with_rconv<TL: Idx + From<TR>, TR: Idx>(
   output: OutputFormat,
 ) -> Result<(), Box<dyn Error>> {
   match (left_moc, right_moc) {
+    // Same types
     (MocQtyType::Hpx(left_moc), MocQtyType::Hpx(right_moc)) => {
       op2_exec_on_fits_moc_rconv(op2, left_moc, right_moc, output)
     }
     (MocQtyType::Time(left_moc), MocQtyType::Time(right_moc)) => {
       op2_exec_on_fits_moc_rconv(op2, left_moc, right_moc, output)
     }
+    (MocQtyType::Freq(left_moc), MocQtyType::Freq(right_moc)) => {
+      op2_exec_on_fits_moc_rconv(op2, left_moc, right_moc, output)
+    }
     (MocQtyType::TimeHpx(_), MocQtyType::TimeHpx(_)) => {
       Err(String::from("Unable to convert a ST-MOCs datatype so far.").into())
     }
-    (MocQtyType::Hpx(_), MocQtyType::TimeHpx(_)) => {
-      Err(String::from("Unable to convert a ST-MOCs datatype so far.").into())
+    (MocQtyType::FreqHpx(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Unable to convert a SF-MOCs datatype so far.").into())
     }
-    (MocQtyType::TimeHpx(_), MocQtyType::Hpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into())
-    }
-    (MocQtyType::Time(_), MocQtyType::TimeHpx(_)) => {
-      Err(String::from("Unable to convert a ST-MOCs datatype so far.").into())
-    }
-    (MocQtyType::TimeHpx(_), MocQtyType::Time(_)) => {
-      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into())
-    }
+    // Hpx vs Other
     (MocQtyType::Hpx(_), MocQtyType::Time(_)) => {
       Err(String::from("Incompatible MOCs. Left: S-MOC. Right: T-MOC.").into())
-    }
-    (MocQtyType::Time(_), MocQtyType::Hpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: T-MOC. Right: S-MOC.").into())
-    }
-    (MocQtyType::Freq(_), MocQtyType::TimeHpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: ST-MOC.").into())
-    }
-    (MocQtyType::TimeHpx(_), MocQtyType::Freq(_)) => {
-      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: F-MOC.").into())
-    }
-    (MocQtyType::Freq(left_moc), MocQtyType::Freq(right_moc)) => {
-      op2_exec_on_fits_moc_rconv(op2, left_moc, right_moc, output)
     }
     (MocQtyType::Hpx(_), MocQtyType::Freq(_)) => {
       Err(String::from("Incompatible MOCs. Left: S-MOC. Right: F-MOC.").into())
     }
-    (MocQtyType::Freq(_), MocQtyType::Hpx(_)) => {
-      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: S-MOC.").into())
+    (MocQtyType::Hpx(_), MocQtyType::TimeHpx(_)) => {
+      Err(String::from("Unable to convert a ST-MOCs datatype so far.").into())
+    }
+    (MocQtyType::Hpx(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: S-MOC. Right: SF-MOC.").into())
+    }
+    // Time vs Other
+    (MocQtyType::Time(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: T-MOC. Right: S-MOC.").into())
     }
     (MocQtyType::Time(_), MocQtyType::Freq(_)) => {
       Err(String::from("Incompatible MOCs. Left: T-MOC. Right: F-MOC.").into())
     }
+    (MocQtyType::Time(_), MocQtyType::TimeHpx(_)) => {
+      Err(String::from("Unable to convert a ST-MOCs datatype so far.").into())
+    }
+    (MocQtyType::Time(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Unable to convert a SF-MOCs datatype so far.").into())
+    }
+    // Freq vs Other
+    (MocQtyType::Freq(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: S-MOC.").into())
+    }
     (MocQtyType::Freq(_), MocQtyType::Time(_)) => {
       Err(String::from("Incompatible MOCs. Left: F-MOC. Right: T-MOC.").into())
+    }
+    (MocQtyType::Freq(_), MocQtyType::TimeHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: F-MOC. Right: ST-MOC.").into())
+    }
+    (MocQtyType::Freq(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Unable to convert a SF-MOCs datatype so far.").into())
+    }
+    // HpxTime vs Other
+    (MocQtyType::TimeHpx(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: S-MOC.").into())
+    }
+    (MocQtyType::TimeHpx(_), MocQtyType::Time(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: T-MOC.").into())
+    }
+    (MocQtyType::TimeHpx(_), MocQtyType::Freq(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: F-MOC.").into())
+    }
+    (MocQtyType::TimeHpx(_), MocQtyType::FreqHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: ST-MOC. Right: SF-MOC.").into())
+    }
+    // FreqTime vs Other
+    (MocQtyType::FreqHpx(_), MocQtyType::Hpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: S-MOC.").into())
+    }
+    (MocQtyType::FreqHpx(_), MocQtyType::Time(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: T-MOC.").into())
+    }
+    (MocQtyType::FreqHpx(_), MocQtyType::Freq(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: F-MOC.").into())
+    }
+    (MocQtyType::FreqHpx(_), MocQtyType::TimeHpx(_)) => {
+      Err(String::from("Incompatible MOCs. Left: SF-MOC. Right: ST-MOC.").into())
     }
   }
 }
@@ -782,7 +895,7 @@ fn op2_exec_on_fits_moc_rconv<TL: Idx + From<TR>, QL: MocQty<TL>, TR: Idx, QR: M
   }
 }
 
-fn op2_exec_on_fits_moc2<T: Idx>(
+fn op2_exec_on_fits_stmoc<T: Idx>(
   op2: Op2,
   left_stmoc: STMocType<T, BufReader<File>>,
   right_stmoc: STMocType<T, BufReader<File>>,
@@ -940,14 +1053,106 @@ fn op2_exec_on_fits_tmoc_stmoc_lconv<TL: Idx, TR: Idx + From<TL>>(
   }
 }
 
+fn op2_exec_on_fits_sfmoc<T: Idx>(
+  op2: Op2,
+  left_stmoc: RangeMoc2DIterFromFits<T, BufReader<File>, Frequency<T>, Hpx<T>>,
+  right_stmoc: RangeMoc2DIterFromFits<T, BufReader<File>, Frequency<T>, Hpx<T>>,
+  output: OutputFormat,
+) -> Result<(), Box<dyn Error>> {
+  op2.perform_op_on_sfrangemoc_iter(left_stmoc, right_stmoc, output)
+}
+
+fn op2_exec_on_fits_smoc_sfmoc<T: Idx>(
+  op2: Op2,
+  left_moc: MocType<T, Hpx<T>, BufReader<File>>,
+  right_moc: RangeMoc2DIterFromFits<T, BufReader<File>, Frequency<T>, Hpx<T>>,
+  output: OutputFormat,
+) -> Result<(), Box<dyn Error>> {
+  match left_moc {
+    MocType::Ranges(left_moc) => {
+      op2.perform_op_on_srangemoc_vs_sfrangemoc_iter(left_moc, right_moc, output)
+    }
+    MocType::Cells(left_moc) => op2.perform_op_on_srangemoc_vs_sfrangemoc_iter(
+      left_moc.into_cell_moc_iter().ranges(),
+      right_moc,
+      output,
+    ),
+  }
+}
+
+fn op2_exec_on_fits_fmoc_sfmoc<T: Idx>(
+  op2: Op2,
+  left_moc: MocType<T, Frequency<T>, BufReader<File>>,
+  right_moc: RangeMoc2DIterFromFits<T, BufReader<File>, Frequency<T>, Hpx<T>>,
+  output: OutputFormat,
+) -> Result<(), Box<dyn Error>> {
+  match left_moc {
+    MocType::Ranges(left_moc) => {
+      op2.perform_op_on_frangemoc_vs_sfrangemoc_iter(left_moc, right_moc, output)
+    }
+    MocType::Cells(left_moc) => op2.perform_op_on_frangemoc_vs_sfrangemoc_iter(
+      left_moc.into_cell_moc_iter().ranges(),
+      right_moc,
+      output,
+    ),
+  }
+}
+
+fn op2_exec_on_fits_smoc_sfmoc_lconv<TL: Idx, TR: Idx + From<TL>>(
+  op2: Op2,
+  left_moc: MocType<TL, Hpx<TL>, BufReader<File>>,
+  right_moc: RangeMoc2DIterFromFits<TR, BufReader<File>, Frequency<TR>, Hpx<TR>>,
+  output: OutputFormat,
+) -> Result<(), Box<dyn Error>> {
+  match left_moc {
+    MocType::Ranges(left_moc) => op2.perform_op_on_srangemoc_vs_sfrangemoc_iter(
+      left_moc.convert::<TR, Hpx<TR>>(),
+      right_moc,
+      output,
+    ),
+    MocType::Cells(left_moc) => op2.perform_op_on_srangemoc_vs_sfrangemoc_iter(
+      left_moc
+        .into_cell_moc_iter()
+        .ranges()
+        .convert::<TR, Hpx<TR>>(),
+      right_moc,
+      output,
+    ),
+  }
+}
+
+fn op2_exec_on_fits_fmoc_sfmoc_lconv<TL: Idx, TR: Idx + From<TL>>(
+  op2: Op2,
+  left_moc: MocType<TL, Frequency<TL>, BufReader<File>>,
+  right_moc: RangeMoc2DIterFromFits<TR, BufReader<File>, Frequency<TR>, Hpx<TR>>,
+  output: OutputFormat,
+) -> Result<(), Box<dyn Error>> {
+  match left_moc {
+    MocType::Ranges(left_moc) => op2.perform_op_on_frangemoc_vs_sfrangemoc_iter(
+      left_moc.convert::<TR, Frequency<TR>>(),
+      right_moc,
+      output,
+    ),
+    MocType::Cells(left_moc) => op2.perform_op_on_frangemoc_vs_sfrangemoc_iter(
+      left_moc
+        .into_cell_moc_iter()
+        .ranges()
+        .convert::<TR, Frequency<TR>>(),
+      right_moc,
+      output,
+    ),
+  }
+}
+
 pub enum Op2 {
   Intersection,
   Union,
   SymmetricDifference,
   Minus,
-  // ST-MOC scpecific
-  TimeFold,
+  // 2D-MOC specific
   SpaceFold,
+  TimeFold,
+  FreqFold,
 }
 impl Op2 {
   pub fn perform_op_on_rangemoc_iter<T, Q, L, R>(
@@ -967,47 +1172,13 @@ impl Op2 {
       Op2::Union => output.write_moc(left_moc_it.or(right_moc_it)),
       Op2::SymmetricDifference => output.write_moc(left_moc_it.xor(right_moc_it)),
       Op2::Minus => output.write_moc(left_moc_it.minus(right_moc_it)),
-      Op2::TimeFold | Op2::SpaceFold => Err(String::from("Operation must involve a ST-MOC").into()),
+      Op2::SpaceFold => {
+        Err(String::from("Operation must involve either a ST-MOC or a SF-MOC").into())
+      }
+      Op2::TimeFold => Err(String::from("Operation must involve a ST-MOC").into()),
+      Op2::FreqFold => Err(String::from("Operation must involve a SF-MOC").into()),
     }
   }
-
-  /*pub fn perform_op_on_srangemoc_iter<T, L, R>(
-    self,
-    left_moc_it: L,
-    right_moc_it: R,
-    output: OutputFormat
-  ) -> Result<(), Box<dyn Error>>
-    where
-      T: Idx,
-      L: RangeMOCIterator<T, Qty=Hpx<T>>,
-      R: RangeMOCIterator<T, Qty=Hpx<T>>
-  {
-    match self {
-      Op2::Intersection => output.write_smoc_possibly_converting_to_u64(left_moc_it.and(right_moc_it)),
-      Op2::Union => output.write_smoc_possibly_converting_to_u64(left_moc_it.or(right_moc_it)),
-      Op2::SymmetricDifference => output.write_smoc_possibly_converting_to_u64(left_moc_it.xor(right_moc_it)),
-      Op2::Minus => output.write_smoc_possibly_converting_to_u64(left_moc_it.minus(right_moc_it)),
-    }
-  }
-
-  pub fn perform_op_on_trangemoc_iter<T, L, R>(
-    self,
-    left_moc_it: L,
-    right_moc_it: R,
-    output: OutputFormat
-  ) -> Result<(), Box<dyn Error>>
-    where
-      T: Idx,
-      L: RangeMOCIterator<T, Qty=Time<T>>,
-      R: RangeMOCIterator<T, Qty=Time<T>>
-  {
-    match self {
-      Op2::Intersection => output.write_tmoc_possibly_converting_to_u64(left_moc_it.and(right_moc_it)),
-      Op2::Union => output.write_tmoc_possibly_converting_to_u64(left_moc_it.or(right_moc_it)),
-      Op2::SymmetricDifference => output.write_tmoc_possibly_converting_to_u64(left_moc_it.xor(right_moc_it)),
-      Op2::Minus => output.write_tmoc_possibly_converting_to_u64(left_moc_it.minus(right_moc_it)),
-    }
-  }*/
 
   fn perform_op_on_trangemoc_vs_strangemoc_iter<T: Idx, L, R>(
     self,
@@ -1069,7 +1240,7 @@ impl Op2 {
         let tmoc_res = RangeMOC::new(time_depth, tranges);
         output.write_tmoc_possibly_converting_to_u64(tmoc_res.into_range_moc_iter())
       }
-      _ => Err(String::from("Operation between T-MOC and  ST-MOC can only be 'sfold'").into()),
+      _ => Err(String::from("Operation between S-MOC and ST-MOC can only be 'sfold'").into()),
     }
   }
 
@@ -1142,9 +1313,131 @@ impl Op2 {
             .time_space_iter(time_depth_1.max(time_depth_2), hpx_depth_1.max(hpx_depth_2)),
         )
       } // warning method name is misleading
-      Op2::TimeFold | Op2::SpaceFold => {
-        Err(String::from("Operation must involve either a S-MOC or a T-MOC").into())
+      Op2::SpaceFold => Err(String::from("Operation must involves either a S-MOC").into()),
+      Op2::TimeFold => Err(String::from("Operation must involves either a T-MOC").into()),
+      Op2::FreqFold => Err(String::from("Operation must involves either a F-MOC").into()),
+    }
+  }
+
+  fn perform_op_on_frangemoc_vs_sfrangemoc_iter<T: Idx, L, R>(
+    self,
+    left_moc: L,
+    right_sfmoc: R,
+    output: OutputFormat,
+  ) -> Result<(), Box<dyn Error>>
+  where
+    L: RangeMOCIterator<T, Qty = Frequency<T>>,
+    R: RangeMOC2Iterator<
+      T,
+      L::Qty,
+      RangeMocIter<T, L::Qty>,
+      T,
+      Hpx<T>,
+      RangeMocIter<T, Hpx<T>>,
+      RangeMOC2Elem<T, L::Qty, T, Hpx<T>>,
+    >,
+  {
+    let hpx_depth = right_sfmoc.depth_max_2();
+    let fmoc: MocRanges<T, Frequency<T>> = MocRanges::new_from(left_moc.collect());
+    let sfmoc = FreqSpaceMoc::from_ranges_it(right_sfmoc);
+    match self {
+      Op2::FreqFold => {
+        let sranges: MocRanges<T, Hpx<T>> = FreqSpaceMoc::project_on_second_dim(&fmoc, &sfmoc);
+        let smoc_res = RangeMOC::new(hpx_depth, sranges);
+        output.write_smoc_possibly_converting_to_u64(smoc_res.into_range_moc_iter())
       }
+      _ => Err(String::from("Operation between F-MOC and  SF-MOC can only be 'ffold'").into()),
+    }
+  }
+
+  fn perform_op_on_srangemoc_vs_sfrangemoc_iter<T: Idx, L, R>(
+    self,
+    left_moc: L,
+    right_sfmoc: R,
+    output: OutputFormat,
+  ) -> Result<(), Box<dyn Error>>
+  where
+    L: RangeMOCIterator<T, Qty = Hpx<T>>,
+    R: RangeMOC2Iterator<
+      T,
+      Frequency<T>,
+      RangeMocIter<T, Frequency<T>>,
+      T,
+      Hpx<T>,
+      RangeMocIter<T, Hpx<T>>,
+      RangeMOC2Elem<T, Frequency<T>, T, Hpx<T>>,
+    >,
+  {
+    // Operations on iterator to be written!!
+    // In the meantime, use hpxranges2d (via FreqSpaceMoc)
+    let freq_depth = right_sfmoc.depth_max_1();
+    let smoc: MocRanges<T, Hpx<T>> = MocRanges::new_from(left_moc.collect());
+    let sfmoc = FreqSpaceMoc::from_ranges_it(right_sfmoc);
+    match self {
+      Op2::SpaceFold => {
+        let franges: MocRanges<T, Frequency<T>> = FreqSpaceMoc::project_on_first_dim(&smoc, &sfmoc);
+        let fmoc_res = RangeMOC::new(freq_depth, franges);
+        output.write_fmoc_possibly_converting_to_u64(fmoc_res.into_range_moc_iter())
+      }
+      _ => Err(String::from("Operation between S-MOC and  ST-MOC can only be 'sfold'").into()),
+    }
+  }
+
+  fn perform_op_on_sfrangemoc_iter<T: Idx, L, R>(
+    self,
+    left_sfmoc: L,
+    right_sfmoc: R,
+    output: OutputFormat,
+  ) -> Result<(), Box<dyn Error>>
+  where
+    L: RangeMOC2Iterator<
+      T,
+      Frequency<T>,
+      RangeMocIter<T, Frequency<T>>,
+      T,
+      Hpx<T>,
+      RangeMocIter<T, Hpx<T>>,
+      RangeMOC2Elem<T, Frequency<T>, T, Hpx<T>>,
+    >,
+    R: RangeMOC2Iterator<
+      T,
+      Frequency<T>,
+      RangeMocIter<T, Frequency<T>>,
+      T,
+      Hpx<T>,
+      RangeMocIter<T, Hpx<T>>,
+      RangeMOC2Elem<T, Frequency<T>, T, Hpx<T>>,
+    >,
+  {
+    match self {
+      Op2::Intersection => {
+        let (freq_depth_1, hpx_depth_1) = (left_sfmoc.depth_max_1(), left_sfmoc.depth_max_2());
+        let (freq_depth_2, hpx_depth_2) = (right_sfmoc.depth_max_1(), right_sfmoc.depth_max_2());
+        let left_sfmoc = FreqSpaceMoc::from_ranges_it(left_sfmoc);
+        let right_sfmoc = FreqSpaceMoc::from_ranges_it(right_sfmoc);
+        let intersecton: HpxRanges2D<T, Frequency<T>, T> = left_sfmoc.intersection(&right_sfmoc);
+        output.write_sfmoc(
+          intersecton.freq_space_iter(freq_depth_1.max(freq_depth_2), hpx_depth_1.max(hpx_depth_2)),
+        )
+      }
+      Op2::Union => output.write_sfmoc(left_sfmoc.or(right_sfmoc)),
+      Op2::SymmetricDifference => {
+        Err(String::from("SymmetricDifference (or xor) not implemented yet for ST-MOCs.").into())
+      } // todo!()
+      Op2::Minus => {
+        let (freq_depth_1, hpx_depth_1) = (left_sfmoc.depth_max_1(), left_sfmoc.depth_max_2());
+        let (freq_depth_2, hpx_depth_2) = (right_sfmoc.depth_max_1(), right_sfmoc.depth_max_2());
+        let left_sfmoc = FreqSpaceMoc::from_ranges_it(left_sfmoc);
+        let right_sfmoc = FreqSpaceMoc::from_ranges_it(right_sfmoc);
+        output.write_sfmoc(
+          left_sfmoc
+            .difference(&right_sfmoc)
+            .freq_space_iter(freq_depth_1.max(freq_depth_2), hpx_depth_1.max(hpx_depth_2)),
+        )
+      } // warning method name is misleading
+      Op2::SpaceFold => Err(String::from("Operation must involves either a S-MOC").into()),
+      Op2::TimeFold => Err(String::from("Operation must involves either a T-MOC").into()),
+      Op2::FreqFold => Err(String::from("Operation must involves either a F-MOC").into()),
     }
   }
 }

@@ -66,7 +66,9 @@ pub enum Filter {
   Position(PositionFilter), // hpx sort (flag to filter on streaming mode?)
   /// Filter a file containing a time using a Time MOC (NOT YET IMPLEMENTED)
   Time(TimeFilter),
+  // Freq(FreqFilter)     // TODO
   // SpaceTime(SpaceTime) // TODO
+  // SpaceFreq(SpaceTime) // TODO
 }
 
 impl Filter {

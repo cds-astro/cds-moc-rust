@@ -326,7 +326,7 @@ pub enum From {
   },
   #[structopt(name = "timestamppos")]
   /// Create a Space-Time MOC from a list of timestamp and positions in decimal degrees
-  /// (timestamp first, then longitude, then latitude)..
+  /// (timestamp first, then longitude, then latitude).
   TimestampPos {
     /// Depth on the time, in `[0, 61]`.
     tdepth: u8,
@@ -368,6 +368,7 @@ pub enum From {
     #[structopt(subcommand)]
     out: OutputFormat,
   },
+  // TODO: From file containing a list of TimeRange,S-MOC path
   #[structopt(name = "freqval")]
   /// Create a Frequency MOC from a list of frequency (in Hz, one per line).
   FreqValue {
@@ -393,6 +394,40 @@ pub enum From {
     #[structopt(subcommand)]
     out: OutputFormat,
   },
+  #[structopt(name = "freqpos")]
+  /// Create a Space-Frequency MOC from a list of frequencies, in Hz, and positions, in decimal degrees
+  /// (frequency first, then longitude, then latitude).
+  FreqPos {
+    /// Depth on the frequency, in `[0, 59]`.
+    fdepth: u8,
+    /// Depth on the position, in `[0, 29]`.
+    sdepth: u8,
+    #[structopt(parse(from_os_str))]
+    /// The input file, use '-' for stdin
+    input: PathBuf,
+    #[structopt(short = "s", long = "separator", default_value = " ")]
+    /// Separator between time lower and upper bounds (default = ' ')
+    separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat,
+  },
+  #[structopt(name = "freqrangepos")]
+  /// Create a Space-Frequency MOC from a list of frequency ranges, in Hz, and positions, in decimal degrees
+  /// (fmin first, then fmax, then longitude, then latitude).
+  FreqrangePos {
+    /// Depth on the frequency, in `[0, 59]`.
+    fdepth: u8,
+    /// Depth on the position, in `[0, 29]`.
+    sdepth: u8,
+    #[structopt(parse(from_os_str))]
+    /// The input file, use '-' for stdin
+    input: PathBuf,
+    #[structopt(short = "s", long = "separator", default_value = " ")]
+    /// Separator between time lower and upper bounds (default = ' ')
+    separator: String,
+    #[structopt(subcommand)]
+    out: OutputFormat,
+  }, // TODO: from file containing a list of FreqRange,S-MOC path
 }
 
 impl From {
@@ -1291,6 +1326,120 @@ impl From {
             .into_range_moc_iter(),
           )
         }
+      }
+      From::FreqPos {
+        fdepth,
+        sdepth,
+        input,
+        separator,
+        out,
+      } => {
+        fn line2fcoos(
+          separator: &str,
+          line: std::io::Result<String>,
+        ) -> Result<(f64, (f64, f64)), Box<dyn Error>> {
+          let line = line?;
+          let (freq_str, line) = line
+            .trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("split to separate frequency from space failed."))?;
+          let (lon_deg, lat_deg) = line
+            .split_once(separator)
+            .ok_or_else(|| String::from("split on space failed."))?;
+          let freq_hz = freq_str.parse::<f64>()?;
+          let lon_deg = lon_deg.parse::<f64>()?;
+          let lat_deg = lat_deg.parse::<f64>()?;
+          let lon_rad = lon_deg2rad(lon_deg)?;
+          let lat_rad = lat_deg2rad(lat_deg)?;
+          Ok((freq_hz, (lon_rad, lat_rad)))
+        }
+        let line2fpos = move |line: std::io::Result<String>| match line2fcoos(&separator, line) {
+          Ok(lonlat) => Some(lonlat),
+          Err(e) => {
+            error!("Error reading or parsing line: {:?}", e);
+            None
+          }
+        };
+        let moc2: RangeMOC2<u64, Frequency<u64>, u64, Hpx<u64>> = if input == PathBuf::from(r"-") {
+          let stdin = std::io::stdin();
+          RangeMOC2::from_freq_in_hz_and_coos(
+            fdepth,
+            sdepth,
+            stdin.lock().lines().filter_map(line2fpos),
+            None,
+          )
+        } else {
+          let f = File::open(input)?;
+          let reader = BufReader::new(f);
+          RangeMOC2::from_freq_in_hz_and_coos(
+            fdepth,
+            sdepth,
+            reader.lines().filter_map(line2fpos),
+            None,
+          )
+        };
+        out.write_sfmoc(moc2.into_range_moc2_iter())
+      }
+      From::FreqrangePos {
+        fdepth,
+        sdepth,
+        input,
+        separator,
+        out,
+      } => {
+        fn line2frcoos(
+          separator: &str,
+          line: std::io::Result<String>,
+        ) -> Result<(Range<f64>, (f64, f64)), Box<dyn Error>> {
+          let line = line?;
+          let (fmin, line) = line
+            .trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("split to isolate fmin failed."))?;
+          let (fmax, line) = line
+            .trim()
+            .split_once(separator)
+            .ok_or_else(|| String::from("split to isolate fmax failed."))?;
+          let (lon_deg, lat_deg) = line
+            .split_once(separator)
+            .ok_or_else(|| String::from("split on space failed."))?;
+          let fmin = fmin.parse::<f64>()?;
+          let fmax = fmax.parse::<f64>()?;
+          if fmin > fmax {
+            return Err(format!("fmin > fmax: {} > {}", fmin, fmax).into());
+          }
+          let lon_deg = lon_deg.parse::<f64>()?;
+          let lat_deg = lat_deg.parse::<f64>()?;
+          let lon_rad = lon_deg2rad(lon_deg)?;
+          let lat_rad = lat_deg2rad(lat_deg)?;
+          Ok((fmin..fmax, (lon_rad, lat_rad)))
+        }
+        let line2frpos = move |line: std::io::Result<String>| match line2frcoos(&separator, line) {
+          Ok(tuple) => Some(tuple),
+          Err(e) => {
+            error!("Error reading or parsing line: {:?}", e);
+            None
+          }
+        };
+        let moc2: RangeMOC2<u64, Frequency<u64>, u64, Hpx<u64>> = if input == PathBuf::from(r"-") {
+          let stdin = std::io::stdin();
+          RangeMOC2::from_freqranges_in_hz_and_coos(
+            fdepth,
+            sdepth,
+            stdin.lock().lines().filter_map(line2frpos),
+            None,
+          )
+        } else {
+          let f = File::open(input)?;
+          let reader = BufReader::new(f);
+          RangeMOC2::from_freqranges_in_hz_and_coos(
+            fdepth,
+            sdepth,
+            reader.lines().filter_map(line2frpos),
+            None,
+          )
+        };
+        out.write_sfmoc(moc2.into_range_moc2_iter())
       } // ST-MOC from t-moc + s-moc (we can then create a complex ST-MOC by union of elementary ST-MOCs)
         // - e.g. multiple observation of the same area of the sky
         // - XMM ST-MOC (from list of observations)?

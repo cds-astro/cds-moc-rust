@@ -3,7 +3,6 @@ use std::{
   fs::File,
   io::{self, BufWriter},
   path::PathBuf,
-  str,
 };
 
 use structopt::StructOpt;
@@ -11,7 +10,7 @@ use structopt::StructOpt;
 use moclib::{
   deser::{
     ascii::{moc2d_to_ascii_ivoa, to_ascii_ivoa, to_ascii_stream},
-    fits::{self, ranges2d_to_fits_ivoa, ranges_to_fits_ivoa},
+    fits::{self, ranges_sf_to_fits_ivoa, ranges_st_to_fits_ivoa, ranges_to_fits_ivoa},
     json::{cellmoc2d_to_json_aladin, to_json_aladin},
   },
   idx::Idx,
@@ -397,8 +396,8 @@ impl OutputFormat {
     T: Idx,
     I: RangeMOCIterator<T, Qty = Time<T>>,
     J: RangeMOCIterator<T, Qty = Hpx<T>>,
-    K: RangeMOC2ElemIt<T, Time<T>, T, Hpx<T>, It1 = I, It2 = J>,
-    L: RangeMOC2Iterator<T, Time<T>, I, T, Hpx<T>, J, K>,
+    K: RangeMOC2ElemIt<T, I::Qty, T, J::Qty, It1 = I, It2 = J>,
+    L: RangeMOC2Iterator<T, I::Qty, I, T, J::Qty, J, K>,
   {
     // In case of ascii or json inputs, we perform useless conversions:
     //            cell -> range -> cell
@@ -458,11 +457,86 @@ impl OutputFormat {
       } => {
         // TODO handle the forced to u64??
         let file = File::create(file)?;
-        ranges2d_to_fits_ivoa(stmoc, moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
+        ranges_st_to_fits_ivoa(stmoc, moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
       }
       OutputFormat::Stream => {
         // let stdout = io::stdout();
         Err(String::from("No stream format for ST-MOCs yet.").into())
+      }
+    }
+  }
+
+  pub fn write_sfmoc<T, I, J, K, L>(self, sfmoc: L) -> Result<(), Box<dyn Error>>
+  where
+    T: Idx,
+    I: RangeMOCIterator<T, Qty = Frequency<T>>,
+    J: RangeMOCIterator<T, Qty = Hpx<T>>,
+    K: RangeMOC2ElemIt<T, I::Qty, T, J::Qty, It1 = I, It2 = J>,
+    L: RangeMOC2Iterator<T, I::Qty, I, T, J::Qty, J, K>,
+  {
+    // In case of ascii or json inputs, we perform useless conversions:
+    //            cell -> range -> cell
+    //   cellcellrange -> range -> cellcellrange
+    // We could make 2 other `write_stmoc` methods (taking different iterators) to avoid this
+    match self {
+      OutputFormat::Ascii {
+        fold,
+        range_len,
+        opt_file: None,
+      } => {
+        let stdout = io::stdout();
+        moc2d_to_ascii_ivoa(
+          sfmoc.into_cellcellrange_moc2_iter(),
+          &fold,
+          range_len,
+          stdout.lock(),
+        )
+        .map_err(|e| e.into())
+      }
+      OutputFormat::Ascii {
+        fold,
+        range_len,
+        opt_file: Some(path),
+      } => {
+        let file = File::create(path)?;
+        moc2d_to_ascii_ivoa(
+          sfmoc.into_cellcellrange_moc2_iter(),
+          &fold,
+          range_len,
+          BufWriter::new(file),
+        )
+        .map_err(|e| e.into())
+      }
+      OutputFormat::Json {
+        fold,
+        opt_file: None,
+      } => {
+        let stdout = io::stdout();
+        cellmoc2d_to_json_aladin(sfmoc.into_cell_moc2_iter(), &fold, stdout.lock())
+          .map_err(|e| e.into())
+      }
+      OutputFormat::Json {
+        fold,
+        opt_file: Some(path),
+      } => {
+        let file = File::create(path)?;
+        cellmoc2d_to_json_aladin(sfmoc.into_cell_moc2_iter(), &fold, BufWriter::new(file))
+          .map_err(|e| e.into())
+      }
+      OutputFormat::Fits {
+        force_u64: _,
+        force_v1: _,
+        moc_id,
+        moc_type,
+        file,
+      } => {
+        // TODO handle the forced to u64??
+        let file = File::create(file)?;
+        ranges_sf_to_fits_ivoa(sfmoc, moc_id, moc_type, BufWriter::new(file)).map_err(|e| e.into())
+      }
+      OutputFormat::Stream => {
+        // let stdout = io::stdout();
+        Err(String::from("No stream format for SF-MOCs yet.").into())
       }
     }
   }
