@@ -4,20 +4,20 @@ use rand::Rng;
 use moc::{moc::range::RangeMOC, qty::Hpx};
 
 fn create_cells_u32(depth: u8, n_cells: usize) -> Vec<u32> {
-  let mut rng = rand::thread_rng();
+  let mut rng = rand::rng();
   let npix = 12 * 4_u32.pow(depth as u32);
   (0..n_cells)
     .into_iter()
-    .map(|_| rng.gen_range(0..npix))
+    .map(|_| rng.random_range(0..npix))
     .collect()
 }
 
 fn create_cells_u64(depth: u8, n_cells: usize) -> Vec<u64> {
-  let mut rng = rand::thread_rng();
+  let mut rng = rand::rng();
   let npix = 12 * 4_u64.pow(depth as u32);
   (0..n_cells)
     .into_iter()
-    .map(|_| rng.gen_range(0..npix))
+    .map(|_| rng.random_range(0..npix))
     .collect()
 }
 

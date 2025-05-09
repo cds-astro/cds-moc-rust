@@ -901,14 +901,18 @@ where
 #[cfg(test)]
 mod tests {
 
-  use std::mem::{align_of, size_of};
-  use std::ops::Range;
+  use std::{
+    mem::{align_of, size_of},
+    ops::Range,
+  };
 
   use num::PrimInt;
   use rand::Rng;
 
-  use crate::qty::{Hpx, MocQty};
-  use crate::ranges::{Ranges, SNORanges};
+  use crate::{
+    qty::{Hpx, MocQty},
+    ranges::{Ranges, SNORanges},
+  };
 
   #[test]
   fn test_alignment() {
@@ -1014,16 +1018,15 @@ mod tests {
   fn test_uniq_decompose() {
     macro_rules! uniq_to_pix_depth {
       ($t:ty, $size:expr) => {
-        let mut rng = rand::thread_rng();
-
+        let mut rng = rand::rng();
         (0..$size).for_each(|_| {
-          let depth = rng.gen_range(Range {
+          let depth = rng.random_range(Range {
             start: 0,
             end: Hpx::<$t>::MAX_DEPTH,
           });
 
           let npix = 12 * 4.pow(depth as u32);
-          let pix = rng.gen_range(Range {
+          let pix = rng.random_range(Range {
             start: 0,
             end: npix,
           });

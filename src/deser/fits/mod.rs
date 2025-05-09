@@ -1627,13 +1627,15 @@ impl<T: Idx, R: BufRead>
 #[cfg(test)]
 mod tests {
 
-  use std::fs::File;
-  use std::io::{BufReader, BufWriter};
-  use std::ops::Range;
-  use std::path::PathBuf;
+  use std::{
+    fs::File,
+    io::{BufReader, BufWriter},
+    ops::Range,
+    path::PathBuf,
+  };
 
   use crate::deser::fits::{
-    from_fits_ivoa, hpx_cells_to_fits_ivoa, rangemoc2d_to_fits_ivoa, ranges_to_fits_ivoa,
+    from_fits_ivoa, hpx_cells_to_fits_ivoa, range_stmoc_to_fits_ivoa, ranges_to_fits_ivoa,
     FitsError, MocIdxType, MocQtyType, MocType, STMocType,
   };
   use crate::elem::cell::Cell;
@@ -1877,6 +1879,6 @@ mod tests {
       .unwrap();
     let writer = BufWriter::new(file);
     // write: it only tests that no error occur while writing
-    rangemoc2d_to_fits_ivoa(&moc2, None, None, writer).unwrap();
+    range_stmoc_to_fits_ivoa(&moc2, None, None, writer).unwrap();
   }
 }
