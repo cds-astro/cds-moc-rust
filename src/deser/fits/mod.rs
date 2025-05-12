@@ -721,7 +721,7 @@ pub fn from_fits_ivoa_custom<R: BufRead>(
   // 0: runiq 1: borne inf (max depht) 2: borne sup (max depth) => very fast binary search :)
   // println!("{:?}", &moc_kws);
   match moc_kws.get::<MocVers>() {
-    Some(MocKeywords::MOCVers(MocVers::V2_0)) => {
+    Some(MocKeywords::MOCVers(MocVers::V2_0)) | Some(MocKeywords::MOCVers(MocVers::V2_1)) => {
       match moc_kws.get::<MocDim>() {
         Some(MocKeywords::MOCDim(MocDim::Space)) => {
           let depth_max = match moc_kws.get::<MocOrdS>() {
@@ -745,7 +745,7 @@ pub fn from_fits_ivoa_custom<R: BufRead>(
             Some(MocKeywords::Ordering(Ordering::Range29)) => {
               Err(FitsError::UncompatibleKeywordContent(
                 String::from("ORDERING  = 'RABGE29'"),
-                String::from("MOCVERS= '2.0'"),
+                String::from("MOCVERS= '2.x'"),
               ))
             }
             // ADD GUNIQ? RUNIQ? RMIXED?
@@ -770,7 +770,7 @@ pub fn from_fits_ivoa_custom<R: BufRead>(
             Some(MocKeywords::Ordering(Ordering::Range29)) => {
               Err(FitsError::UncompatibleKeywordContent(
                 String::from("ORDERING  = 'RANGE29'"),
-                String::from("MOCVERS= '2.0'"),
+                String::from("MOCVERS= '2.x'"),
               ))
             }
             // ADD GUNIQ? RUNIQ? RMIXED?
@@ -804,7 +804,7 @@ pub fn from_fits_ivoa_custom<R: BufRead>(
             Some(MocKeywords::Ordering(Ordering::Range29)) => {
               Err(FitsError::UncompatibleKeywordContent(
                 String::from("ORDERING  = 'RANGE29'"),
-                String::from("MOCVERS= '2.0'"),
+                String::from("MOCVERS= '2.x'"),
               ))
             }
             // ADD GUNIQ? RUNIQ? RMIXED?
@@ -829,7 +829,7 @@ pub fn from_fits_ivoa_custom<R: BufRead>(
             Some(MocKeywords::Ordering(Ordering::Range29)) => {
               Err(FitsError::UncompatibleKeywordContent(
                 String::from("ORDERING  = 'RANGE29'"),
-                String::from("MOCVERS= '2.0'"),
+                String::from("MOCVERS= '2.x'"),
               ))
             }
             // ADD GUNIQ? RUNIQ? RMIXED?
@@ -863,7 +863,7 @@ pub fn from_fits_ivoa_custom<R: BufRead>(
             Some(MocKeywords::Ordering(Ordering::Range29)) => {
               Err(FitsError::UncompatibleKeywordContent(
                 String::from("ORDERING  = 'RANGE29'"),
-                String::from("MOCVERS= '2.0'"),
+                String::from("MOCVERS= '2.x'"),
               ))
             }
             // ADD GUNIQ? RUNIQ? RMIXED?
@@ -1739,6 +1739,27 @@ mod tests {
       }
       // Err(e) => println!("{}", e),
       _ => assert!(false),
+    }
+  }
+
+  #[test]
+  fn test_read_sfmoc_fits() {
+    let path_buf1 = PathBuf::from("resources/MOC2.1/SFMocMUSE.fits");
+    let path_buf2 = PathBuf::from("../resources/MOC2.1/SFMocMUSE.fits");
+    let file = File::open(&path_buf1)
+      .or_else(|_| File::open(&path_buf2))
+      .unwrap();
+    let reader = BufReader::new(file);
+    match from_fits_ivoa(reader) {
+      Ok(MocIdxType::U64(MocQtyType::FreqHpx(moc))) => {
+        assert_eq!(moc.depth_max_1(), 14);
+        assert_eq!(moc.depth_max_2(), 12);
+      }
+      Err(e) => {
+        eprintln!("{}", e);
+        panic!()
+      }
+      _ => panic!(),
     }
   }
 

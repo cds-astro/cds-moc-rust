@@ -59,6 +59,7 @@ pub trait FitsCard: Sized {
 pub enum MocVers {
   V1_1,
   V2_0,
+  V2_1,
   // V2_0_Freq,
 }
 impl FitsCard for MocVers {
@@ -68,10 +69,11 @@ impl FitsCard for MocVers {
     match get_str_val_no_quote(keyword_record)? {
       b"1.1" => Ok(MocVers::V1_1),
       b"2.0" => Ok(MocVers::V2_0),
+      b"2.1" => Ok(MocVers::V2_1),
       // b"2.0-freq" => Ok(MocVers::V2_0_Freq),
       parsed_val => Err(Self::predefine_val_err(
         parsed_val,
-        &[b"1.1", b"2.0" /* b"2.0-freq" */],
+        &[b"1.1", b"2.0", b"2.1" /* b"2.0-freq" */],
       )),
     }
   }
@@ -80,7 +82,8 @@ impl FitsCard for MocVers {
     String::from(match self {
       MocVers::V1_1 => "'1.1'",
       MocVers::V2_0 => "'2.0'",
-      // MocVers::V2_0_Freq => "'2.0-freq'",
+      MocVers::V2_1 => "'2.1'", // SF-MOC.?
+                                // MocVers::V2_0_Freq => "'2.0-freq'",
     })
   }
 }
