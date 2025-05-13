@@ -628,6 +628,11 @@ impl U64MocStore {
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_stmoc_from_ascii(&s))
   }
+  pub fn load_sfmoc_from_ascii_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_sfmoc_from_ascii(&s))
+  }
 
   pub fn load_smoc_from_ascii(&self, content: &str) -> Result<usize, String> {
     from_ascii_ivoa::<u64, Hpx<u64>>(content)
@@ -677,6 +682,18 @@ impl U64MocStore {
       })
   }
 
+  pub fn load_sfmoc_from_ascii(&self, content: &str) -> Result<usize, String> {
+    moc2d_from_ascii_ivoa::<u64, Frequency<u64>, u64, Hpx<u64>>(content)
+      .map_err(|e| e.to_string())
+      .and_then(|cellrange2| {
+        let moc2 = cellrange2
+          .into_cellcellrange_moc2_iter()
+          .into_range_moc2_iter()
+          .into_range_moc2();
+        store::add(moc2)
+      })
+  }
+
   // - from json //
 
   pub fn load_smoc_from_json_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
@@ -701,6 +718,12 @@ impl U64MocStore {
     fs::read_to_string(path)
       .map_err(|e| e.to_string())
       .and_then(|s| self.load_stmoc_from_json(&s))
+  }
+
+  pub fn load_sfmoc_from_json_file<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
+    fs::read_to_string(path)
+      .map_err(|e| e.to_string())
+      .and_then(|s| self.load_sfmoc_from_json(&s))
   }
 
   pub fn load_smoc_from_json(&self, content: &str) -> Result<usize, String> {
@@ -732,6 +755,18 @@ impl U64MocStore {
 
   pub fn load_stmoc_from_json(&self, content: &str) -> Result<usize, String> {
     cellmoc2d_from_json_aladin::<u64, Time<u64>, u64, Hpx<u64>>(content)
+      .map_err(|e| e.to_string())
+      .and_then(|cell2| {
+        let moc2 = cell2
+          .into_cell_moc2_iter()
+          .into_range_moc2_iter()
+          .into_range_moc2();
+        store::add(moc2)
+      })
+  }
+
+  pub fn load_sfmoc_from_json(&self, content: &str) -> Result<usize, String> {
+    cellmoc2d_from_json_aladin::<u64, Frequency<u64>, u64, Hpx<u64>>(content)
       .map_err(|e| e.to_string())
       .and_then(|cell2| {
         let moc2 = cell2
