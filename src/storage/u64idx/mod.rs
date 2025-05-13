@@ -2235,7 +2235,7 @@ impl U64MocStore {
   }
 
   ////////////////////////
-  // ST-MOC projections //
+  // ST/SF-MOC projections //
 
   /// Returns the union of the S-MOCs associated to T-MOCs intersecting the given T-MOC.
   /// Left: T-MOC, right: ST-MOC, result: S-MOC.
@@ -2243,10 +2243,24 @@ impl U64MocStore {
     Op2::TFold.exec(time_moc_index, st_moc_index)
   }
 
-  /// Returns the union of the T-MOCs associated to S-MOCs intersecting the given S-MOC.
-  /// Left: S-MOC, right: ST-MOC, result: T-MOC.
-  pub fn space_fold(&self, space_moc_index: usize, st_moc_index: usize) -> Result<usize, String> {
-    Op2::SFold.exec(space_moc_index, st_moc_index)
+  /// Returns the union of the T-MOCs or F-MOCs associated to S-MOCs intersecting the given S-MOC.
+  /// Left: S-MOC, right: ST-MOC or SF-MOC, result: T-MOC or F-MOC.
+  pub fn space_fold(
+    &self,
+    space_moc_index: usize,
+    st_or_sf_moc_index: usize,
+  ) -> Result<usize, String> {
+    Op2::SFold.exec(space_moc_index, st_or_sf_moc_index)
+  }
+
+  /// Returns the union of the S-MOCs associated to F-MOCs intersecting the given F-MOC.
+  /// Left: F-MOC, right: SF-MOC, result: S-MOC.
+  pub fn frequency_fold(
+    &self,
+    freq_moc_index: usize,
+    sf_moc_index: usize,
+  ) -> Result<usize, String> {
+    Op2::FFold.exec(freq_moc_index, sf_moc_index)
   }
 
   ///////////////////////
