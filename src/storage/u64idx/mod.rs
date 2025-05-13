@@ -41,7 +41,8 @@ use crate::{
     CellOrCellRangeMOCIterator, RangeMOCIterator,
   },
   moc2d::{
-    CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator, RangeMOC2IntoIterator, RangeMOC2Iterator,
+    range::RangeMOC2, CellMOC2IntoIterator, CellOrCellRangeMOC2IntoIterator, RangeMOC2IntoIterator,
+    RangeMOC2Iterator,
   },
   qty::{Frequency, Hpx, MocQty, Time},
   storage::u64idx::op1::{
@@ -1996,6 +1997,129 @@ impl U64MocStore {
         .time_space_iter(time_depth, space_depth)
         .into_range_moc2(),
     )
+  }
+
+  // * SF-MOC CREATION //
+
+  /// Create and store a new SF-MOC from a list of sky coordinates and frequencies.
+  ///
+  /// # Arguments
+  ///
+  /// * `freq_hz` - The frequencies expressed in Hz.
+  /// * `lon` - The longitudes of the sky coordinates, in radians.
+  /// * `lat` - The latitudes of the sky coordinates, in radians.
+  /// * `freq_depth` - The depth along the frequency (i.e. `F`) axis.
+  /// * `space_depth` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  /// # Output
+  /// - The index in the storage
+  pub fn create_from_hz_positions(
+    &self,
+    freq_hz: Vec<f64>,
+    lon: Vec<f64>,
+    lat: Vec<f64>,
+    freq_depth: u8,
+    space_depth: u8,
+  ) -> Result<usize, String> {
+    if freq_depth > Frequency::<u64>::MAX_DEPTH {
+      Err(format!(
+        "Frequency depth must be in [0, {}]",
+        Frequency::<u64>::MAX_DEPTH
+      ))
+    } else if freq_hz.len() != lon.len() {
+      Err(format!(
+        "Frequencies and longitudes do not have the same size: {} != {}",
+        freq_hz.len(),
+        lon.len()
+      ))
+    } else if lon.len() != lat.len() {
+      Err(format!(
+        "Longitudes and latitudes do not have the same size: {} != {}",
+        lon.len(),
+        lat.len()
+      ))
+    } else {
+      store::add(
+        RangeMOC2::<u64, Frequency<u64>, u64, Hpx<u64>>::from_freq_in_hz_and_coos(
+          freq_depth,
+          space_depth,
+          freq_hz.into_iter().zip(lon.into_iter().zip(lat)),
+          None,
+        ),
+      )
+    }
+  }
+
+  /// Create a frequency-spatial coverage (2D) from a list of sky coordinates
+  /// and ranges of frequencies.
+  ///
+  /// # Arguments
+  ///
+  /// * ``freq_hz_start`` - The starting frequency, in Hz.
+  /// * ``freq_hz_end`` - The ending frequency, in Hz.
+  /// * ``lon`` - The longitudes of the sky coordinates.
+  /// * ``lat`` - The latitudes of the sky coordinates.
+  /// * ``freq_depth`` - The depth along the frequency (i.e. `F`) axis.
+  /// * ``space_depth`` - The depth at which HEALPix cell indices
+  ///   will be computed.
+  ///
+  /// # Precondition
+  ///
+  /// * ``lon`` and ``lat`` are expressed in radians.
+  /// They are valid because they come from
+  /// `astropy.units.Quantity` objects.
+  /// * ``freq_hz_start`` and ``freq_hz_ebd`` are expressed in Hz
+  ///
+  /// # Errors
+  ///
+  /// If the number of longitudes, latitudes and freq_hz_start and freq_hz_start do not match.
+  pub fn create_from_hzranges_positions(
+    &self,
+    freq_hz_start: Vec<f64>,
+    freq_hz_end: Vec<f64>,
+    lon: Vec<f64>,
+    lat: Vec<f64>,
+    freq_depth: u8,
+    space_depth: u8,
+  ) -> Result<usize, String> {
+    if freq_depth > Frequency::<u64>::MAX_DEPTH {
+      Err(format!(
+        "Frequency depth must be in [0, {}]",
+        Frequency::<u64>::MAX_DEPTH
+      ))
+    } else if freq_hz_start.len() != lon.len() {
+      Err(format!(
+        "Frequencies and longitudes do not have the same size: {} != {}",
+        freq_hz_start.len(),
+        lon.len()
+      ))
+    } else if freq_hz_start.len() != freq_hz_end.len() {
+      Err(format!(
+        "Frequencies range start and end do not have the same size: {} != {}",
+        freq_hz_start.len(),
+        freq_hz_end.len()
+      ))
+    } else if lon.len() != lat.len() {
+      Err(format!(
+        "Longitudes and latitudes do not have the same size: {} != {}",
+        lon.len(),
+        lat.len()
+      ))
+    } else {
+      store::add(
+        RangeMOC2::<u64, Frequency<u64>, u64, Hpx<u64>>::from_freqranges_in_hz_and_coos(
+          freq_depth,
+          space_depth,
+          freq_hz_start
+            .into_iter()
+            .zip(freq_hz_end)
+            .map(|(start, end)| start..end)
+            .zip(lon.into_iter().zip(lat)),
+          None,
+        ),
+      )
+    }
   }
 
   /////////////////////////
