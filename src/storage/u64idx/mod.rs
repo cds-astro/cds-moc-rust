@@ -60,7 +60,7 @@ mod store;
 use self::{
   common::{
     check_depth, lat_deg2rad, lon_deg2rad, lon_deg2rad_relaxed, InternalMoc, MocQType, FMOC,
-    HALF_PI, PI, SMOC, STMOC, TMOC,
+    HALF_PI, PI, SFMOC, SMOC, STMOC, TMOC,
   },
   load::{
     fmoc_from_fits_gen, from_fits_gen, from_fits_u64, sfmoc_from_fits_u64, smoc_from_fits_gen,
@@ -128,6 +128,11 @@ impl U64MocStore {
 
   pub fn new_empty_stmoc(&self, depth_time: u8, depth_space: u8) -> Result<usize, String> {
     let moc = STMOC::new_empty(depth_time, depth_space);
+    store::add(moc)
+  }
+
+  pub fn new_empty_sfmoc(&self, depth_freq: u8, depth_space: u8) -> Result<usize, String> {
+    let moc = SFMOC::new_empty(depth_freq, depth_space);
     store::add(moc)
   }
 
