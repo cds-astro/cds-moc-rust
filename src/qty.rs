@@ -1,9 +1,8 @@
-use num::One;
-
 use std::{fmt::Debug, marker::PhantomData, ops::Range};
 
-use crate::deser::fits::keywords::MocDim;
-use crate::idx::Idx;
+use num::One;
+
+use crate::{deser::fits::keywords::MocDim, idx::Idx};
 
 pub trait Bounded<T> {
   fn upper_bound_exclusive() -> T;
@@ -330,6 +329,21 @@ impl<T: Idx> MocableQty for Frequency<T> {
 }
 impl<T> MocQty<T> for Frequency<T> where T: Idx {}
 impl<T: Idx> Frequency<T> {
+  /// Returns the relative precision of the frequency (in Hz) encoded at the
+  /// given depth.
+  pub fn depth2rprec(depth: u8) -> f64 {
+    if depth < 7 {
+      // We are in exponent bits
+      // (1_u64 << (1 << (7 - depth))) as f64
+      2.0_f64.powf((1 << (7 - depth)) as f64)
+    } else if depth <= Self::MAX_DEPTH {
+      // We are in matinssa bits
+      1_f64 / ((1_u64 << (1 + depth - 7)) as f64)
+    } else {
+      0f64
+    }
+  }
+
   /*fn freq2hash_single(freq: f32) -> T {
       // f32: 1 sign bit + 8 exponent bits + 23 fraction bits
       // value = (-1)^sign * 2^(exponent - 127) * (1 + fraction/2^24)
@@ -349,7 +363,7 @@ impl<T: Idx> Frequency<T> {
   //        -     expo = -127 + 1023 = 896  => reserved for the 0.0 value on a float
   //        -     expo =  128 + 1023 = 1151 => reserved for the NaN on a float
 
-  /// Transforms a frequency, in herts, into its hash value of giben depth.
+  /// Transforms a frequency, in hertz, into its hash value of given depth.
   /// # Panics
   /// * if `freq` not in `[5.048709793414476e-29, 5.846006549323611e+48[`.
   pub fn freq2hash(freq: f64) -> T {
@@ -406,7 +420,6 @@ impl<T: Idx> Frequency<T> {
 
 #[cfg(test)]
 mod tests {
-
   use crate::qty::{Frequency, Hpx, MocQty, MocableQty, Time};
 
   #[test]
@@ -529,6 +542,167 @@ mod tests {
     assert_eq!(
       Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
       freq_hz
+    );
+  }
+
+  #[test]
+  fn test_depth2rprec() {
+    /*for i in 0..=59 {
+      println!(
+        "assert_eq!(Frequency::<u64>::depth2rprec({}), {});",
+        i,
+        Frequency::<u64>::depth2rprec(i)
+      );
+    }*/
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(0),
+      340282366920938500000000000000000000000.0
+    );
+    assert_eq!(Frequency::<u64>::depth2rprec(1), 18446744073709552000.0);
+    assert_eq!(Frequency::<u64>::depth2rprec(2), 4294967296.0);
+    assert_eq!(Frequency::<u64>::depth2rprec(3), 65536.0);
+    assert_eq!(Frequency::<u64>::depth2rprec(4), 256.0);
+    assert_eq!(Frequency::<u64>::depth2rprec(5), 16.0);
+    assert_eq!(Frequency::<u64>::depth2rprec(6), 4.0);
+    assert_eq!(Frequency::<u64>::depth2rprec(7), 0.5);
+    assert_eq!(Frequency::<u64>::depth2rprec(8), 0.25);
+    assert_eq!(Frequency::<u64>::depth2rprec(9), 0.125);
+    assert_eq!(Frequency::<u64>::depth2rprec(10), 0.0625);
+    assert_eq!(Frequency::<u64>::depth2rprec(11), 0.03125);
+    assert_eq!(Frequency::<u64>::depth2rprec(12), 0.015625);
+    assert_eq!(Frequency::<u64>::depth2rprec(13), 0.0078125);
+    assert_eq!(Frequency::<u64>::depth2rprec(14), 0.00390625);
+    assert_eq!(Frequency::<u64>::depth2rprec(15), 0.001953125);
+    assert_eq!(Frequency::<u64>::depth2rprec(16), 0.0009765625);
+    assert_eq!(Frequency::<u64>::depth2rprec(17), 0.00048828125);
+    assert_eq!(Frequency::<u64>::depth2rprec(18), 0.000244140625);
+    assert_eq!(Frequency::<u64>::depth2rprec(19), 0.0001220703125);
+    assert_eq!(Frequency::<u64>::depth2rprec(20), 0.00006103515625);
+    assert_eq!(Frequency::<u64>::depth2rprec(21), 0.000030517578125);
+    assert_eq!(Frequency::<u64>::depth2rprec(22), 0.0000152587890625);
+    assert_eq!(Frequency::<u64>::depth2rprec(23), 0.00000762939453125);
+    assert_eq!(Frequency::<u64>::depth2rprec(24), 0.000003814697265625);
+    assert_eq!(Frequency::<u64>::depth2rprec(25), 0.0000019073486328125);
+    assert_eq!(Frequency::<u64>::depth2rprec(26), 0.00000095367431640625);
+    assert_eq!(Frequency::<u64>::depth2rprec(27), 0.000000476837158203125);
+    assert_eq!(Frequency::<u64>::depth2rprec(28), 0.0000002384185791015625);
+    assert_eq!(Frequency::<u64>::depth2rprec(29), 0.00000011920928955078125);
+    assert_eq!(Frequency::<u64>::depth2rprec(30), 0.00000005960464477539063);
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(31),
+      0.000000029802322387695313
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(32),
+      0.000000014901161193847656
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(33),
+      0.000000007450580596923828
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(34),
+      0.000000003725290298461914
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(35),
+      0.000000001862645149230957
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(36),
+      0.0000000009313225746154785
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(37),
+      0.0000000004656612873077393
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(38),
+      0.00000000023283064365386963
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(39),
+      0.00000000011641532182693481
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(40),
+      0.00000000005820766091346741
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(41),
+      0.000000000029103830456733704
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(42),
+      0.000000000014551915228366852
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(43),
+      0.000000000007275957614183426
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(44),
+      0.000000000003637978807091713
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(45),
+      0.0000000000018189894035458565
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(46),
+      0.0000000000009094947017729282
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(47),
+      0.0000000000004547473508864641
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(48),
+      0.00000000000022737367544323206
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(49),
+      0.00000000000011368683772161603
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(50),
+      0.00000000000005684341886080802
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(51),
+      0.00000000000002842170943040401
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(52),
+      0.000000000000014210854715202004
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(53),
+      0.000000000000007105427357601002
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(54),
+      0.000000000000003552713678800501
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(55),
+      0.0000000000000017763568394002505
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(56),
+      0.0000000000000008881784197001252
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(57),
+      0.0000000000000004440892098500626
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(58),
+      0.0000000000000002220446049250313
+    );
+    assert_eq!(
+      Frequency::<u64>::depth2rprec(59),
+      0.00000000000000011102230246251565
     );
   }
 }
