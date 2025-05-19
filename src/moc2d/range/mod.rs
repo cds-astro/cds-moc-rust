@@ -277,12 +277,14 @@ impl RangeMOC2<u64, Time<u64>, u64, Hpx<u64>> {
     val_it: I,
     buf_capacity: Option<usize>,
   ) -> Self {
+    let shift = Time::<u64>::shift_from_depth_max(depth_time);
     let layer = healpix::nested::get(depth_hpx);
     Self::from_fixed_depth_cells(
       depth_time,
       depth_hpx,
-      val_it
-        .map(move |(us_since_jd0, lon_rad, lat_rad)| (us_since_jd0, layer.hash(lon_rad, lat_rad))),
+      val_it.map(move |(us_since_jd0, lon_rad, lat_rad)| {
+        (us_since_jd0 >> shift, layer.hash(lon_rad, lat_rad))
+      }),
       buf_capacity,
     )
   }
@@ -301,13 +303,14 @@ impl RangeMOC2<u64, Frequency<u64>, u64, Hpx<u64>> {
     val_it: I,
     buf_capacity: Option<usize>,
   ) -> Self {
+    let shift = Frequency::<u64>::shift_from_depth_max(depth_freq);
     let layer = healpix::nested::get(depth_hpx);
     Self::from_fixed_depth_cells(
       depth_freq,
       depth_hpx,
       val_it.map(move |(freq_hz, (lon_rad, lat_rad))| {
         (
-          Frequency::<u64>::freq2hash(freq_hz),
+          Frequency::<u64>::freq2hash(freq_hz) >> shift,
           layer.hash(lon_rad, lat_rad),
         )
       }),
@@ -645,5 +648,61 @@ impl<'a, T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>>
       depth_max_r: self.depth_max_r,
       iter: self.elems.iter(),
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+
+  use super::*;
+
+  use crate::{
+    deser::ascii::moc2d_from_ascii_ivoa,
+    moc2d::{CellOrCellRangeMOC2IntoIterator, CellOrCellRangeMOC2Iterator, RangeMOC2IntoIterator},
+    qty::{Frequency, Hpx},
+  };
+
+  #[test]
+  fn test_from_freq_in_hz_and_coos() {
+    let deg1 = 1.0_f64.to_radians();
+    let deg2 = 2.0_f64.to_radians();
+    let elems = [
+      (0.01_f64, (0.0, 0.0)),
+      (2.0_f64, (deg1, deg1)),
+      (300.0_f64, (deg2, deg2)),
+    ];
+    let moc2 = RangeMOC2::<u64, Frequency<u64>, u64, Hpx<u64>>::from_freq_in_hz_and_coos(
+      20,
+      12,
+      elems.into_iter(),
+      None,
+    );
+
+    let moc2ascii = moc2d_from_ascii_ivoa::<u64, Frequency<u64>, u64, Hpx<u64>>(
+      r#"
+    f20/714997
+s12/79691776
+f20/778240
+s12/79697029
+f20/836992
+s12/79712788
+f20/ s12/
+"#,
+    )
+    .map(|cellrange2| {
+      cellrange2
+        .into_cellcellrange_moc2_iter()
+        .into_range_moc2_iter()
+        .into_range_moc2()
+    })
+    .unwrap();
+    assert_eq!(moc2, moc2ascii);
+
+    /*moc2
+    .into_range_moc2_iter()
+    .into_cellcellrange_moc2_iter()
+    .to_ascii_ivoa(Some(80), false, std::io::stdout())
+    .map_err(|e| e.to_string())
+    .unwrap();*/
   }
 }
