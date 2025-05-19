@@ -26,6 +26,7 @@ use crate::{
     ascii::{from_ascii_ivoa, moc2d_from_ascii_ivoa},
     fits::{
       from_fits_ivoa, multiordermap::from_fits_multiordermap, skymap::from_fits_skymap, MocIdxType,
+      MocQtyType::FreqHpx,
     },
     img::to_img_default,
     json::{cellmoc2d_from_json_aladin, from_json_aladin},
@@ -33,7 +34,7 @@ use crate::{
   },
   elem::valuedcell::valued_cells_to_moc_with_opt,
   elemset::range::HpxRanges,
-  hpxranges2d::TimeSpaceMoc,
+  hpxranges2d::{FreqSpaceMoc, TimeSpaceMoc},
   idx::Idx,
   moc::{
     range::{CellSelection, RangeMOC},
@@ -2162,6 +2163,73 @@ impl U64MocStore {
     }
   }
 
+  /// Create a frequency-spatial coverage (2D) from a list of frequency ranges (in hz)
+  /// and S-MOCs.
+  ///
+  /// # Arguments
+  ///
+  /// * ``freq_hz_start`` - The starting frequency, in Hz.
+  /// * ``freq_hz_end`` - The ending frequency, in Hz.
+  /// * ``freq_hz`` - The depth along the frequency (i.e. `F`) axis.
+  /// * ``spatial_coverage_indices`` - Indices in the store of the S-MOCs associated to each range
+  ///   will be computed.
+  ///
+  /// # Errors
+  ///
+  /// If the number of elements in `freq_hz_start`, `freq_hz_end` and `spatial_coverage_indices` do not match.
+  pub fn from_freq_ranges_spatial_coverages_in_store(
+    &self,
+    freq_hz_start: Vec<f64>,
+    freq_hz_end: Vec<f64>,
+    freq_depth: u8,
+    spatial_coverage_indices: Vec<usize>,
+    // space_depth: u8,
+  ) -> Result<usize, String> {
+    if freq_depth > Frequency::<u64>::MAX_DEPTH {
+      Err(format!(
+        "Frequency depth must be in [0, {}]",
+        Frequency::<u64>::MAX_DEPTH
+      ))
+    } else if freq_hz_start.len() != freq_hz_end.len() {
+      Err(format!(
+        "Frequencies range start and end do not have the same size: {} != {}",
+        freq_hz_start.len(),
+        freq_hz_end.len()
+      ))
+    } else if freq_hz_start.len() != spatial_coverage_indices.len() {
+      Err(format!(
+        "Frequency ranges and S-MOC indices do not have the same size: {} != {}",
+        freq_hz_start.len(),
+        spatial_coverage_indices.len()
+      ))
+    } else {
+      let frequencies = freqs2hash(freq_depth, freq_hz_start, freq_hz_end)?;
+      let space_depth = spatial_coverage_indices
+        .iter()
+        .filter_map(|index| self.get_smoc_depth(*index).ok())
+        .max()
+        .unwrap_or(0);
+      let spatial_coverages: Vec<HpxRanges<u64>> = spatial_coverage_indices
+        .into_iter()
+        .map(
+          |index| self.get_smoc_copy(index).map(|moc| moc.into_moc_ranges()), // |index| self.degrade(index, space_depth).map(|moc| moc.into_moc_ranges())
+        )
+        .collect::<Result<_, _>>()?;
+      let moc = FreqSpaceMoc::<u64, u64>::create_from_freq_ranges_spatial_coverage(
+        frequencies,
+        spatial_coverages,
+        freq_depth,
+      );
+      store::add(
+        moc
+          .freq_space_iter(freq_depth, space_depth)
+          .into_range_moc2(),
+      )
+    }
+  }
+
+  // create_from_freq_ranges_spatial_coverage
+
   /////////////////////////
   // OPERATIONS ON 1 MOC //
 
@@ -2686,7 +2754,7 @@ fn times2hash(
   if depth > Time::<u64>::MAX_DEPTH {
     Err(format!(
       "Time depth must be in [0, {}]",
-      Hpx::<u64>::MAX_DEPTH
+      Time::<u64>::MAX_DEPTH
     ))
   } else if times_start.len() != times_end.len() {
     Err(format!(
@@ -2715,6 +2783,42 @@ fn times2hash(
         *t = t1..t2;
       });
     Ok(times)
+  }
+}
+
+fn freqs2hash(
+  depth: u8,
+  freq_start: Vec<f64>,
+  freq_end: Vec<f64>,
+) -> Result<Vec<Range<u64>>, String> {
+  if depth > Frequency::<u64>::MAX_DEPTH {
+    Err(format!(
+      "Frequency depth must be in [0, {}]",
+      Frequency::<u64>::MAX_DEPTH
+    ))
+  } else if freq_start.len() != freq_end.len() {
+    Err(format!(
+      "Frequency start and end do not have the same size: {} != {}",
+      freq_start.len(),
+      freq_end.len()
+    ))
+  } else {
+    let mut freqs = vec![0..0; freq_start.len()];
+    #[cfg(not(target_arch = "wasm32"))]
+    freqs
+      .par_iter_mut()
+      .zip_eq(freq_start.into_par_iter().zip_eq(freq_end.into_par_iter()))
+      .for_each(|(f, (f1, f2))| {
+        *f = Frequency::<u64>::freq2hash(f1)..Frequency::<u64>::freq2hash(f2);
+      });
+    #[cfg(target_arch = "wasm32")]
+    freqs
+      .iter_mut()
+      .zip(freq_start.into_iter().zip(freq_end.into_iter()))
+      .for_each(|(f, (f1, f2))| {
+        *f = Frequency::<u64>::freq2hash(f1)..Frequency::<u64>::freq2hash(f2);
+      });
+    Ok(freqs)
   }
 }
 
