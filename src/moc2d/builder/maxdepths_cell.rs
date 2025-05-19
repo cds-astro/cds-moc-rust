@@ -2,12 +2,13 @@
 
 use std::cmp::Ordering;
 
-use crate::moc::{builder::fixed_depth::FixedDepthMocBuilder, range::RangeMOC};
-use crate::moc2d::Idx;
-use crate::moc2d::{RangeMOC2, RangeMOC2Elem};
-use crate::qty::MocQty;
+use crate::{
+  moc::{builder::fixed_depth::FixedDepthMocBuilder, range::RangeMOC},
+  moc2d::{Idx, RangeMOC2, RangeMOC2Elem},
+  qty::MocQty,
+};
 
-pub struct FixedDepthSTMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
+pub struct FixedDepth2DMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
   depth_1: u8,
   depth_2: u8,
   buff: Vec<(T, U)>,
@@ -15,9 +16,9 @@ pub struct FixedDepthSTMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
   moc: Option<RangeMOC2<T, Q, U, R>>,
 }
 
-impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U, R> {
+impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepth2DMocBuilder<T, Q, U, R> {
   pub fn new(depth_1: u8, depth_2: u8, buf_capacity: Option<usize>) -> Self {
-    FixedDepthSTMocBuilder {
+    Self {
       depth_1,
       depth_2,
       buff: Vec::with_capacity(buf_capacity.unwrap_or(100_000)),
@@ -51,7 +52,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
 
   fn drain_buffer(&mut self) {
     if !self.sorted {
-      // Sort on the firs dim
+      // Sort on the first dim
       self
         .buff
         .sort_unstable_by(|(h1_a, _), (h1_b, _)| h1_a.cmp(h1_b));
@@ -151,5 +152,33 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepthSTMocBuilder<T, Q, U,
   fn clear_buff(&mut self) {
     self.sorted = true;
     self.buff.clear();
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::io;
+
+  use super::FixedDepth2DMocBuilder;
+  use crate::{
+    moc2d::{CellOrCellRangeMOC2IntoIterator, CellOrCellRangeMOC2Iterator, RangeMOC2IntoIterator},
+    qty::{Frequency, Hpx},
+  };
+
+  #[test]
+  fn test_build2dmoc_fixeddepth() {
+    let mut builder =
+      FixedDepth2DMocBuilder::<u64, Frequency<u64>, u64, Hpx<u64>>::new(10, 11, None);
+    builder.push(1, 1);
+    builder.push(2, 3);
+    builder.push(4, 6);
+    let moc2d = builder.into_moc();
+    assert_eq!(moc2d.compute_n_ranges(), 6);
+    /*moc2d
+    .into_range_moc2_iter()
+    .into_cellcellrange_moc2_iter()
+    .to_ascii_ivoa(Some(80), false, io::stdout())
+    .map_err(|e| e.to_string())
+    .unwrap();*/
   }
 }

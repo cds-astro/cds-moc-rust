@@ -10,7 +10,7 @@ use crate::{
   },
   moc2d::{
     builder::{
-      maxdepths_cell::FixedDepthSTMocBuilder,
+      maxdepths_cell::FixedDepth2DMocBuilder,
       maxdepths_ranges_cells::RangesAndFixedDepthCellsSTMocBuilder,
     },
     CellMOC2ElemIt, CellMOC2IntoIterator, CellMOC2Iterator, HasTwoMaxDepth, MOC2Properties,
@@ -206,7 +206,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2<T, Q, U, R> {
     cells_it: I,
     buf_capacity: Option<usize>,
   ) -> Self {
-    let mut builder = FixedDepthSTMocBuilder::new(depth_1, depth_2, buf_capacity);
+    let mut builder = FixedDepth2DMocBuilder::new(depth_1, depth_2, buf_capacity);
     for (cell_1, cell_2) in cells_it {
       builder.push(cell_1, cell_2);
     }
