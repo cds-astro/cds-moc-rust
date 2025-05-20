@@ -2662,17 +2662,17 @@ impl U64MocStore {
     )
   }
 
-  /// Returns an array (of boolean or u8 or ...) telling if the pairs of coordinates
-  /// in the input slice are in (true=1) or out of (false=0) the S-MOC.
+  /// Returns an array (of boolean or u8 or ...) telling if the pairs of time and coordinates
+  /// in the input slice are in (true=1) or out of (false=0) the ST-MOC.
   /// # Args
-  /// * `moc_index`: index of the S-MOC to be used for filtering
+  /// * `moc_index`: index of the ST-MOC to be used for filtering
   /// * `usec_pos_it`: iterator on tuples made of a time, in microsec since JD=0, and coordinates
-  ///                  in degrees `(lon, lat)`
+  ///                  in radians `(lon, lat)`
   /// # Remarks
   /// * the size of the returned array is the same as the number of elements on the input iterator.
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
-  /// * similarly, be carefull not to use an input Iterator based on costly operations...
+  /// * similarly, be careful not to use an input Iterator based on costly operations...
   pub fn filter_timepos<T, F, R>(
     &self,
     moc_index: usize,
@@ -2694,7 +2694,46 @@ impl U64MocStore {
           .collect::<Vec<R>>(),
       ),
       _ => Err(String::from(
-        "Can't filter time on a MOC different from a T-MOC",
+        "Can't filter time and space on a MOC different from a ST-MOC",
+      )),
+    };
+    store::exec_on_one_readonly_moc(moc_index, filter)
+  }
+
+  /// Returns an array (of boolean or u8 or ...) telling if the pairs of frequency and coordinates
+  /// in the input iterator are in (true=1) or out of (false=0) the SF-MOC.
+  /// # Args
+  /// * `moc_index`: index of the SF-MOC to be used for filtering
+  /// * `hz_pos_it`: iterator on tuples made of a frequency, in Hz since JD=0, and coordinates
+  ///                  in radians `(lon, lat)`
+  /// # Remarks
+  /// * the size of the returned array is the same as the number of elements on the input iterator.
+  /// * we do not return an iterator to avoid chaining with possibly costly operations
+  ///   while keeping a read lock on the store.
+  /// * similarly, be carefull not to use an input Iterator based on costly operations...
+  pub fn filter_freqpos<T, F, R>(
+    &self,
+    moc_index: usize,
+    freq_pos_it: T,
+    fn_bool: F,
+  ) -> Result<Vec<R>, String>
+  where
+    T: Iterator<Item = (f64, (f64, f64))>,
+    F: Fn(bool) -> R,
+  {
+    let layer = healpix::nested::get(Hpx::<u64>::MAX_DEPTH);
+    let filter = move |moc: &InternalMoc| match moc {
+      InternalMoc::FreqSpace(sfmoc) => Ok(
+        freq_pos_it
+          .map(|(freq_hz, (lon, lat))| {
+            let freq = Frequency::<u64>::freq2hash(freq_hz);
+            let idx = layer.hash(lon, lat);
+            fn_bool(sfmoc.contains_val(&freq, &idx))
+          })
+          .collect::<Vec<R>>(),
+      ),
+      _ => Err(String::from(
+        "Can't filter frequency and space on a MOC different from a SF-MOC",
       )),
     };
     store::exec_on_one_readonly_moc(moc_index, filter)
