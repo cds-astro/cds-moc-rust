@@ -514,10 +514,10 @@ where
   L: RangeMOC2Iterator<T, I::Qty, I, T, J::Qty, J, K>,
   W: Write,
 {
-  let depth_max_time = moc_it.depth_max_1();
+  let depth_max_freq = moc_it.depth_max_1();
   let depth_max_hpx = moc_it.depth_max_2();
-  let moc_kw_map = build_range_stmoc_keywords(
-    depth_max_time,
+  let moc_kw_map = build_range_sfmoc_keywords(
+    depth_max_freq,
     depth_max_hpx,
     moc_id,
     moc_type,
