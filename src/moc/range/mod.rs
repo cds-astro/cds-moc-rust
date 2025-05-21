@@ -136,7 +136,10 @@ pub struct RangeMOC<T: Idx, Q: MocQty<T>> {
 }
 impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
   pub fn new(depth_max: u8, ranges: MocRanges<T, Q>) -> Self {
-    Self { depth_max, ranges }
+    Self {
+      depth_max: depth_max.min(Q::MAX_DEPTH),
+      ranges,
+    }
   }
   pub fn new_empty(depth_max: u8) -> Self {
     Self::new(depth_max, MocRanges::default())
@@ -146,10 +149,7 @@ impl<T: Idx, Q: MocQty<T>> RangeMOC<T, Q> {
       start: T::zero(),
       end: Q::upper_bound_exclusive(),
     };
-    Self {
-      depth_max,
-      ranges: Ranges::new_unchecked(vec![range]).into(),
-    }
+    Self::new(depth_max, Ranges::new_unchecked(vec![range]).into())
   }
 
   /// Similar to what's Vec does: https://doc.rust-lang.org/src/core/slice/mod.rs.html#617-619

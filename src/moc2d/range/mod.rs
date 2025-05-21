@@ -161,8 +161,8 @@ pub struct RangeMOC2<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
 impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2<T, Q, U, R> {
   pub fn new(depth_max_l: u8, depth_max_r: u8, elems: Vec<RangeMOC2Elem<T, Q, U, R>>) -> Self {
     Self {
-      depth_max_l,
-      depth_max_r,
+      depth_max_l: depth_max_l.min(Q::MAX_DEPTH),
+      depth_max_r: depth_max_r.min(R::MAX_DEPTH),
       elems,
     }
   }
