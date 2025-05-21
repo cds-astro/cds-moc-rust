@@ -1,14 +1,12 @@
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
-use std::marker::PhantomData;
-use std::mem;
-use std::ops::Range;
+use std::{cmp::Ordering, collections::BTreeMap, marker::PhantomData, mem, ops::Range};
 
-use crate::elemset::range::MocRanges;
-use crate::idx::Idx;
-use crate::moc::range::RangeMOC;
-use crate::moc2d::{RangeMOC2, RangeMOC2Elem};
-use crate::qty::MocQty;
+use crate::{
+  elemset::range::MocRanges,
+  idx::Idx,
+  moc::range::RangeMOC,
+  moc2d::{RangeMOC2, RangeMOC2Elem},
+  qty::MocQty,
+};
 
 // While cell_2 list is the same, add T-range.
 //  else create a new range list.
@@ -237,7 +235,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> SweepLineMOC2ElemBuilder<T, Q, 
   }
 }
 
-pub struct RangesAndFixedDepthCellsSTMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
+pub struct RangesAndFixedDepthCells2DMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> {
   depth_1: u8,
   // one_at_new_depth_1: T,
   rm_bits_mask_1: T,
@@ -249,13 +247,13 @@ pub struct RangesAndFixedDepthCellsSTMocBuilder<T: Idx, Q: MocQty<T>, U: Idx, R:
   _r: PhantomData<R>,
 }
 
-impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangesAndFixedDepthCellsSTMocBuilder<T, Q, U, R> {
+impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangesAndFixedDepthCells2DMocBuilder<T, Q, U, R> {
   pub fn new(depth_1: u8, depth_2: u8, buf_capacity: Option<usize>) -> Self {
     let shift = Q::shift_from_depth_max(depth_1) as u32;
     // let one_at_new_depth_1 = T::one().unsigned_shl(shift);
     let rm_bits_mask_1 = (!T::zero()).unsigned_shl(shift);
     let bits_to_be_rm_mask_1 = !rm_bits_mask_1;
-    RangesAndFixedDepthCellsSTMocBuilder {
+    Self {
       depth_1,
       // one_at_new_depth_1,
       rm_bits_mask_1,
@@ -429,5 +427,42 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangesAndFixedDepthCellsSTMocBu
   fn clear_buff(&mut self) {
     // self.sorted = true;
     self.buff.clear();
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::RangesAndFixedDepthCells2DMocBuilder;
+  use crate::qty::{Frequency, Hpx, MocQty};
+
+  #[test]
+  fn test_build2dmoc_rangefixeddepth() {
+    let mut builder =
+      RangesAndFixedDepthCells2DMocBuilder::<u64, Frequency<u64>, u64, Hpx<u64>>::new(
+        Frequency::<u64>::MAX_DEPTH,
+        Hpx::<u64>::MAX_DEPTH,
+        None,
+      );
+    let f1s = Frequency::<u64>::freq2hash(0.01);
+    let f1e = Frequency::<u64>::freq2hash(0.1);
+    let f2s = Frequency::<u64>::freq2hash(0.02);
+    let f2e = Frequency::<u64>::freq2hash(0.2);
+    let f3s = Frequency::<u64>::freq2hash(0.03);
+    let f3e = Frequency::<u64>::freq2hash(0.3);
+
+    builder.push(f1s..f1e, 1);
+    builder.push(f2s..f2e, 3);
+    builder.push(f3s..f3e, 6);
+    let moc2d = builder.into_moc();
+
+    /*for e in moc2d.clone().into_range_moc2_iter() {
+      let (f, s) = e.mocs();
+      println!("FMOC: {:?}", &f);
+      println!("SMOC: {:?}", &s);
+    }*/
+    // println!("Test point F={}, HPX={}", &f1s, &1);
+    assert!(moc2d.contains_val(&f1s, &1));
+    assert!(moc2d.contains_val(&f3s, &1));
+    assert!(!moc2d.contains_val(&f3e, &1));
   }
 }

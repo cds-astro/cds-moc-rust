@@ -157,13 +157,9 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> FixedDepth2DMocBuilder<T, Q, U,
 
 #[cfg(test)]
 mod tests {
-  use std::io;
 
   use super::FixedDepth2DMocBuilder;
-  use crate::{
-    moc2d::{CellOrCellRangeMOC2IntoIterator, CellOrCellRangeMOC2Iterator, RangeMOC2IntoIterator},
-    qty::{Frequency, Hpx},
-  };
+  use crate::qty::{Frequency, Hpx};
 
   #[test]
   fn test_build2dmoc_fixeddepth() {

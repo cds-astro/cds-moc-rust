@@ -2228,8 +2228,6 @@ impl U64MocStore {
     }
   }
 
-  // create_from_freq_ranges_spatial_coverage
-
   /////////////////////////
   // OPERATIONS ON 1 MOC //
 
@@ -2710,7 +2708,7 @@ impl U64MocStore {
   /// * the size of the returned array is the same as the number of elements on the input iterator.
   /// * we do not return an iterator to avoid chaining with possibly costly operations
   ///   while keeping a read lock on the store.
-  /// * similarly, be carefull not to use an input Iterator based on costly operations...
+  /// * similarly, be careful not to use an input Iterator based on costly operations...
   pub fn filter_freqpos<T, F, R>(
     &self,
     moc_index: usize,

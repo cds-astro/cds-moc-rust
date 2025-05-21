@@ -11,7 +11,7 @@ use crate::{
   moc2d::{
     builder::{
       maxdepths_cell::FixedDepth2DMocBuilder,
-      maxdepths_ranges_cells::RangesAndFixedDepthCellsSTMocBuilder,
+      maxdepths_ranges_cells::RangesAndFixedDepthCells2DMocBuilder,
     },
     CellMOC2ElemIt, CellMOC2IntoIterator, CellMOC2Iterator, HasTwoMaxDepth, MOC2Properties,
     RangeMOC2ElemIt, RangeMOC2IntoIterator, RangeMOC2Iterator,
@@ -220,7 +220,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2<T, Q, U, R> {
     cells_it: I,
     buf_capacity: Option<usize>,
   ) -> Self {
-    let mut builder = RangesAndFixedDepthCellsSTMocBuilder::new(depth_1, depth_2, buf_capacity);
+    let mut builder = RangesAndFixedDepthCells2DMocBuilder::new(depth_1, depth_2, buf_capacity);
     for (range_1, cell_2) in cells_it {
       builder.push(range_1, cell_2);
     }
@@ -238,14 +238,14 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2<T, Q, U, R> {
       match (elem.moc_l.first_index(), elem.moc_l.last_index()) {
         (Some(start), Some(end)) => {
           if *val_left < start {
-            Ordering::Less
-          } else if *val_left >= end {
             Ordering::Greater
+          } else if *val_left >= end {
+            Ordering::Less
           } else {
             Ordering::Equal
           }
         }
-        _ => Ordering::Less,
+        _ => Ordering::Greater,
       }
     });
     match comp_res {
@@ -658,7 +658,7 @@ mod tests {
 
   use crate::{
     deser::ascii::moc2d_from_ascii_ivoa,
-    moc2d::{CellOrCellRangeMOC2IntoIterator, CellOrCellRangeMOC2Iterator, RangeMOC2IntoIterator},
+    moc2d::{CellOrCellRangeMOC2IntoIterator, RangeMOC2IntoIterator},
     qty::{Frequency, Hpx},
   };
 
