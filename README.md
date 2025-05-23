@@ -24,7 +24,7 @@ MOC Lib Rust rely on the [CDS HEALPix Rust library](https://github.com/cds-astro
 
 This Rust library implements the v2.0 of the [MOC standard](https://ivoa.net/documents/MOC/),
 including (S-)MOCs, T-MOCs and ST-MOCs.  
-It also implements a still experimental F-MOC (F for Frequency).
+It also implements F-MOCs (F for Frequency) and SF-MOCs.
 
 MOC Lib Rust is used in:
 * [MOCPy](https://github.com/cds-astro/mocpy), a Python wrapper to manipulate MOCs;
