@@ -2,7 +2,7 @@
 
 ## 0.10.0
 
-Released 2025-05-xx
+Released 2025-05-23
 
 * Bump cdshealpix to 0.7.x
 

@@ -305,7 +305,6 @@ where
 
 #[cfg(test)]
 mod tests {
-
   use std::{fs, path::PathBuf, str::from_utf8};
 
   use crate::moc2d::{HasTwoMaxDepth, RangeMOC2Iterator};
@@ -471,5 +470,24 @@ mod tests {
     assert!(stmoc2.is_empty());
     assert_eq!(stmoc2.depth_max_1(), 12);
     assert_eq!(stmoc2.depth_max_2(), 8);
+  }
+
+  #[test]
+  fn test_stmoc_from_json() {
+    let json = r#"[
+{
+  "t": {
+    "7": [0],
+    "9": [4],
+    "10": [10]
+  },
+  "s": {
+    "9": [0, 1],
+    "10": [8, 9, 10]
+  }
+},
+{ "t": { "10": [] }, "s": { "10": [] } }
+]"#;
+    cellmoc2d_from_json_aladin::<u64, Time<u64>, u64, Hpx<u64>>(&json).unwrap();
   }
 }

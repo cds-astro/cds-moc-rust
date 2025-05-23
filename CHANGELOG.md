@@ -2,13 +2,14 @@
 
 ## 0.18.0
 
-Released 2025-05-xx
+Released 2025-05-23
 
 ### Changed
 
 * Ignore too deep `NUNIQ` in bugged FITS file from another lib
 * Accept `MOCORDER` with no `MOCORD_S` in FITS file of v2.0
-* change `exec_on_readwrite_store` signature
+* Change `exec_on_readwrite_store` signature
+* Change 'xxST_xx' metods names into `xx2Dxx` names, and conversely 
 
 ### Added
 
@@ -16,6 +17,10 @@ Released 2025-05-xx
 * Add `refine` method on MOCs
 * Add SF-MOC support!!!
 
+### Fixed
+
+* Fix the `ST-MOC` `contains_val` method
+* Fix ST-MOC method `from_time_and_coos` (was no called in MOCPy)
 
 
 ## 0.17.0
