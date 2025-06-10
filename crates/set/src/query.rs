@@ -12,7 +12,6 @@ use clap::Parser;
 use rayon::prelude::*;
 
 use healpix::{best_starting_depth, has_best_starting_depth, nested};
-
 use moclib::{
   deser::{
     ascii::from_ascii_ivoa,
@@ -179,9 +178,7 @@ impl Query {
         } else {
           let moc64: RangeMOC<u64, Hpx<u64>> =
             RangeMOC::from_cone(lon, lat, r_rad, depth, 2, CellSelection::All);
-          let moc32: RangeMOC<u32, Hpx<u32>> =
-            convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&moc64).into_range_moc_iter())
-              .into_range_moc();
+          let moc32: RangeMOC<u32, Hpx<u32>> = to_u32_possibly_degrading(&moc64);
           let moc32: Ranges<u32> = moc32.into_moc_ranges().into_ranges();
           let moc64: Ranges<u64> = moc64.into_moc_ranges().into_ranges();
           let moc32_ref = (&moc32).into();
@@ -308,9 +305,7 @@ pub fn load_moc<R: BufRead>(
         .into_cellcellrange_moc_iter()
         .ranges()
         .into_range_moc();
-      let range_moc_u32: RangeMOC<u32, Hpx<u32>> =
-        convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&range_moc_u64).into_range_moc_iter())
-          .into_range_moc();
+      let range_moc_u32: RangeMOC<u32, Hpx<u32>> = to_u32_possibly_degrading(&range_moc_u64);
       Ok((range_moc_u32, range_moc_u64))
     }
     InputFormat::Json => {
@@ -319,9 +314,7 @@ pub fn load_moc<R: BufRead>(
       let cells = from_json_aladin::<u64, Hpx<u64>>(&input_str)?;
       let range_moc_u64: RangeMOC<u64, Hpx<u64>> =
         cells.into_cell_moc_iter().ranges().into_range_moc();
-      let range_moc_u32: RangeMOC<u32, Hpx<u32>> =
-        convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&range_moc_u64).into_range_moc_iter())
-          .into_range_moc();
+      let range_moc_u32: RangeMOC<u32, Hpx<u32>> = to_u32_possibly_degrading(&range_moc_u64);
       Ok((range_moc_u32, range_moc_u64))
     }
     InputFormat::Fits => {
@@ -340,9 +333,7 @@ pub fn load_moc<R: BufRead>(
           let range_moc_u64 =
             convert_to_u64::<u16, Hpx<u16>, _, Hpx<u64>>(range_moc_u16.into_range_moc_iter())
               .into_range_moc();
-          let range_moc_u32 =
-            convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&range_moc_u64).into_range_moc_iter())
-              .into_range_moc();
+          let range_moc_u32 = to_u32_possibly_degrading(&range_moc_u64);
           Ok((range_moc_u32, range_moc_u64))
         }
         MocIdxType::U32(moc) => {
@@ -370,9 +361,7 @@ pub fn load_moc<R: BufRead>(
               "Unexpected type in FITS file MOC. Expected: MocQtyType::Hpx",
             )),
           }?;
-          let range_moc_u32 =
-            convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&range_moc_u64).into_range_moc_iter())
-              .into_range_moc();
+          let range_moc_u32 = to_u32_possibly_degrading(&range_moc_u64);
           Ok((range_moc_u32, range_moc_u64))
         }
       }
@@ -403,6 +392,7 @@ where
         let id = flg_depth_id.identifier();
         let status = flg_depth_id.status();
         let depth = flg_depth_id.depth();
+
         if status == StatusFlag::Valid || (include_deprecated && status == StatusFlag::Deprecated) {
           if depth <= Hpx::<u32>::MAX_DEPTH {
             let ranges = moc_set_reader.ranges::<u32>(byte_range);
@@ -563,3 +553,54 @@ fn lat_deg2rad(lat_deg: f64) -> Result<f64, Box<dyn Error>> {
     Ok(lat)
   }
 }
+
+pub(crate) fn to_u32_possibly_degrading(
+  moc64: &RangeMOC<u64, Hpx<u64>>,
+) -> RangeMOC<u32, Hpx<u32>> {
+  if moc64.depth_max() <= Hpx::<u32>::MAX_DEPTH {
+    convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&moc64).into_range_moc_iter()).into_range_moc()
+  } else {
+    let moc64tmp = moc64.degraded(Hpx::<u32>::MAX_DEPTH);
+    convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&moc64tmp).into_range_moc_iter())
+      .into_range_moc()
+  }
+}
+
+/*
+#[cfg(test)]
+mod test {
+  use super::{Query, Region};
+
+  fn init_logger() {
+    let log_level = log::LevelFilter::max();
+    // let log_level = log::LevelFilter::Error;
+
+    let _ = env_logger::builder()
+      // Include all events in tests
+      .filter_level(log_level)
+      // Ensure events are captured by `cargo test`
+      .is_test(true)
+      // Ignore errors initializing the logger if tests race to configure it
+      .try_init();
+  }
+
+  #[test]
+  fn test_cone00() {
+    init_logger();
+    let q = Query {
+      file: "/data/pineau/mocset/test_cdsarc/mocset10.bin".into(),
+      include_deprecated: false,
+      print_coverage: false,
+      parallel: None,
+      region: Region::Cone {
+        lon_deg: 0.0,
+        lat_deg: 0.0,
+        r_arcsec: 5.0,
+        prec: 2,
+        full: false,
+      },
+    };
+    q.exec().unwrap();
+  }
+}
+*/

@@ -1,6 +1,6 @@
 [package]
 name = "moc-set"
-version = "0.10.0"
+version = "0.10.1"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = "Command-line tool to build, update and query a persistent set of HEALPix Multi-Order Coverages maps (MOCs)"
 license = "MIT OR Apache-2.0"
@@ -29,6 +29,9 @@ rayon = { workspace = true }
 # other dependencies
 clap = { version = "4.5.37", features = ["derive"] }
 memmap = { package = "memmap2", version = "0.9.5" }
+
+[dev-dependencies]
+env_logger = "0.11"
 
 [package.metadata.deb]
 maintainer = "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"

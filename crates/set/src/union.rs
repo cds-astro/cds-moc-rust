@@ -12,8 +12,6 @@ use std::{
 use clap::Parser;
 
 use healpix::{best_starting_depth, has_best_starting_depth, nested};
-
-use moclib::moc::range::CellSelection;
 use moclib::{
   deser::{
     ascii::from_ascii_ivoa,
@@ -23,10 +21,7 @@ use moclib::{
   idx::Idx,
   moc::{
     builder::maxdepth_range::RangeMocBuilder,
-    range::{
-      op::convert::{convert_from_u64, convert_to_u64},
-      RangeMOC,
-    },
+    range::{op::convert::convert_to_u64, CellSelection, RangeMOC},
     CellMOCIntoIterator, CellMOCIterator, CellOrCellRangeMOCIntoIterator,
     CellOrCellRangeMOCIterator, RangeMOCIntoIterator, RangeMOCIterator,
   },
@@ -34,7 +29,9 @@ use moclib::{
   ranges::{BorrowedRanges, Ranges, SNORanges},
 };
 
-use crate::{extract::OutputFormat, MocSetFileReader, StatusFlag};
+use crate::{
+  extract::OutputFormat, query::to_u32_possibly_degrading, MocSetFileReader, StatusFlag,
+};
 
 const HALF_PI: f64 = 0.5 * std::f64::consts::PI;
 const TWICE_PI: f64 = 2.0 * std::f64::consts::PI;
@@ -206,9 +203,7 @@ impl Union {
         } else {
           let moc64: RangeMOC<u64, Hpx<u64>> =
             RangeMOC::from_cone(lon, lat, r_rad, depth, 2, CellSelection::All);
-          let moc32: RangeMOC<u32, Hpx<u32>> =
-            convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&moc64).into_range_moc_iter())
-              .into_range_moc();
+          let moc32: RangeMOC<u32, Hpx<u32>> = to_u32_possibly_degrading(&moc64);
           let moc32: Ranges<u32> = moc32.into_moc_ranges().into_ranges();
           let moc64: Ranges<u64> = moc64.into_moc_ranges().into_ranges();
           let moc32_ref = (&moc32).into();
@@ -304,9 +299,7 @@ pub fn load_moc<R: BufRead>(
         .into_cellcellrange_moc_iter()
         .ranges()
         .into_range_moc();
-      let range_moc_u32: RangeMOC<u32, Hpx<u32>> =
-        convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&range_moc_u64).into_range_moc_iter())
-          .into_range_moc();
+      let range_moc_u32: RangeMOC<u32, Hpx<u32>> = to_u32_possibly_degrading(&range_moc_u64);
       Ok((range_moc_u32, range_moc_u64))
     }
     InputFormat::Json => {
@@ -315,9 +308,7 @@ pub fn load_moc<R: BufRead>(
       let cells = from_json_aladin::<u64, Hpx<u64>>(&input_str)?;
       let range_moc_u64: RangeMOC<u64, Hpx<u64>> =
         cells.into_cell_moc_iter().ranges().into_range_moc();
-      let range_moc_u32: RangeMOC<u32, Hpx<u32>> =
-        convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&range_moc_u64).into_range_moc_iter())
-          .into_range_moc();
+      let range_moc_u32: RangeMOC<u32, Hpx<u32>> = to_u32_possibly_degrading(&range_moc_u64);
       Ok((range_moc_u32, range_moc_u64))
     }
     InputFormat::Fits => {
@@ -336,9 +327,7 @@ pub fn load_moc<R: BufRead>(
           let range_moc_u64 =
             convert_to_u64::<u16, Hpx<u16>, _, Hpx<u64>>(range_moc_u16.into_range_moc_iter())
               .into_range_moc();
-          let range_moc_u32 =
-            convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&range_moc_u64).into_range_moc_iter())
-              .into_range_moc();
+          let range_moc_u32 = to_u32_possibly_degrading(&range_moc_u64);
           Ok((range_moc_u32, range_moc_u64))
         }
         MocIdxType::U32(moc) => {
@@ -366,9 +355,7 @@ pub fn load_moc<R: BufRead>(
               "Unexpected type in FITS file MOC. Expected: MocQtyType::Hpx",
             )),
           }?;
-          let range_moc_u32 =
-            convert_from_u64::<Hpx<u64>, u32, Hpx<u32>, _>((&range_moc_u64).into_range_moc_iter())
-              .into_range_moc();
+          let range_moc_u32 = to_u32_possibly_degrading(&range_moc_u64);
           Ok((range_moc_u32, range_moc_u64))
         }
       }

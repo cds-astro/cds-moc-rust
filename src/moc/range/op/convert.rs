@@ -1,9 +1,10 @@
-use std::ops::Range;
+use std::{marker::PhantomData, ops::Range};
 
-use crate::idx::Idx;
-use crate::moc::{HasMaxDepth, MOCProperties, NonOverlapping, RangeMOCIterator, ZSorted};
-use crate::qty::MocQty;
-use std::marker::PhantomData;
+use crate::{
+  idx::Idx,
+  moc::{HasMaxDepth, MOCProperties, NonOverlapping, RangeMOCIterator, ZSorted},
+  qty::MocQty,
+};
 
 /// Decorator that converts from one datatype to another datatype.
 /*pub fn convert_to_u64<T, Q, I, R>(it: I) -> ConvertIterator<T, Q, I, u64, R>
@@ -138,6 +139,8 @@ where
 }
 
 /// Decorator that converts from u64 to another datatype.
+/// WARNING: to be called only on MOC having a depth smaller than Q::MAX_DEPTH,
+/// **YOU** have to degrade first!!
 pub fn convert_from_u64<Q1, T, Q, I>(it: I) -> ConvertFromU64Iterator<Q1, T, Q, I>
 where
   Q1: MocQty<u64>,
