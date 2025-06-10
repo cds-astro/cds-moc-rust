@@ -1,5 +1,12 @@
 # `moc-wasm` Change Log
 
+## 0.10.1
+
+Released 2025-06-10
+
+* No modification, release due to new moc-set release
+
+
 ## 0.10.0
 
 Released 2025-05-23
