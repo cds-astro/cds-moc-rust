@@ -680,12 +680,12 @@ mod tests {
 
     let moc2ascii = moc2d_from_ascii_ivoa::<u64, Frequency<u64>, u64, Hpx<u64>>(
       r#"
-    f20/714997
-s12/79691776
-f20/778240
-s12/79697029
-f20/836992
-s12/79712788
+f20/599186 
+s12/79691776 
+f20/685357 
+s12/79697029 
+f20/766850 
+s12/79712788 
 f20/ s12/
 "#,
     )
@@ -698,11 +698,12 @@ f20/ s12/
     .unwrap();
     assert_eq!(moc2, moc2ascii);
 
-    /*moc2
-    .into_range_moc2_iter()
-    .into_cellcellrange_moc2_iter()
-    .to_ascii_ivoa(Some(80), false, std::io::stdout())
-    .map_err(|e| e.to_string())
-    .unwrap();*/
+    /*use crate::moc2d::CellOrCellRangeMOC2Iterator;
+    moc2
+      .into_range_moc2_iter()
+      .into_cellcellrange_moc2_iter()
+      .to_ascii_ivoa(Some(80), false, std::io::stdout())
+      .map_err(|e| e.to_string())
+      .unwrap();*/
   }
 }

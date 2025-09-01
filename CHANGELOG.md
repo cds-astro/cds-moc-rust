@@ -1,5 +1,15 @@
 # `moc` Change Log
 
+
+## 0.19.0
+
+Released 2025-09-XX
+
+### Changed
+
+* The way F-MOCs are computed!
+
+
 ## 0.18.0
 
 Released 2025-05-23

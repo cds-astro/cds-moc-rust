@@ -1,8 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData, ops::Range};
 
-use num::One;
-
 use crate::{deser::fits::keywords::MocDim, idx::Idx};
+use num::One;
 
 pub trait Bounded<T> {
   fn upper_bound_exclusive() -> T;
@@ -291,24 +290,11 @@ impl<T: Idx> MocableQty for Time<T> {
 }
 impl<T> MocQty<T> for Time<T> where T: Idx {}
 
-/// Mask to keep only the f64 sign
-pub const F64_SIGN_BIT_MASK: u64 = 0x8000000000000000;
-/// Equals !F64_SIGN_BIT_MASK (the inverse of the f64 sign mask)
-pub const F64_BUT_SIGN_BIT_MASK: u64 = 0x7FFFFFFFFFFFFFFF;
-/// Mask to keep only the f64 exponent part
-pub const F64_EXPONENT_BIT_MASK: u64 = 0x7FF << 52;
-/// Inverse of the f64 exponent mask
-pub const F64_BUT_EXPONENT_BIT_MASK: u64 = !F64_EXPONENT_BIT_MASK;
-/// Mask to keep only the f64 mantissa part
-pub const F64_MANTISSA_BIT_MASK: u64 = !(0xFFF << 52);
-/// Inverse of the f64 mantissa mask
-pub const F64_BUT_MANTISSA_BIT_MASK: u64 = 0xFFF << 52;
-
 /// Frequency index (from 5.048709793414476e-29 to 5.846006549323611e+48 Hz)
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Frequency<T: Idx>(PhantomData<T>);
 impl<T: Idx> MocableQty for Frequency<T> {
-  const N_RESERVED_BITS: u8 = 4; // 64 - 52 - 8
+  const N_RESERVED_BITS: u8 = 12; // 64 - 52 - 1: 52 order MAX, N_ORDER = 53
   const NAME: &'static str = "FREQUENCY";
   const PREFIX: char = 'f';
   const DIM: u8 = 1;
@@ -329,6 +315,50 @@ impl<T: Idx> MocableQty for Frequency<T> {
 }
 impl<T> MocQty<T> for Frequency<T> where T: Idx {}
 impl<T: Idx> Frequency<T> {
+  /*
+  Thomas Robitaille suggest to use te formula:
+      index = ( log10(freq) - log10(fre_min) ) / ( log10(freq_max) - log10(fre_min )) * 2^order
+  Which can be transformed in:
+      ln(freq/freq_min) / cte * 2^order with cte = ln(freq_max/freq_min)
+  , its reverse is then:
+      freq = freq_min * exp( cte * index / 2^order )
+  * pro: regular spacing in log scale (which is better, e.g. for WCS)
+  * con: at order max, the transformation Hz <--> index does not preserve any more the original value bit
+    while the current version basically consist in directly manipulating ranges of Hz using the u64 bit representation of f64.
+  Here the example cdde I wrote (tested in Rust Playground)
+
+  fn main() {
+    const MIN: f64 = 5.0487097934144756E-29_f64;
+    const MAX: f64 = 5.846006549323611E+48_f64;
+    let cte: f64= (MAX/MIN).ln();
+
+    let depth = 60;
+    let freq = 1.2345678912345E+10_f64;
+    //let freq = 12280285068.63777_f64;
+
+
+    println!("freq: {}", freq);
+    for depth in 0..60 {
+      let two_pow_depth = 2_f64.powi(depth);
+      let index = ( ( (freq/MIN).ln() / cte ) * two_pow_depth ) as u64;
+      let freq_inv  = MIN * (cte * (index as f64) / two_pow_depth).exp();
+      println!("depth: {:02}; freq: {}; ind: {}", depth, freq_inv, index);
+    }
+
+    println!("------------");
+
+    let depth = 60;
+    let two_pow_depth = 2_f64.powi(depth);
+    let index = ( ( (freq/MIN).ln() / cte ) * two_pow_depth ) as u64;
+    for depth in 10..60 {
+      let nindex = index >> (depth - 10);
+      let freq_inv  = MIN * (cte * (index as f64) / two_pow_depth).exp();
+      println!("depth: {:02}; freq: {}; ind: {}", depth, freq_inv, nindex);
+    }
+  }
+  */
+
+  /*
   /// Returns the relative precision of the frequency (in Hz) encoded at the
   /// given depth.
   pub fn depth2rprec(depth: u8) -> f64 {
@@ -337,21 +367,12 @@ impl<T: Idx> Frequency<T> {
       // (1_u64 << (1 << (7 - depth))) as f64
       2.0_f64.powf((1 << (7 - depth)) as f64)
     } else if depth <= Self::MAX_DEPTH {
-      // We are in matinssa bits
+      // We are in mantissa bits
       1_f64 / ((1_u64 << (1 + depth - 7)) as f64)
     } else {
       0f64
     }
   }
-
-  /*fn freq2hash_single(freq: f32) -> T {
-      // f32: 1 sign bit + 8 exponent bits + 23 fraction bits
-      // value = (-1)^sign * 2^(exponent - 127) * (1 + fraction/2^24)
-      // * assert bit sign == 0
-      // * exponent ...
-      // * leave mantissa unchanged
-  }*/
-  // Starts first with f64 only, gen we may generalize to f32 making a Float trait ?
 
   // For floats:
   //    + min: 10^-18 = 2^(expo - 1023) => -18 * ln(10) / ln(2) + 1023 = expo => expo =  963
@@ -400,21 +421,181 @@ impl<T: Idx> Frequency<T> {
     let freq_hash_dmax = (freq_bits & F64_BUT_EXPONENT_BIT_MASK) | exponent;
     T::from_u64_idx(freq_hash_dmax)
   }
+  fn freq2hash_slow(freq: f64) -> T {
+    println!("val: {}", freq);
+    let freq_bits = freq.to_bits();
+    let exponent1 = (freq_bits & F64_EXPONENT_BIT_MASK) >> 52;
+    let exposant = (freq.log2().floor() as i64 + 1023) as u64;
+    println!("ln2: {}", freq.log2() + 1023.0);
+    assert_eq!(exposant, exponent1);
+    let exponent1 = (exponent1 - 929) << 52;
+    let exposant = (freq.log2() + 94.0) as u64 * 2_u64.pow(52);
+    println!("frln2: {}", freq.log2() + 94.0);
+    assert_eq!(exposant, exponent1);
+    let mantisse1 = freq_bits & F64_BUT_EXPONENT_BIT_MASK;
+    let mantisse: u64 =
+      (((freq / 2.0_f64.powf(freq.log2().floor())) - 1.0) * 2.0_f64.powf(52.0)) as u64;
+    assert_eq!(mantisse, mantisse1);
+    // T::from_u64_idx(exposant + mantisse)
 
-  pub fn hash2freq(hash: T) -> f64 {
-    let freq_hash = hash.to_u64_idx();
-    let exponent = (freq_hash & F64_EXPONENT_BIT_MASK) >> 52;
-    // Warning, only case = 256 is range upper bound (exclusive)
+    // Formule:
+    // [ int(floor(log2(freq) + 94) * 2^52) + int( (freq/2^floor(log2(freq)) - 1) * 2^52  ) ] / 2^(59 - ordre)
+
+    T::from_u64_idx(
+      ((freq.log2() + 94.0).floor() * 2.0_f64.powf(52.0)) as u64
+        + (((freq / 2.0_f64.powf(freq.log2().floor())) - 1.0) * 2.0_f64.powf(52.0)) as u64,
+    )
+
+   */
+
+  /// Transforms a frequency, in hertz, into its hash value of given depth.
+  /// # Panics
+  /// * if `freq` not in `[5.048709793414476e-29, 5.846006549323611e+48[`.
+  ///
+  /// # NOTE
+  /// The previous version was using the following code:
+  /// ```rust,ignore
+  ///
+  /// /// Mask to keep only the f64 sign
+  /// pub const F64_SIGN_BIT_MASK: u64 = 0x8000000000000000;
+  /// /// Equals !F64_SIGN_BIT_MASK (the inverse of the f64 sign mask)
+  /// pub const F64_BUT_SIGN_BIT_MASK: u64 = 0x7FFFFFFFFFFFFFFF;
+  /// /// Mask to keep only the f64 exponent part
+  /// pub const F64_EXPONENT_BIT_MASK: u64 = 0x7FF << 52;
+  /// /// Inverse of the f64 exponent mask
+  /// pub const F64_BUT_EXPONENT_BIT_MASK: u64 = !F64_EXPONENT_BIT_MASK;
+  /// /// Mask to keep only the f64 mantissa part
+  /// pub const F64_MANTISSA_BIT_MASK: u64 = !(0xFFF << 52);
+  /// /// Inverse of the f64 mantissa mask
+  /// pub const F64_BUT_MANTISSA_BIT_MASK: u64 = 0xFFF << 52;
+  ///
+  /// pub fn freq2hash(freq: f64) -> T {
+  ///     const FREQ_MIN: f64 = 5.048_709_793_414_476e-29; // f64::from_bits(  929_u64 << 52);
+  ///     const FREQ_MAX: f64 = 5.846_006_549_323_611e48; // f64::from_bits((1184_u64 << 52) | F64_MANTISSA_BIT_MASK);
+  ///     assert!(
+  ///       FREQ_MIN <= freq,
+  ///       "Wrong frequency in Hz. Expected: >= {}. Actual: {}",
+  ///       FREQ_MIN,
+  ///       freq
+  ///     );
+  ///     assert!(
+  ///       freq <= FREQ_MAX,
+  ///       "Wrong frequency in Hz. Expected: < {}. Actual: {}",
+  ///       FREQ_MAX,
+  ///       freq
+  ///     );
+  ///     let freq_bits = freq.to_bits();
+  ///     assert_eq!(freq_bits & F64_SIGN_BIT_MASK, 0); // We already checked that freq is positive, but...
+  ///     let exponent = (freq_bits & F64_EXPONENT_BIT_MASK) >> 52;
+  ///     assert!((929..=1184).contains(&exponent), "Exponent: {}", exponent); // Should be ok since we already tested freq range values
+  ///     let exponent = (exponent - 929) << 52;
+  ///     let freq_hash_dmax = (freq_bits & F64_BUT_EXPONENT_BIT_MASK) | exponent;
+  ///     T::from_u64_idx(freq_hash_dmax)
+  /// }
+  /// ```
+  ///
+  /// The idea was to use the long representation of a double at max order (59), leaving the double
+  /// mantissa unchanged and storing the exponent on 7 bits instead of 11.
+  /// For orders 59 to 7, going up from order N to N-1 was equivalent to removing the least significant
+  /// bit of the mantissa (so to remove one significant bit). Thus, going up from oder N to N-2 or 3
+  /// was (almost) equivalent to losing one significant digit on the scientific (decimal) notation.
+  /// Then, for order 7 to 0, going up from order N to N-1 was equivalent to removing a significant
+  /// bit on the exponent (thus to divide by x2 the represented interval).
+  /// The advantage was to have, at the deepest resolution, no transformation between the original
+  /// frequency value (in Hz): the transformation was bijective, preserving all bits of the original
+  /// value.
+  /// The drawback was an inhomogeneous WCS representation:
+  /// * the WCS was linear for tiles having an order larger or equal to 7;
+  /// * the WCS was log for tiles with pixel of order smaller or equals to 7;
+  /// * the WCS was mixed for tiles lower than order 7 with pixels of resolution lower than 7.
+  ///
+  /// Thomas Robitaille proposed an other version with a simple WCS (always LOG):
+  /// use the formula:
+  /// > index(freq) = ( log10(freq) - log10(fre_min) ) / ( log10(freq_max) - log10(fre_min )) * 2^order_max
+  ///
+  /// Which can be transformed:
+  /// > index(freq) = (ln(freq/freq_min) / cte * 2^order_max
+  /// with:
+  /// > cte = ln(freq_max/freq_min)
+  ///
+  /// From my point-of-view, the drawback is that the transformation is no more bijective: at the deepest
+  /// order, the round trip conversion `hash2freq(freq2hash(fre))` does not provide with the exact input
+  /// bit pattern.
+  /// Also, the transformation basically consist in transforming a frequency (in Hz) in a value
+  /// in `[0.0, 1.0[` and multiplying it by `2^ordre_max`.
+  /// Hence, it is pointless to have an `order_max` larger than 52 (the number of bit in a f64 mantissa)
+  /// since the values in `[0.0, 1.0]` cannot represent more than `2^52-1` distinct values (the product
+  /// by a power of 2 leaves the mantissa unchanged and only changes exponent bits).
+  /// Also, this solution  required to call a `ln` function, which is slower than simple bit manipulation.
+  ///
+  /// Having a simpler WCS has been considered more important than speed, than the bijective and
+  /// a larger number of orders aspects.
+  ///
+  /// We thus decided:
+  /// * use the log transformation
+  /// * to use the MIN/MAX range `[10^-18, 10^+38[` like originally provided by Baptiste Cecconi.
+  /// * limit the order to 52.  
+  pub fn freq2hash(freq: f64) -> T {
+    const FREQ_MIN: f64 = 1e-18;
+    const FREQ_MAX: f64 = 1e+38;
+    let cte: f64 = (FREQ_MAX / FREQ_MIN).ln();
+    let two_pow_order_max: f64 = 2_f64.powi((Frequency::<u64>::MAX_DEPTH + 1) as i32);
     assert!(
-      exponent <= 256,
-      "Exponent: {}. Hash: {}. Hash bits: {:064b}",
-      exponent,
-      freq_hash,
-      freq_hash
+      FREQ_MIN <= freq,
+      "Wrong frequency in Hz. Expected: >= {}. Actual: {}",
+      FREQ_MIN,
+      freq
     );
-    let exponent = (exponent + 929) << 52;
-    let freq_bits = (freq_hash & F64_BUT_EXPONENT_BIT_MASK) | exponent;
-    f64::from_bits(freq_bits)
+    assert!(
+      freq < FREQ_MAX,
+      "Wrong frequency in Hz. Expected: < {}. Actual: {}",
+      FREQ_MAX,
+      freq
+    );
+
+    T::from_u64_idx((((freq / FREQ_MIN).ln() / cte) * two_pow_order_max) as u64)
+  }
+
+  /// # NOTE
+  /// The previous version was using the following code (see #fn.method.freq2hash for more details):
+  /// ```rust,ignore
+  ///
+  /// /// Mask to keep only the f64 sign
+  /// pub const F64_SIGN_BIT_MASK: u64 = 0x8000000000000000;
+  /// /// Equals !F64_SIGN_BIT_MASK (the inverse of the f64 sign mask)
+  /// pub const F64_BUT_SIGN_BIT_MASK: u64 = 0x7FFFFFFFFFFFFFFF;
+  /// /// Mask to keep only the f64 exponent part
+  /// pub const F64_EXPONENT_BIT_MASK: u64 = 0x7FF << 52;
+  /// /// Inverse of the f64 exponent mask
+  /// pub const F64_BUT_EXPONENT_BIT_MASK: u64 = !F64_EXPONENT_BIT_MASK;
+  /// /// Mask to keep only the f64 mantissa part
+  /// pub const F64_MANTISSA_BIT_MASK: u64 = !(0xFFF << 52);
+  /// /// Inverse of the f64 mantissa mask
+  /// pub const F64_BUT_MANTISSA_BIT_MASK: u64 = 0xFFF << 52;  
+  ///
+  /// pub fn hash2freq(hash: T) -> f64 {
+  ///     let freq_hash = hash.to_u64_idx();
+  ///     let exponent = (freq_hash & F64_EXPONENT_BIT_MASK) >> 52;
+  ///     // Warning, only case = 256 is range upper bound (exclusive)
+  ///     assert!(
+  ///       exponent <= 256,
+  ///       "Exponent: {}. Hash: {}. Hash bits: {:064b}",
+  ///       exponent,
+  ///       freq_hash,
+  ///       freq_hash
+  ///     );
+  ///     let exponent = (exponent + 929) << 52;
+  ///     let freq_bits = (freq_hash & F64_BUT_EXPONENT_BIT_MASK) | exponent;
+  ///     f64::from_bits(freq_bits)
+  ///   }
+  /// ```
+  pub fn hash2freq(hash: T) -> f64 {
+    const FREQ_MIN: f64 = 1e-18;
+    const FREQ_MAX: f64 = 1e+38;
+    let cte: f64 = (FREQ_MAX / FREQ_MIN).ln();
+    let two_pow_order_max: f64 = 2_f64.powi((Frequency::<u64>::MAX_DEPTH + 1) as i32);
+    let freq_hash = hash.to_u64_idx();
+    FREQ_MIN * (cte * (freq_hash as f64) / two_pow_order_max).exp()
   }
 }
 
@@ -504,6 +685,7 @@ mod tests {
     assert_eq!(Time::<u64>::n_cells_max(), 2_u64.pow(62));
   }
 
+  /*
   #[test]
   fn test_freq() {
     // Independent of T
@@ -517,7 +699,7 @@ mod tests {
     assert_eq!(Frequency::<u64>::MAX_DEPTH, 59);
     assert_eq!(Frequency::<u64>::MAX_SHIFT, 59);
     assert_eq!(Frequency::<u64>::n_cells_max(), 2_u64.pow(60));
-    // Test trasnformations
+    // Test transformations
     let freq_hz = 0.1;
     assert_eq!(
       Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
@@ -541,6 +723,56 @@ mod tests {
     let freq_hz = 5.846006549323610e+48;
     assert_eq!(
       Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
+      freq_hz
+    );
+  }
+
+  #[test]
+  fn test_freq_slow() {
+    // Test trasnformations
+    let freq_hz = 0.1;
+    assert_eq!(
+      Frequency::<u64>::freq2hash(freq_hz),
+      Frequency::<u64>::freq2hash_slow(freq_hz)
+    );
+    assert_eq!(
+      Frequency::<u64>::hash2freq_slow(Frequency::<u64>::freq2hash_slow(freq_hz)),
+      freq_hz
+    );
+    let freq_hz = 1.125697115656943e-18;
+    assert_eq!(
+      Frequency::<u64>::freq2hash(freq_hz),
+      Frequency::<u64>::freq2hash_slow(freq_hz)
+    );
+    assert_eq!(
+      Frequency::<u64>::hash2freq_slow(Frequency::<u64>::freq2hash_slow(freq_hz)),
+      freq_hz
+    );
+    let freq_hz = 1.12569711565245e+44;
+    assert_eq!(
+      Frequency::<u64>::freq2hash(freq_hz),
+      Frequency::<u64>::freq2hash_slow(freq_hz)
+    );
+    assert_eq!(
+      Frequency::<u64>::hash2freq_slow(Frequency::<u64>::freq2hash_slow(freq_hz)),
+      freq_hz
+    );
+    let freq_hz = 5.048709793414476e-29;
+    assert_eq!(
+      Frequency::<u64>::freq2hash(freq_hz),
+      Frequency::<u64>::freq2hash_slow(freq_hz)
+    );
+    assert_eq!(
+      Frequency::<u64>::hash2freq_slow(Frequency::<u64>::freq2hash_slow(freq_hz)),
+      freq_hz
+    );
+    let freq_hz = 5.84600654932300e+48;
+    assert_eq!(
+      Frequency::<u64>::freq2hash(freq_hz),
+      Frequency::<u64>::freq2hash_slow(freq_hz)
+    );
+    assert_eq!(
+      Frequency::<u64>::hash2freq_slow(Frequency::<u64>::freq2hash_slow(freq_hz)),
       freq_hz
     );
   }
@@ -704,5 +936,46 @@ mod tests {
       Frequency::<u64>::depth2rprec(59),
       0.00000000000000011102230246251565
     );
+  }*/
+
+  #[test]
+  fn test_freq() {
+    // Independent of T
+    assert_eq!(Frequency::<u64>::DIM, 1);
+    assert_eq!(Frequency::<u64>::N_D0_CELLS, 2);
+    assert_eq!(Frequency::<u64>::N_D0_BITS, 1);
+    assert_eq!(Frequency::<u64>::LEVEL_MASK, 1);
+    assert_eq!(Frequency::<u64>::shift(1), 1);
+    assert_eq!(Frequency::<u64>::shift(10), 10);
+    // Depends on T
+    assert_eq!(Frequency::<u64>::MAX_DEPTH, 51);
+    assert_eq!(Frequency::<u64>::MAX_SHIFT, 51);
+    assert_eq!(Frequency::<u64>::n_cells_max(), 2_u64.pow(52));
+    // Test transformations
+    /*let freq_hz = 0.1;
+    assert_eq!(
+      Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
+      freq_hz
+    );
+    let freq_hz = 1.125697115656943e-18;
+    assert_eq!(
+      Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
+      freq_hz
+    );
+    let freq_hz = 1.12569711565245e+44;
+    assert_eq!(
+      Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
+      freq_hz
+    );
+    let freq_hz = 5.048709793414476e-29;
+    assert_eq!(
+      Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
+      freq_hz
+    );
+    let freq_hz = 5.846006549323610e+48;
+    assert_eq!(
+      Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
+      freq_hz
+    );*/
   }
 }
