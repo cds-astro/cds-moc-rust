@@ -71,7 +71,7 @@ pub trait HpxMOMIterator<T: Idx, V: Value<T>>: MOMIterator<T, Hpx<T>, V> {
   fn retain_values_with_weights_in_hpxmoc(
     self,
     moc: &RangeMOC<T, Hpx<T>>,
-  ) -> HpxMOMFilter<T, V, Self> {
+  ) -> HpxMOMFilter<'_, T, V, Self> {
     HpxMOMFilter::new(self, moc)
   }
 }

@@ -155,7 +155,7 @@ impl<T: Idx, Q: MocQty<T>> MocRanges<T, Q> {
     self.complement_with_upper_bound(Q::upper_bound_exclusive())
   }
 
-  pub fn iter(&self) -> Iter<Range<T>> {
+  pub fn iter(&self) -> Iter<'_, Range<T>> {
     self.0.iter()
   }
 

@@ -189,27 +189,27 @@ impl<TT: Idx> FreqSpaceMoc<TT, TT> {
   pub fn create_from_freq_positions(
     freqs: Vec<TT>,
     positions: Vec<TT>,
-    time_deph: u8,
+    freq_deph: u8,
     hpx_depth: u8,
   ) -> Self {
-    Self::create_from_values_and_position(freqs, positions, time_deph, hpx_depth)
+    Self::create_from_values_and_position(freqs, positions, freq_deph, hpx_depth)
   }
 
   pub fn create_from_freq_ranges_positions(
     freq_ranges: Vec<Range<TT>>,
     positions: Vec<TT>,
-    time_deph: u8,
+    freq_deph: u8,
     hpx_depth: u8,
   ) -> Self {
-    Self::create_from_ranges_and_position(freq_ranges, positions, time_deph, hpx_depth)
+    Self::create_from_ranges_and_position(freq_ranges, positions, freq_deph, hpx_depth)
   }
 
   pub fn create_from_freq_ranges_spatial_coverage(
     freq_ranges: Vec<Range<TT>>,
     spatial_ranges: Vec<HpxRanges<TT>>,
-    time_deph: u8,
+    freq_deph: u8,
   ) -> Self {
-    Self::create_from_ranges_and_spatial_coverage(freq_ranges, spatial_ranges, time_deph)
+    Self::create_from_ranges_and_spatial_coverage(freq_ranges, spatial_ranges, freq_deph)
   }
 }
 

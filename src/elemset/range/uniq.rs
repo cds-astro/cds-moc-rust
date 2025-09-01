@@ -27,7 +27,7 @@ impl<T: Idx> HpxUniqRanges<T> {
     HpxRanges::<T>::new_from(nested_data)
   }
 
-  pub fn iter(&self) -> Iter<Range<T>> {
+  pub fn iter(&self) -> Iter<'_, Range<T>> {
     self.ranges.iter()
   }
 }
