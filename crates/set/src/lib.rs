@@ -11,9 +11,8 @@ use std::{
   str::FromStr,
 };
 
-use memmap::{Mmap, MmapMut, MmapOptions};
-
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use memmap::{Mmap, MmapMut, MmapOptions};
 
 use moclib::{
   deser::fits::{from_fits_ivoa, MocIdxType},
@@ -252,7 +251,7 @@ impl MocSetFileReader {
     self.helper.n128()
   }
 
-  pub fn meta(&self) -> Metadata {
+  pub fn meta(&self) -> Metadata<'_> {
     let blob = &self.mmap[self.helper.meta_bytes()];
     let len = self.helper.n_mocs_max();
     assert_eq!(blob.len(), len << META_ELEM_BYTE_SIZE_SHIFT);
@@ -266,7 +265,7 @@ impl MocSetFileReader {
     Metadata(unsafe { &*slice_from_raw_parts(blob.as_ptr() as *const FlagDepthId, len) })
   }
 
-  pub fn index(&self) -> CumulByteSize {
+  pub fn index(&self) -> CumulByteSize<'_> {
     let blob = &self.mmap[self.helper.index_bytes()];
     let len = self.helper.n_mocs_max_plus_one();
     assert_eq!(blob.len(), len << INDEX_ELEM_BYTE_SIZE_SHIFT);

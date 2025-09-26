@@ -82,6 +82,9 @@ pub enum Region {
     #[clap(short = 'i', long = "included")]
     /// Returns MOCs containing the whole cone MOC (instead of overlapping only)
     full: bool,
+    #[clap(short = 'r', long = "reverse-included", requires = "full")]
+    /// Returns MOCs contained in the whole given MOC (instead of containing), requires option '-i'.
+    rev: bool,
   },
   #[clap(name = "moc")]
   /// The given MOC (you create a moc using moc-cli and pipe it into moc-set)
@@ -95,6 +98,9 @@ pub enum Region {
     #[clap(short = 'i', long = "included")]
     /// Returns MOCs containing the whole given MOC (instead of overlapping)
     full: bool,
+    #[clap(short = 'r', long = "reverse-included", requires = "full")]
+    /// Returns MOCs contained in the whole given MOC (instead of containing), requires option '-i'.
+    rev: bool,
   },
 }
 
@@ -164,6 +170,7 @@ impl Query {
         r_arcsec,
         prec,
         full,
+        rev,
       } => {
         let r_rad = (r_arcsec / 3600.0).to_radians();
         let depth = if !has_best_starting_depth(r_rad) {
@@ -181,25 +188,45 @@ impl Query {
           let moc32: RangeMOC<u32, Hpx<u32>> = to_u32_possibly_degrading(&moc64);
           let moc32: Ranges<u32> = moc32.into_moc_ranges().into_ranges();
           let moc64: Ranges<u64> = moc64.into_moc_ranges().into_ranges();
-          let moc32_ref = (&moc32).into();
-          let moc64_ref = (&moc64).into();
+          let moc32_ref: BorrowedRanges<u32> = (&moc32).into();
+          let moc64_ref: BorrowedRanges<u64> = (&moc64).into();
           if full {
-            if self.print_coverage {
-              exec_gen_with_coverage(
-                self.file,
-                self.include_deprecated,
-                move |ranges| ranges.contains(&moc32_ref),
-                move |ranges| ranges.contains(&moc64_ref),
-                self.parallel,
-              )
+            if rev {
+              if self.print_coverage {
+                exec_gen_with_coverage(
+                  self.file,
+                  self.include_deprecated,
+                  move |ranges| moc32_ref.contains(ranges),
+                  move |ranges| moc64_ref.contains(ranges),
+                  self.parallel,
+                )
+              } else {
+                exec_gen(
+                  self.file,
+                  self.include_deprecated,
+                  move |ranges| moc32_ref.contains(ranges),
+                  move |ranges| moc64_ref.contains(ranges),
+                  self.parallel,
+                )
+              }
             } else {
-              exec_gen(
-                self.file,
-                self.include_deprecated,
-                move |ranges| ranges.contains(&moc32_ref),
-                move |ranges| ranges.contains(&moc64_ref),
-                self.parallel,
-              )
+              if self.print_coverage {
+                exec_gen_with_coverage(
+                  self.file,
+                  self.include_deprecated,
+                  move |ranges| ranges.contains(&moc32_ref),
+                  move |ranges| ranges.contains(&moc64_ref),
+                  self.parallel,
+                )
+              } else {
+                exec_gen(
+                  self.file,
+                  self.include_deprecated,
+                  move |ranges| ranges.contains(&moc32_ref),
+                  move |ranges| ranges.contains(&moc64_ref),
+                  self.parallel,
+                )
+              }
             }
           } else if self.print_coverage {
             exec_gen_with_coverage(
@@ -224,6 +251,7 @@ impl Query {
         input,
         input_fmt,
         full,
+        rev,
       } => {
         let path = input;
         let (moc32, moc64) = if path == PathBuf::from("-") {
@@ -248,25 +276,45 @@ impl Query {
         }?;
         let moc32: Ranges<u32> = moc32.into_moc_ranges().into_ranges();
         let moc64: Ranges<u64> = moc64.into_moc_ranges().into_ranges();
-        let moc32_ref = (&moc32).into();
-        let moc64_ref = (&moc64).into();
+        let moc32_ref: BorrowedRanges<u32> = (&moc32).into();
+        let moc64_ref: BorrowedRanges<u64> = (&moc64).into();
         if full {
-          if self.print_coverage {
-            exec_gen_with_coverage(
-              self.file,
-              self.include_deprecated,
-              move |ranges| ranges.contains(&moc32_ref),
-              move |ranges| ranges.contains(&moc64_ref),
-              self.parallel,
-            )
+          if rev {
+            if self.print_coverage {
+              exec_gen_with_coverage(
+                self.file,
+                self.include_deprecated,
+                move |ranges| moc32_ref.contains(ranges),
+                move |ranges| moc64_ref.contains(ranges),
+                self.parallel,
+              )
+            } else {
+              exec_gen(
+                self.file,
+                self.include_deprecated,
+                move |ranges| moc32_ref.contains(ranges),
+                move |ranges| moc64_ref.contains(ranges),
+                self.parallel,
+              )
+            }
           } else {
-            exec_gen(
-              self.file,
-              self.include_deprecated,
-              move |ranges| ranges.contains(&moc32_ref),
-              move |ranges| ranges.contains(&moc64_ref),
-              self.parallel,
-            )
+            if self.print_coverage {
+              exec_gen_with_coverage(
+                self.file,
+                self.include_deprecated,
+                move |ranges| ranges.contains(&moc32_ref),
+                move |ranges| ranges.contains(&moc64_ref),
+                self.parallel,
+              )
+            } else {
+              exec_gen(
+                self.file,
+                self.include_deprecated,
+                move |ranges| ranges.contains(&moc32_ref),
+                move |ranges| ranges.contains(&moc64_ref),
+                self.parallel,
+              )
+            }
           }
         } else if self.print_coverage {
           exec_gen_with_coverage(
