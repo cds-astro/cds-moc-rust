@@ -1,6 +1,6 @@
 # `moc` Change Log
 
-## 0.19.0
+## 0.19.1
 
 Released 2025-09-26
 
