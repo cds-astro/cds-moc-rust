@@ -1,11 +1,16 @@
 # `moc-cli` Change Log
 
+## 0.11.0
+
+Released 2025-09-26
+
+* Change the way F-MOC are computed (including fmin, fmax and the number of orders).
+
 ## 0.10.1
 
 Released 2025-06-10
 
 * No modification, release due to new moc-set release
-
 
 ## 0.10.0
 

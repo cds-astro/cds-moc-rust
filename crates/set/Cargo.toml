@@ -1,6 +1,6 @@
 [package]
 name = "moc-set"
-version = "0.10.1"
+version = "0.11.0"
 authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
 description = "Command-line tool to build, update and query a persistent set of HEALPix Multi-Order Coverages maps (MOCs)"
 license = "MIT OR Apache-2.0"

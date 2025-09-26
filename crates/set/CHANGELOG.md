@@ -1,13 +1,17 @@
 # `moc-set` Change Log
 
+## 0.11.0
+
+Released 2025-09-26
+
+* Add the 'reverse' option to get all MOCs that are contained in a given MOC.
+
 ## 0.10.1
 
 Released 2025-06-10
 
 * Fix bug on queries (cone, moc) involving temporary MOCs deeper than depth 13
   (the moc had to be degraded before converted into u32)
-
-
 
 ## 0.10.0
 

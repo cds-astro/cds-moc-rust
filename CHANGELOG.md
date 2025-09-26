@@ -1,14 +1,12 @@
 # `moc` Change Log
 
-
 ## 0.19.0
 
-Released 2025-09-XX
+Released 2025-09-26
 
 ### Changed
 
-* The way F-MOCs are computed!
-
+* The way F-MOCs are computed (including fmin, fmax and the number of orders; see comments in the code)!
 
 ## 0.18.0
 
@@ -19,7 +17,7 @@ Released 2025-05-23
 * Ignore too deep `NUNIQ` in bugged FITS file from another lib
 * Accept `MOCORDER` with no `MOCORD_S` in FITS file of v2.0
 * Change `exec_on_readwrite_store` signature
-* Change 'xxST_xx' metods names into `xx2Dxx` names, and conversely 
+* Change 'xxST_xx' metods names into `xx2Dxx` names, and conversely
 
 ### Added
 
@@ -31,7 +29,6 @@ Released 2025-05-23
 
 * Fix the `ST-MOC` `contains_val` method
 * Fix ST-MOC method `from_time_and_coos` (was no called in MOCPy)
-
 
 ## 0.17.0
 
@@ -51,7 +48,6 @@ Released 2024-10-16
     + `border_elementary_edges_vertices`
 * Add `multiordermap_filter_mask_moc` in `storage`
 
-
 ## 0.16.0
 
 Released 2024-XX-XX
@@ -59,8 +55,6 @@ Released 2024-XX-XX
 ### Added
 
 * MOM filtering to return values in a MOC and associated weights
-
-
 
 ## 0.15.0
 
@@ -77,7 +71,6 @@ Released 2024-06-27
 * Add a `BorrowedRangeMOC` struct with method `overlap` operator
 * Add method `overlapped_by_iter` to both `RangeMOC` and `BorrowedRangeMOC`
 
-
 ## 0.14.2
 
 Released 2024-05-28
@@ -87,7 +80,6 @@ Released 2024-05-28
 * Method 'all_cells_with_unidirectional_neigs' for AladinLite
 * Re-export `cdshealpix::compass_point::OrdinalMap` and `cdshealpix::compass_point::OrdinalSet` in `moc::range`
 
-
 ## 0.14.1
 
 Released 2024-05-28
@@ -95,7 +87,6 @@ Released 2024-05-28
 ## Added
 
 * Re-export `cdshealpix::compass_point::Ordinal` in `moc::range`
-
 
 ## 0.14.0
 
@@ -108,13 +99,13 @@ Released 2024-05-27
 
 ### Changed
 
-* Add max time depth and max space depth at the end of the ST-MOC ASCII representation 
-* Add max time depth and max space depth at the end of the ST-MOC JSON  representation 
+* Add max time depth and max space depth at the end of the ST-MOC ASCII representation
+* Add max time depth and max space depth at the end of the ST-MOC JSON representation
 
 ### Fixed
 
 * Fix the empty ASCII represention of an empty ST-MOC
-* Fix the empty JSON  represention of an empty ST-MOC
+* Fix the empty JSON represention of an empty ST-MOC
 * Empty ST-MOC loaded as... empty (instead of containing one element imade of an empty T-MOC and and emtpy S-MOC)
 
 ## 0.13.0
@@ -130,7 +121,6 @@ Released 2024-05-14
 
 * Bump cdshealpix to 0.6.8
 
-
 ## 0.12.1
 
 Released 2023-12-20
@@ -140,7 +130,6 @@ Released 2023-12-20
 * Bugs in the stcs2moc: allky not complete + intesection error comming from cdshealpix BMOC
 * Update CDSHealpix
 
-
 ## 0.12.0
 
 Released 2023-12-11
@@ -148,7 +137,6 @@ Released 2023-12-11
 ### Added
 
 * stcs2moc functionnality
-
 
 ## 0.11.4
 
@@ -158,7 +146,6 @@ Never Released
 
 * test index validity in ASCII MOCs
 
-
 ## 0.11.3 (no bug fix, but minor add)
 
 Released 2023-03-31
@@ -166,7 +153,6 @@ Released 2023-03-31
 ### Added
 
 * Methods for frequency MOCs in store
-
 
 ## 0.11.2
 
@@ -176,8 +162,6 @@ Released 2023-03-06
 
 * Wrong constant (pi/2 instead of pi) when checking elliptical cone position angle
 
-
-
 ## 0.11.1
 
 Released 2023-02-17
@@ -185,7 +169,6 @@ Released 2023-02-17
 ### Fixed
 
 * Dumb initialization of the counts in the store
-
 
 ## 0.11.0
 
@@ -195,11 +178,9 @@ Released 2023-02-17
 
 * Operations `fill_holes` and `fill_holes_smaller_than`
 * Add reference count in store to handle external MOC copies
-  (e.g. when using python multiprocessing silnetly resorting 
-   on pickle, which cause bugs since the MOC store index is no
-   more uniq and is may be dropped)
-
-
+  (e.g. when using python multiprocessing silnetly resorting
+  on pickle, which cause bugs since the MOC store index is no
+  more uniq and is may be dropped)
 
 ## 0.10.1
 
@@ -209,7 +190,6 @@ Released 2023-02-13
 
 * Remove spurious "WARNING: Keyword 'TTYPE1' found more than once in a same HDU! We use the first occurrence."
   when readding FITs files
-
 
 ## 0.10.0
 
@@ -239,8 +219,7 @@ Released 2022-09-09
 
 ### Bug correction
 
-* Print the deepest order in JSON output even when it contains no cell 
-
+* Print the deepest order in JSON output even when it contains no cell
 
 ## 0.9.0-alpha
 
@@ -249,7 +228,6 @@ Released 2022-06-17
 ### Added
 
 * Add Frequency MOCs
-
 
 ## 0.8.0
 
@@ -262,7 +240,6 @@ Released 2022-04-13
 * Add support for specific FITS skymaps (possibly gzipped)
 * Add gzip support for FITS Multi-Order Map
 
-
 ## 0.7.1
 
 Released 2022-03-22 (not a bug fix)
@@ -270,7 +247,6 @@ Released 2022-03-22 (not a bug fix)
 ### Added
 
 * Possibility to perform operations on borrowed ranges in addition to owned ranges
-
 
 ## 0.7.0
 
@@ -284,8 +260,7 @@ Released 2022-02-04
 ### Enhancement
 
 * Make FITS deserialization more robust for UNIQ indices
-  (to cope with a -- now fixed -- Aladin bug adding trailing '0' uniq indices)  
-
+  (to cope with a -- now fixed -- Aladin bug adding trailing '0' uniq indices)
 
 ## 0.6.1
 
@@ -293,7 +268,7 @@ Released 2021-11-15
 
 ### Modification
 
-* Remove the wasm/nowasm `create_from_time_ranges_spatial_coverage` instead of wasm only (used in MOCPy) 
+* Remove the wasm/nowasm `create_from_time_ranges_spatial_coverage` instead of wasm only (used in MOCPy)
 
 ## 0.6.0
 
@@ -324,7 +299,6 @@ Released 2021-10-18
 ## 0.4.0
 
 Put apart from MOCPy: 2021-08-16
-
 
 ### Previous versions
 
