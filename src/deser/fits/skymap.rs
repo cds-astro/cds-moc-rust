@@ -149,6 +149,8 @@ fn from_fits_skymap_internal<R: BufRead>(
   let tform1 = check_keyword_and_get_str_val(it80.next().unwrap(), b"TFORM1 ")?;
   let (is_f64, n_pack) = if tform1 == "D" || tform1 == "1D" {
     Ok((true, 1_u64))
+  } else if tform1 == "1024D" {
+    Ok((true, 1024_u64))
   } else if tform1 == "E" || tform1 == "1E" {
     Ok((false, 1_u64))
   } else if tform1 == "1024E" {
@@ -157,7 +159,7 @@ fn from_fits_skymap_internal<R: BufRead>(
     // TODO: ALSO SUPPORT B or 1B and TTYPE = M (for MASK)!!
     Err(FitsError::UnexpectedValue(
       String::from("TFORM1"),
-      String::from("['D', '1D', 'E', '1E' or '1024E']"),
+      String::from("['D', '1D', '1024D', 'E', '1E' or '1024E']"),
       String::from(tform1),
     ))
   }?;
