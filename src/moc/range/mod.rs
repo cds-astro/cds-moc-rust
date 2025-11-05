@@ -1561,7 +1561,9 @@ impl<T: Idx> RangeMOC<T, Frequency<T>> {
   {
     let mut builder = RangeMocBuilder::new(depth, buf_capacity);
     for range in it {
-      builder.push(Frequency::<T>::freq2hash(range.start)..Frequency::<T>::freq2hash(range.end));
+      builder.push(
+        Frequency::<T>::freq2hash(range.start)..Frequency::<T>::freq2hash_accept_freqmax(range.end),
+      );
     }
     builder.into_moc()
   }

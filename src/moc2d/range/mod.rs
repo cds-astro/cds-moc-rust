@@ -333,7 +333,7 @@ impl RangeMOC2<u64, Frequency<u64>, u64, Hpx<u64>> {
       val_it.map(move |(freq_hz_range, (lon_rad, lat_rad))| {
         (
           Frequency::<u64>::freq2hash(freq_hz_range.start)
-            ..Frequency::<u64>::freq2hash(freq_hz_range.end),
+            ..Frequency::<u64>::freq2hash_accept_freqmax(freq_hz_range.end),
           layer.hash(lon_rad, lat_rad),
         )
       }),
