@@ -547,7 +547,7 @@ impl<T: Idx> Frequency<T> {
       freq
     );
     assert!(
-      freq < FREQ_MAX,
+      freq <= FREQ_MAX,
       "Wrong frequency in Hz. Expected: < {}. Actual: {}",
       FREQ_MAX,
       freq
@@ -595,7 +595,13 @@ impl<T: Idx> Frequency<T> {
     let cte: f64 = (FREQ_MAX / FREQ_MIN).ln();
     let two_pow_order_max: f64 = 2_f64.powi((Frequency::<u64>::MAX_DEPTH + 1) as i32);
     let freq_hash = hash.to_u64_idx();
-    FREQ_MIN * (cte * (freq_hash as f64) / two_pow_order_max).exp()
+    let freq = FREQ_MIN * (cte * (freq_hash as f64) / two_pow_order_max).exp();
+    // Added because we are not bijective anymore...
+    if freq <= FREQ_MAX {
+      freq
+    } else {
+      FREQ_MAX
+    }
   }
 }
 
@@ -972,10 +978,11 @@ mod tests {
       Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
       freq_hz
     );
-    let freq_hz = 5.846006549323610e+48;
+    */
+    let freq_hz = 1e+38;
     assert_eq!(
       Frequency::<u64>::hash2freq(Frequency::<u64>::freq2hash(freq_hz)),
       freq_hz
-    );*/
+    );
   }
 }
