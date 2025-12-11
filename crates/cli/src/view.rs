@@ -9,6 +9,7 @@ use std::{
 
 use structopt::StructOpt;
 
+use healpix::nested::map::img::PosConversion;
 use mapproj::{
   cylindrical::{car::Car, cea::Cea, cyp::Cyp, mer::Mer},
   hybrid::hpx::Hpx as Hpix,
@@ -108,6 +109,10 @@ pub struct View {
   /// Generate the output PNG without showing it.
   hide: bool,
 
+  /// Show the MOC inage in Galactic instead of Equatorial
+  #[structopt(short = "g", long = "galactic")]
+  galactic: bool,
+
   #[structopt(subcommand)]
   /// Image generation parameters
   mode: Mode,
@@ -119,7 +124,14 @@ impl View {
     if path == PathBuf::from("-") {
       if let Some(input_fmt) = self.input_fmt {
         let stdin = std::io::stdin();
-        exec(stdin.lock(), input_fmt, self.output, self.mode, !self.hide)
+        exec(
+          stdin.lock(),
+          input_fmt,
+          self.output,
+          self.galactic,
+          self.mode,
+          !self.hide,
+        )
       } else {
         Err(
           String::from(
@@ -138,6 +150,7 @@ impl View {
         BufReader::new(f),
         input_fmt,
         self.output,
+        self.galactic,
         self.mode,
         !self.hide,
       )
@@ -149,6 +162,7 @@ pub(crate) fn exec<R: BufRead>(
   mut input: R,
   input_fmt: InputFormat,
   output: PathBuf,
+  galactic: bool,
   mode: Mode,
   view: bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -214,6 +228,11 @@ pub(crate) fn exec<R: BufRead>(
       }
     }
   }?;
+  let pos_conv = if galactic {
+    Some(PosConversion::EqMap2GalImg)
+  } else {
+    None
+  };
   match mode {
     Mode::AllSky { y_size } => to_png_file(
       &smoc,
@@ -221,11 +240,12 @@ pub(crate) fn exec<R: BufRead>(
       Some(Mol::new()),
       None,
       None,
+      pos_conv,
       output.as_path(),
       view,
     )
     .map_err(|e| e.into()),
-    Mode::Auto { y_size } => to_png_file_auto(&smoc, y_size, output.as_path(), view)
+    Mode::Auto { y_size } => to_png_file_auto(&smoc, y_size, pos_conv, output.as_path(), view)
       .map(|_| ())
       .map_err(|e| e.into()),
     Mode::Custom {
@@ -253,6 +273,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Car::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -263,6 +284,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Cea::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -273,6 +295,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Cyp::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -283,6 +306,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Mer::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -294,6 +318,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Hpix::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -305,6 +330,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Ait::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -315,6 +341,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Mol::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -325,6 +352,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Par::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -335,6 +363,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Sfl::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -346,6 +375,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Air::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -356,6 +386,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Arc::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -366,6 +397,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Feye::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -376,6 +408,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Sin::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -386,6 +419,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Stg::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -396,6 +430,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Tan::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
@@ -406,6 +441,7 @@ pub(crate) fn exec<R: BufRead>(
           Some(Zea::new()),
           center,
           proj_bounds,
+          pos_conv,
           output.as_path(),
           view,
         )
