@@ -794,7 +794,7 @@ impl U64MocStore {
     let ysize = img_y_size as usize;
     let op = move |moc: &InternalMoc| match moc {
       InternalMoc::Space(smoc) => {
-        let data = to_img_default(smoc, (xsize as u16, ysize as u16), None, None);
+        let data = to_img_default(smoc, (xsize as u16, ysize as u16), None, None, None);
         let mut buff = Vec::<u8>::with_capacity(1024 + xsize * ysize);
         let mut encoder = png::Encoder::new(&mut buff, xsize as u32, ysize as u32);
         encoder.set_color(png::ColorType::Rgba);
@@ -818,7 +818,7 @@ impl U64MocStore {
     let ysize = img_y_size as usize;
     let op = move |moc: &InternalMoc| match moc {
       InternalMoc::Space(smoc) => {
-        Ok(to_img_default(smoc, (xsize as u16, ysize as u16), None, None).into_boxed_slice())
+        Ok(to_img_default(smoc, (xsize as u16, ysize as u16), None, None, None).into_boxed_slice())
       }
       _ => Err(String::from(
         "Can't make an image for a MOC different from a S-MOC",
