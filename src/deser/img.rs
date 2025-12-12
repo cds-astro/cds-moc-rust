@@ -8,11 +8,14 @@ use std::{
   path::Path,
 };
 
-use healpix::nested::{self, map::img::PosConversion};
+use healpix::nested;
 use mapproj::{
   img2celestial::Img2Celestial, img2proj::ReversedEastPngImgXY2ProjXY, math::HALF_PI,
   pseudocyl::mol::Mol, zenithal::sin::Sin, CanonicalProjection, CenteredProjection, ImgXY, LonLat,
 };
+
+// Re-export cdshealpix PosConversion
+pub use healpix::nested::map::img::PosConversion;
 
 use crate::{
   elem::cell::Cell,
