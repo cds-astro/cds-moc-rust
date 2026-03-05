@@ -255,7 +255,7 @@ impl<T: Idx, Q: MocQty<T>, U: Idx, R: MocQty<U>> RangeMOC2<T, Q, U, R> {
   }
 
   /// So far the internal code resort to the code to perform operation on iterator.
-  /// TODO: make a more performan code based on the particular RangeMOC2 type?
+  /// TODO: make a more performant code based on the particular RangeMOC2 type?
   pub fn into_or(self, rhs: RangeMOC2<T, Q, U, R>) -> RangeMOC2<T, Q, U, R> {
     op::or::or(self.into_range_moc2_iter(), rhs.into_range_moc2_iter()).into_range_moc2()
   }

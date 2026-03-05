@@ -26,7 +26,6 @@ use crate::{
     ascii::{from_ascii_ivoa, moc2d_from_ascii_ivoa},
     fits::{
       from_fits_ivoa, multiordermap::from_fits_multiordermap, skymap::from_fits_skymap, MocIdxType,
-      MocQtyType::FreqHpx,
     },
     img::to_img_default,
     json::{cellmoc2d_from_json_aladin, from_json_aladin},
@@ -1753,22 +1752,16 @@ impl U64MocStore {
         lon.len()
       ))
     } else {
-      lonlat2hash(space_depth, lon, lat)
-        .map(|ipix| {
-          TimeSpaceMoc::<u64, u64>::create_from_times_positions(
-            times,
-            ipix,
-            time_depth,
-            space_depth,
-          )
-        })
-        .and_then(|moc| {
-          store::add(
-            moc
-              .time_space_iter(time_depth, space_depth)
-              .into_range_moc2(),
-          )
-        })
+      let stmoc = STMOC::from_time_and_coos(
+        time_depth,
+        space_depth,
+        times
+          .into_iter()
+          .zip(lon.into_iter().zip(lat.into_iter()))
+          .map(|(t, (l, b))| (t, l, b)),
+        None,
+      );
+      store::add(stmoc)
     }
   }
 
@@ -1860,17 +1853,13 @@ impl U64MocStore {
     } else {
       let ipix = lonlat2hash(space_depth, lon, lat)?;
       let times = times2hash(time_depth, times_start, times_end)?;
-      let moc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_positions(
-        times,
-        ipix,
+      let stmoc = STMOC::from_ranges_and_fixed_depth_cells(
         time_depth,
         space_depth,
+        times.into_iter().zip(ipix.into_iter()),
+        None,
       );
-      store::add(
-        moc
-          .time_space_iter(time_depth, space_depth)
-          .into_range_moc2(),
-      )
+      store::add(stmoc)
     }
   }
 
