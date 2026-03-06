@@ -392,8 +392,9 @@ impl<'a, T: Idx, S: Idx> SNORanges2D<'a, T, S> for Ranges2D<T, S> {
       let mut spatial_coverages = vec![];
 
       let mut ranges_idx = HashSet::new();
-      ranges_idx.insert(0);
-      let mut prev_time_bound = sorted_time_bound_ranges.first().unwrap().x;
+      let mut prev_time_bound = sorted_time_bound_ranges[0].x;
+      ranges_idx.insert(sorted_time_bound_ranges[0].y_idx);
+
       for time_bound in sorted_time_bound_ranges.iter().skip(1) {
         let cur_time_bound = time_bound.x;
 
@@ -448,8 +449,9 @@ impl<'a, T: Idx, S: Idx> SNORanges2D<'a, T, S> for Ranges2D<T, S> {
       let mut spatial_coverages = vec![];
 
       let mut ranges_idx = HashSet::new();
-      ranges_idx.insert(0);
-      let mut prev_time_bound = sorted_time_bound_ranges.first().unwrap().x;
+      let mut prev_time_bound = sorted_time_bound_ranges[0].x;
+      ranges_idx.insert(sorted_time_bound_ranges[0].y_idx);
+
       for time_bound in sorted_time_bound_ranges.iter().skip(1) {
         let cur_time_bound = time_bound.x;
 

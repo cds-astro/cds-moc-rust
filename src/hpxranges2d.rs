@@ -907,3 +907,85 @@ impl<'a, T: Idx, Q1: MocQty<T>>
   > for RangeMOC2IteratorAdaptor<'a, T, Q1>
 {
 }
+
+#[cfg(test)]
+mod test {
+  use crate::{
+    deser::ascii::{from_ascii_ivoa, moc2d_to_ascii_ivoa},
+    hpxranges2d::TimeSpaceMoc,
+    moc::{CellOrCellRangeMOCIntoIterator, CellOrCellRangeMOCIterator, RangeMOCIterator},
+    moc2d::CellOrCellRangeMOC2IntoIterator,
+    qty::Hpx,
+  };
+
+  #[test]
+  fn test_create_from_ranges_and_spatial_coverage() {
+    let smoc1 = from_ascii_ivoa::<u64, Hpx<u64>>("28/5")
+      .unwrap()
+      .into_cellcellrange_moc_iter()
+      .ranges()
+      .into_range_moc();
+    let smoc2 = from_ascii_ivoa::<u64, Hpx<u64>>("28/10")
+      .unwrap()
+      .into_cellcellrange_moc_iter()
+      .ranges()
+      .into_range_moc();
+    let smoc3 = from_ascii_ivoa::<u64, Hpx<u64>>("28/0")
+      .unwrap()
+      .into_cellcellrange_moc_iter()
+      .ranges()
+      .into_range_moc();
+
+    /*let tmin = [
+      212129064066183891_u64,
+      212286830467183917,
+      212444596869183883,
+    ];
+    let tmax = [
+      212129150466183920_u64,
+      212286916867183945,
+      212444683269183913,
+    ];*/
+
+    let tmin = [
+      212286830467183917,
+      212444596869183883,
+      212129064066183891_u64,
+    ];
+    let tmax = [
+      212286916867183945,
+      212444683269183913,
+      212129150466183920_u64,
+    ];
+
+    let times = tmin
+      .into_iter()
+      .zip(tmax.into_iter())
+      .map(|(tmin, tmax)| tmin..tmax)
+      .collect();
+    let time_depth = 30;
+
+    let stmoc = TimeSpaceMoc::<u64, u64>::create_from_time_ranges_spatial_coverage(
+      times,
+      [smoc1, smoc2, smoc3]
+        .into_iter()
+        .map(|moc| moc.into_moc_ranges())
+        .collect(),
+      time_depth,
+    );
+    let mut buff = Vec::new();
+    moc2d_to_ascii_ivoa(
+      stmoc
+        .time_space_iter(time_depth, 28)
+        .into_cellcellrange_moc2_iter(),
+      &None,
+      false,
+      &mut buff,
+    )
+    .unwrap();
+    let ascii = String::from_utf8_lossy(&buff).to_string();
+    let expected = "t26/6173769 27/12347537 12347540 28/24695082 29/49390147 49390166 30/98780293 s28/0 t25/3089180 28/24713448 29/49426879 49426898 30/98853798 s28/5 t25/3091476 27/12365903 30/98927264 s28/10 t30/ s28/\n";
+    // println!("{}", ascii);
+    assert_eq!(&ascii, expected);
+  }
+}
