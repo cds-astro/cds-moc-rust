@@ -1,5 +1,20 @@
 # `moc` Change Log
 
+## 0.19.2
+
+Released 20256-03-09
+
+### Changed
+
+* Bump cdshealpix version to 0.9.1
+* Add `TFORM = 1024D` support to skymaps
+* Add possiblity to show the MOC in Galactic instead of Equatorial
+
+### Fixed
+
+* Bug in `make_consistent` affecting the construction of (some) 2D MOCs 
+
+
 ## 0.19.1
 
 Released 2025-09-26
