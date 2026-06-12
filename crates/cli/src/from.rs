@@ -1,5 +1,6 @@
 use std::{
   error::Error,
+  fs,
   fs::File,
   io::{BufRead, BufReader},
   num::ParseFloatError,
@@ -9,10 +10,13 @@ use std::{
 };
 
 use log::error;
+use rayon::{
+  iter::{IntoParallelIterator, ParallelIterator},
+  prelude::ParallelString,
+};
 use structopt::StructOpt;
 
 use healpix::nested::Layer;
-
 use moclib::{
   deser::{
     fits::{multiordermap::from_fits_multiordermap, skymap::from_fits_skymap},
@@ -236,6 +240,9 @@ pub enum From {
     #[structopt(short = "s", long = "separator", default_value = " ")]
     /// File separator (default = ' ')
     separator: String,
+    #[structopt(short = "p", long = "parallel")]
+    /// Use multithreading, loading first the full file in memory.
+    parallel: bool,
     #[structopt(subcommand)]
     out: OutputFormat,
   },
@@ -608,13 +615,14 @@ impl From {
         input,
         separator,
         out,
+        parallel,
       } => {
+        let separator = separator.as_str().chars().next().unwrap_or(' ');
         fn line2m(
           depth: u8,
-          separator: &str,
-          line: std::io::Result<String>,
+          separator: char,
+          line: String,
         ) -> Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>> {
-          let line = line?;
           let (geom, params) = line
             .trim()
             .split_once(separator)
@@ -767,22 +775,44 @@ impl From {
             ),
           }
         }
-        let line2moc = move |line: std::io::Result<String>| match line2m(depth, &separator, line) {
+        // Result<RangeMOC<u64, Hpx<u64>>, Box<dyn Error>>
+        let lineres2m = move |depth: u8, separator: char, line: std::io::Result<String>| {
+          line
+            .map_err(|e| e.into())
+            .and_then(|line| line2m(depth, separator, line))
+        };
+        let line2moc = move |line: std::io::Result<String>| match lineres2m(depth, separator, line)
+        {
           Ok(moc) => Some(moc),
           Err(e) => {
             error!("Error reading or parsing line: {:?}", e);
             None
           }
         };
-        let moc: RangeMOC<u64, Hpx<u64>> = if input == PathBuf::from(r"-") {
-          let stdin = std::io::stdin();
-          // kway_or_it(stdin.lock().lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
-          kway_or(Box::new(stdin.lock().lines().filter_map(line2moc)))
+        let moc: RangeMOC<u64, Hpx<u64>> = if parallel {
+          let lines: Vec<String> = if input == PathBuf::from(r"-") {
+            std::io::stdin().lock().lines().collect()
+          } else {
+            fs::read_to_string(input).map(|blob| blob.par_lines().map(|s| s.to_string()).collect())
+          }?;
+          lines
+            .into_par_iter()
+            .filter_map(move |line| line2m(depth, separator, line).ok())
+            .reduce(
+              || RangeMOC::<u64, Hpx<u64>>::new_empty(depth),
+              |l, r| l.or(&r),
+            )
         } else {
-          let f = File::open(input)?;
-          let reader = BufReader::new(f);
-          // kway_or_it(reader.lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
-          kway_or(Box::new(reader.lines().filter_map(line2moc)))
+          if input == PathBuf::from(r"-") {
+            let stdin = std::io::stdin();
+            // kway_or_it(stdin.lock().lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
+            kway_or(Box::new(stdin.lock().lines().filter_map(line2moc)))
+          } else {
+            let f = File::open(input)?;
+            let reader = BufReader::new(f);
+            // kway_or_it(reader.lines().filter_map(line2moc).map(|m| m.into_range_moc_iter()))
+            kway_or(Box::new(reader.lines().filter_map(line2moc)))
+          }
         };
         out.write_smoc_possibly_auto_converting_from_u64(moc.into_range_moc_iter())
       }
