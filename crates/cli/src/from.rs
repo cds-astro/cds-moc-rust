@@ -11,7 +11,7 @@ use std::{
 
 use log::error;
 use rayon::{
-  iter::{IntoParallelIterator, ParallelIterator},
+  iter::{IntoParallelIterator, ParallelBridge, ParallelIterator},
   prelude::ParallelString,
 };
 use structopt::StructOpt;
@@ -243,6 +243,9 @@ pub enum From {
     #[structopt(short = "p", long = "parallel")]
     /// Use multithreading, loading first the full file in memory.
     parallel: bool,
+    #[structopt(short = "b", long = "bridge")]
+    /// Use multithreading, streaming instead of loading the full file in memory.
+    parallel_with_bridge: bool,
     #[structopt(subcommand)]
     out: OutputFormat,
   },
@@ -616,6 +619,7 @@ impl From {
         separator,
         out,
         parallel,
+        parallel_with_bridge,
       } => {
         let separator = separator.as_str().chars().next().unwrap_or(' ');
         fn line2m(
@@ -789,7 +793,56 @@ impl From {
             None
           }
         };
-        let moc: RangeMOC<u64, Hpx<u64>> = if parallel {
+        let moc: RangeMOC<u64, Hpx<u64>> = if parallel_with_bridge {
+          struct Chunk<R: std::io::Read> {
+            line_it: std::io::Lines<BufReader<R>>,
+          }
+          impl<R: std::io::Read> Chunk<R> {
+            fn new(it: std::io::Lines<BufReader<R>>) -> Self {
+              Self { line_it: it }
+            }
+          }
+          impl<R: std::io::Read> Iterator for Chunk<R> {
+            type Item = Vec<String>;
+            fn next(&mut self) -> Option<Self::Item> {
+              // let mut v: Vec<String> = Vec::with_capacity(50_000);
+              let v: Vec<String> = self
+                .line_it
+                .by_ref()
+                .take(50_000)
+                .filter_map(|l| l.ok()) // Else emit a warning on stderr (decorate with Enumerate)?
+                .collect();
+              if v.is_empty() {
+                None
+              } else {
+                Some(v)
+              }
+            }
+          }
+
+          if input == PathBuf::from(r"-") {
+            let reader = BufReader::new(std::io::stdin());
+            Chunk::new(reader.lines())
+              .par_bridge()
+              .flatten()
+              .filter_map(move |line| line2m(depth, separator, line).ok()) // Else emit a warning on stderr (decorate with Enumerate)?
+              .reduce(
+                || RangeMOC::<u64, Hpx<u64>>::new_empty(depth),
+                |l, r| l.or(&r),
+              )
+          } else {
+            let f = File::open(input)?;
+            let reader = BufReader::new(f);
+            Chunk::new(reader.lines())
+              .par_bridge()
+              .flatten()
+              .filter_map(move |line| line2m(depth, separator, line).ok()) // Else emit a warning on stderr (decorate with Enumerate)?
+              .reduce(
+                || RangeMOC::<u64, Hpx<u64>>::new_empty(depth),
+                |l, r| l.or(&r),
+              )
+          }
+        } else if parallel {
           let lines: Vec<String> = if input == PathBuf::from(r"-") {
             std::io::stdin().lock().lines().collect()
           } else {
