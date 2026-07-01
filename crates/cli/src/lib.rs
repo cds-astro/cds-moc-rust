@@ -1,8 +1,9 @@
-use std::error::Error;
-use std::str::FromStr;
+use std::{error::Error, str::FromStr};
 
-use time::format_description::{self, well_known::Rfc3339};
-use time::PrimitiveDateTime;
+use time::{
+  format_description::{self, well_known::Rfc3339},
+  PrimitiveDateTime,
+};
 // use chrono::prelude::*;
 
 pub mod constants;

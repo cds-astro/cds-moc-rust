@@ -367,7 +367,6 @@ fn build_range_moc_keywords<T: Idx, Q: MocQty<T>>(
   moc_kws.insert(MocKeywords::TType1(TType1 {
     ttype: String::from("RANGE"),
   }));
-  // No ttype
   moc_kws
 }
 
@@ -601,7 +600,9 @@ fn build_range_stmoc_keywords<T: Idx>(
   }
   // BINTABLE specific
   moc_kws.insert(MocKeywords::TForm1(T::TFORM));
-  // No ttype
+  moc_kws.insert(MocKeywords::TType1(TType1 {
+    ttype: String::from("INTERLEAVED_SETS_OF_FLAGGED_RANGES"),
+  }));
   moc_kws
 }
 
@@ -634,7 +635,9 @@ fn build_range_sfmoc_keywords<T: Idx>(
   }
   // BINTABLE specific
   moc_kws.insert(MocKeywords::TForm1(T::TFORM));
-  // No ttype
+  moc_kws.insert(MocKeywords::TType1(TType1 {
+    ttype: String::from("INTERLEAVED_SETS_OF_FLAGGED_RANGES"),
+  }));
   moc_kws
 }
 
