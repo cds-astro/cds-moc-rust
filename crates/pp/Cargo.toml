@@ -1,0 +1,62 @@
+[package]
+name = "stmoc-pp"
+version = "0.12.0"
+authors = ["F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"]
+description = "Command-line to create and query a ST-MOC persitent precursors set, i.e. a list of (Time rrange, S-MOC) couples."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+categories = ["command-line-utilities", "science", "data-structures", "algorithms"]
+keywords = ["healpix", "moc"]
+documentation = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/pp"
+homepage = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/pp"
+repository = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/pp"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+path = "src/main.rs"
+name = "stmocpp"
+bench = false
+test = false
+
+[dependencies]
+moclib = { package = "moc", path = "../.." }
+clap = { version = "4.5.37", features = ["derive"] }
+time = { version = "0.3.54", features = ["parsing", "formatting"] }
+itertools = "0.15" # For advanced methods used on iterator in the external sort
+crossbeam = "0.8"  # For external sort
+rayon = "1.12.0"   # For in memory // sort
+log = "0.4"
+memmap = { package = "memmap2", version = "0.9.11" }
+
+[package.metadata.deb]
+maintainer = "F.-X. Pineau <francois-xavier.pineau@astro.unistra.fr>"
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/stmocpp", "usr/bin/stmocpp", "755"],
+    ["COPYING", "usr/share/doc/stmocpp/", "644"],
+    ["LICENSE-MIT", "usr/share/doc/stmocpp/", "644"],
+    ["LICENSE-APACHE", "usr/share/doc/stmocpp/", "644"],
+    ["CHANGELOG.md", "usr/share/doc/stmocpp/CHANGELOG", "644"],
+    ["README.md", "usr/share/doc/stmocpp/README", "644"],
+    #["FAQ.md", "usr/share/doc/stmocpp/FAQ", "644"],
+    ["doc/stmocpp.1", "usr/share/man/man1/stmocpp.1", "644"],
+    # Similarly for shell completions.
+    #["deployment/deb/stmocpp.bash", "usr/share/bash-completion/completions/stmocpp", "644"],
+    #["deployment/deb/stmocpp.fish", "usr/share/fish/vendor_completions.d/stmocpp.fish", "644"],
+    #["deployment/deb/_stmocpp", "usr/share/zsh/vendor-completions/", "644"],
+]
+extended-description = """\
+stmocpp is a command-line to query a set of (Time range, S-MOCs) tuples (ST-MOC precursors) in a single binary file.
+Internally, it resorts on an implicit R-Tree on time ranges.
+"""
+
+
+
+
+
+
+

@@ -16,7 +16,7 @@ keywords = ["healpix", "moc"]
 documentation = "https://docs.rs/moc"
 homepage = "https://github.com/cds-astro/cds-moc-rust/"
 repository = "https://github.com/cds-astro/cds-moc-rust/"
-edition = "2021"
+edition = "2024"
 exclude = [
     "resources",
 ]
@@ -30,7 +30,7 @@ bench = true
 
 [workspace]
 members = [
-    "crates/cli",
+    "crates/cli", "crates/pp",
     "crates/set"
 ]
 exclude = ["crates/wasm"]
