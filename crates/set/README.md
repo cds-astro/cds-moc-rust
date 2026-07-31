@@ -8,39 +8,38 @@ Multi-Order Coverages maps (MOCs), see [this IVOA standard](https://ivoa.net/doc
 Query a set of S-MOCs pre-saved in a single large binary file.  
 The file can be seen as a persistent cache preventing
 from having to open/read/parse a possible large set of FITS files.  
-A `moc-set` can be updated by adding or removing MOCs from it, without having 
+A `moc-set` can be updated by adding or removing MOCs from it, without having
 to re-build the full binary file (except from time to time using the `purge` command).
-It is built in such a way that read operations are allowed while updating (add, remove, change status, purge) 
-the binary file, but a write operation immediately fails (return status != 0) if another write operation 
-is already ongoing.  
-
+It is built in such a way that read operations are allowed while updating (add, remove, change status, purge)
+the binary file, but a write operation immediately fails (return status != 0) if another write operation
+is already ongoing.
 
 ## Used by
 
 MOC set in used:
+
 * in production in [VizieR](https://vizier.u-strasbg.fr/viz-bin/VizieR) when querying a cone
-  on the `> 16_000` catalogues
-* in an ongoing project leading by [@lmichel](https://github.com/lmichel) to look for XMM FOVs intersecting a user define region.
+  on the `> 16_000` catalogues;
+* in the AMORA project leading by [@lmichel](https://github.com/lmichel) to look for XMM FOVs intersecting a user define
+  region;
+* in the Paris Observatory's [VESPA geoportal](https://padc-findme.obspm.fr/#/browse/Mars).
 
+## Similar to the [CDS MOC Server](http://alasky.unistra.fr/MocServer/query).
 
-## Similar to the [CDS MOC Server](http://alasky.unistra.fr/MocServer/query).  
-
-The [CDS MOC Server](http://alasky.unistra.fr/MocServer/query) additionally stores metadata information associated 
-to each MOC, allows queries with constraints on those metadata, and supports T-MOCs and ST-MOCs in addition to S-MOCs. 
-
+The [CDS MOC Server](http://alasky.unistra.fr/MocServer/query) additionally stores metadata information associated
+to each MOC, allows queries with constraints on those metadata, and supports T-MOCs and ST-MOCs in addition to S-MOCs.
 
 So, `moc-set` offers functionalities similar to **a sub-part of** the MOC Server functionalities
-(except for T-MOCs and ST-MOCs, one could build a MOC Server like service based on `moc-set`, 
+(except for T-MOCs and ST-MOCs, one could build a MOC Server like service based on `moc-set`,
 using an additional mechanism to store and filter metadata).
 
-The MOC Server is implemented in Java. All information used by the MOC Server are loaded 
-in memory at service startup. To speed up the starting time, the MOC Server also resort on a binary dump, 
-needing synchronisation mechanisms with the running server data when the list of MOCs is updated. 
+The MOC Server is implemented in Java. All information used by the MOC Server are loaded
+in memory at service startup. To speed up the starting time, the MOC Server also resort on a binary dump,
+needing synchronisation mechanisms with the running server data when the list of MOCs is updated.
 
-`moc-set` has primarily been developed for VizieR needs: lighter/simpler version of the MOC server, with 
-less information needed (VizieR already store catalogues metadata), system programming language with no runtime, 
+`moc-set` has primarily been developed for VizieR needs: lighter/simpler version of the MOC server, with
+less information needed (VizieR already store catalogues metadata), system programming language with no runtime,
 possibly less memory available, ...
-
 
 ## Install
 
@@ -48,6 +47,7 @@ possibly less memory available, ...
 
 MOCSet is available in [pypi](https://pypi.org/project/moc-set),
 you can thus install the `mocset` executable using `pip`:
+
 ```bash
 pip install -U moc-set
 mocset --help
@@ -60,18 +60,21 @@ Download the last `mocset_vxx_yyy.deb` corresponding to your architecture
 from the [github release page](https://github.com/cds-astro/cds-moc-rust/releases).
 
 Install the `.deb` by clicking on it or using the command line:
+
 ```bash
 sudo dpkg -i mocset_vxx_yyy.deb
 sudo apt-get install -f
 ```
 
 Then you can use the tool:
+
 ```bash
 mocset
 man mocset
 ```
 
 You can uninstall using, e.g.:
+
 ```bash
 sudo dpkg -r $(dpkg -f mocset_vxx_yyy.deb Package)
 ```
@@ -81,13 +84,16 @@ sudo dpkg -r $(dpkg -f mocset_vxx_yyy.deb Package)
 Download the last `mocset-vxx_yyy.tar.gz` corresponding to your architecture
 from the [github release page](https://github.com/cds-astro/cds-moc-rust/releases).
 You probably want ot use:
+
 * Linux: `mocset-vxx-x86_64-unknown-linux-musl.tar.gz`
 * MacOS: `mocset-vxx-x86_64-apple-darwin.tar.gz`
 * Windows: `mocset-vxx-.zip`
 
-WARNING: for linux, use [`musl`](https://en.wikipedia.org/wiki/Musl) instead of `gnu` (high chances of incompatibility in the latter case)
+WARNING: for linux, use [`musl`](https://en.wikipedia.org/wiki/Musl) instead of `gnu` (high chances of incompatibility
+in the latter case)
 
 The tar contains a single executable binary file.
+
 ```bash
 tar xzvf mocset-vxx-yyy.tar.gz
 ./mocset
@@ -98,19 +104,25 @@ tar xzvf mocset-vxx-yyy.tar.gz
 [Install rust](https://www.rust-lang.org/tools/install)
 (and check that `~/.cargo/bin/` is in your path),
 or update the Rust compiler with:
+
 ```bash
 rustup update
 ``` 
 
 Clone the [moc lib rust](https://github.com/cds-astro/cds-moc-rust) project:
+
 ```dtd
 git clone https://github.com/cds-astro/cds-moc-rust
 ```
+
 Install from using `cargo`:
+
 ```bash
 cargo install --path crates/set
 ```
+
 or
+
 ```
 RUSTFLAGS='-C target-cpu=native' cargo install --path crates/set
 ```
@@ -118,6 +130,7 @@ RUSTFLAGS='-C target-cpu=native' cargo install --path crates/set
 ## Usage
 
 Exec `mocset --help` to get the help message:
+
 ```
 > mocset --help
 Command-line tool to build, update and query a persistent set of HEALPix Multi-Order Coverages maps (MOCs)
@@ -144,6 +157,7 @@ Options:
 
 Simply list in a csv file a set of identifier (integer in `[0, 281_474_976_710_655]`),
 and MOC FITS file path. See e.g the file [moclist.txt](resources/tests/moclist.txt):
+
 ```bash
 1,data/CDS_B_bax_bax.fits
 2,data/CDS_I_172_irs.fits
@@ -159,19 +173,24 @@ and MOC FITS file path. See e.g the file [moclist.txt](resources/tests/moclist.t
 ```
 
 Then execute `moc-set` from the `mocset` command:
+
 ```bash
 > mocset make --n128 3 --moc-list moclist.txt --delimiter , mocset.bin
 ```
+
 or from the source code, [installing](https://www.rust-lang.org/tools/install) the Rust compiler (including Cargo):
+
 ```bash
 > cargo run --release -- make --n128 3 --moc-list moclist.txt --delimiter , mocset.bin
 ```
+
 To build the moc-set binary file `mocset.bin`.
 
-The total number of MOCs that can be stored in the file equals `n128 * 128 - 1 (so 383 in the example above, since n128=3).
-
+The total number of MOCs that can be stored in the file equals `n128 * 128 - 1 (so 383 in the example above, since
+n128=3).
 
 See the help message for more details:
+
 ```
 > mocset make --help
 Make a new mocset
@@ -191,6 +210,7 @@ Options:
 ### List the content of a MOC set
 
 Simply use `mocset list`:
+
 ```
 > mocset list mocset.bin
 id,status,depth,n_ranges,byte_size
@@ -202,11 +222,13 @@ id,status,depth,n_ranges,byte_size
 6,valid,11,17,136
 ...
 ```
+
 * `status`: can be `valid`, `deprecated` or `removed`
 * `n_ranges`: number of ranges in the MOC
 * `byte_size`: size of the MOC stored in the MOC set (in bytes)
 
 See the help message:
+
 ```
 > mocset list --help
 Provide the list of the MOCs in the mocset and the associated flags
@@ -221,10 +243,10 @@ Options:
   -h, --help    Print help
 ```
 
-
 ### Querying a MOC set
 
 See the help to get the different query modes:
+
 ```
 > mocset query --help
 Query the mocset
@@ -250,14 +272,18 @@ Options:
 #### Query for a single position
 
 To obtain the list of the MOCs containing a the position 90.0 +0.0 (in decimal degrees), use:
+
 ```bash
 > mocset query moclist.bin pos 90.0 +0.0
 id
 161
 ```
-The result is the list of the identifier of the MOC covering the input position (only one MOC, with identifier 161 in our example).
+
+The result is the list of the identifier of the MOC covering the input position (only one MOC, with identifier 161 in
+our example).
 
 See the full help:
+
 ```
 > mocset query pos --help
 Single position
@@ -272,10 +298,10 @@ Options:
   -h, --help  Print help
 ```
 
-
 #### Query for a cone
 
 To obtain the list of the MOCs overlapping the cone of center 90.0 +0.0 and having a radius of 320 arcsec, use:
+
 ```bash
 > mocset query mocset.bin cone 90.0 +0.0 320.0 --precision 5
 id
@@ -286,14 +312,16 @@ id
 ```
 
 `--precision` is optional, its default value is 2:
- * at a `precision` of 0, `mocset` transforms the input cone in a MOC 
-containing 1 to 9 values. 
- * at a `precision` of 1, `mocset` transforms the input cone in a MOC
-containing 1 to `9x4` values.
- * at a `precision` of `n`, `mocset` transforms the input cone in a MOC
-containing 1 to `9x4^n` values.
+
+* at a `precision` of 0, `mocset` transforms the input cone in a MOC
+  containing 1 to 9 values.
+* at a `precision` of 1, `mocset` transforms the input cone in a MOC
+  containing 1 to `9x4` values.
+* at a `precision` of `n`, `mocset` transforms the input cone in a MOC
+  containing 1 to `9x4^n` values.
 
 See the help:
+
 ```
 > mocset query cone --help
 A cone, i.e. a position with a small area around (approximated by a MOC)
@@ -314,6 +342,7 @@ Options:
 #### Query for a MOC
 
 To obtain the list of the MOCs overlapping the MOC stored in a given FITs file, e.g the MOC of XMM4 DR9, use:
+
 ```
 > mocset query mocset.bin moc YOUR_PATH/CDS_IX_59_xmm4dr9s.fits
 id
@@ -330,7 +359,9 @@ id
 ...
 ```
 
-You may also use a MOC generate on the fly using [moc-cli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli)
+You may also use a MOC generate on the fly
+using [moc-cli](https://github.com/cds-astro/cds-moc-rust/tree/main/crates/cli)
+
 ```
 > moc from polygon 5 "(0.0,0.0),(10.0,0.0),(0.0,10.0)" ascii | mocset query mocset.bin moc - --format ascii
 id
@@ -351,6 +382,7 @@ id
 ```
 
 See the help
+
 ```
 > mocset query moc --help
 The given MOC (you create a moc using moc-cli and pipe it into moc-set)
@@ -369,6 +401,7 @@ Options:
 ### Query from a STC-S region
 
 You can query from a STC-S region using `moc-cli`:
+
 ```bash
 echo "Intersection ICRS (
     Polygon 272.536719 -19.461249 272.542612 -19.476380 272.537389 -19.491509 272.540192 -19.499823
@@ -400,11 +433,11 @@ echo "Intersection ICRS (
 )" | moc from stcs 14 - ascii | mocset query mocset.bin moc - --format ascii
 ```
 
-
 #### Generic parameter
 
 For all queries, the option `--add-deprecated` (or `-d`) add the MOCs flagged as deprecated in
 the output, e.g.:
+
 ```bash
 mocset query --add-deprecated moclist.bin pos 90.0 +0.0 --precision 5
 ```
@@ -412,13 +445,15 @@ mocset query --add-deprecated moclist.bin pos 90.0 +0.0 --precision 5
 ### Updating a MOC set
 
 You can:
-* `chgstatus` change the status of a MOC in the MOC set to flag it as `deprecated` or back to `valid`, 
+
+* `chgstatus` change the status of a MOC in the MOC set to flag it as `deprecated` or back to `valid`,
   or as `removed` (WARNING: once removed, a MOC cannot be flagged back as `deprecated` or `valid`)
 * `append` a new MOC at the end of the MOC set, the ID of a removed MOC can be reused
 * `purge` a MOC set to physically remove all MOCs flagged as `removed`.
   This process basically re-write the whole MOC set file.
- 
+
 Example of usage of `chgstatus`
+
 ```
 > mocset list mocset.bin
 id,status,depth,n_ranges,byte_size
@@ -446,16 +481,19 @@ id,status,depth,n_ranges,byte_size
 ```
 
 Example of usage of `append`:
+
 ```
 > mocset append mocset.bin 3000 MY_PATH/my_new_moc.fits
 ```
 
 Example of usage of `purge`:
+
 ```
 > mocset purge mocset.bin
 ```
 
 Help messages:
+
 ```
 > mocset chgstatus --help
 Change the status flag of the given MOCs identifiers (valid, deprecated, removed)
@@ -487,7 +525,6 @@ Options:
 
 ```
 
-
 ```
 > mocset purge --help
 Purge the mocset removing physically the MOCs flagged as 'removed'
@@ -515,13 +552,16 @@ of the system to keep the file's data in the disk cache.
 
 If used on a server with a lot of I/O, the data may not stay in the disk cache for long.
 If we nevertheless want to always answer quickly, there is at least three options:
-* write a daemon loading the full dataset in memory 
+
+* write a daemon loading the full dataset in memory
 * create a VM (or a docker?) containing only the `moc-set` tool
-* my favourite one: use shared memory, resorting e.g. on the [shared_memory crate](https://crates.io/crates/shared_memory)
+* my favourite one: use shared memory, resorting e.g. on
+  the [shared_memory crate](https://crates.io/crates/shared_memory)
 
 ### File structure
 
 The structure of the file is made of two main blocks:
+
 * a fixed length header, made of
     + a fixed length metadata
     + a fixed length cumulative byte index
@@ -532,6 +572,7 @@ The structure of the file is made of two main blocks:
 #### Metadata part
 
 A fixed size (chosen at creation) buffer of `n` `u64` elements.
+
 * the first `u64` contains an indication on the buffer size
 * all other `u64` values, one per MOC in the `moc-set`, are made of 3 components:
     + a `u8` flag taking 4 possible values (only 2 bits are used, 6 are remaining):
@@ -549,9 +590,10 @@ The file can store `n - 1` MOCs.
 #### Cumulative byte index
 
 A fixed size (chosen at creation) buffer of `n` `u64` elements.
+
 * the first `u64` contains the byte size of the header, i.e. the size of the file with no data
-  it also correspond to the starting byte of the first MOC that will be inserted in the `moc-set`; 
-* all other elements at index `i` contains the size of the file if only storing the 
+  it also correspond to the starting byte of the first MOC that will be inserted in the `moc-set`;
+* all other elements at index `i` contains the size of the file if only storing the
   $i+1$ first MOCs.
 
 To get the size (in bytes) of the MOC at index `i`, we can simply perform the operation:
@@ -563,7 +605,6 @@ A simple concatenation of the MOCs ranges.
 According to the depth of each MOC, the ranges are either ranges of `u32` or ranges of `u64`.
 
 ![](resources/doc/img/MOCSet_full.png)
-
 
 ### Updates and Reading while writing
 
@@ -595,7 +636,7 @@ data byte beyond the last known cumulative index byte.
 If a process is reading while another is writing, the newly written part will also
 simply be ignored if the metadata part has not yet been updated/written.
 
-It works well because we only append new MOCs (we never delete information), 
+It works well because we only append new MOCs (we never delete information),
 we only update metadata to flag a MOC as removed of deprecated, and we
 respect the read/write order as described above.
 
@@ -603,27 +644,21 @@ respect the read/write order as described above.
 
 ![](resources/doc/img/MOCSet_write1.png)
 
-
 #### Add a new moc step 1/3
 
 ![](resources/doc/img/MOCSet_write2.png)
-
 
 #### add a new moc step 2/3
 
 ![](resources/doc/img/MOCSet_write3.png)
 
-
 #### add a new moc step 3/3
 
 ![](resources/doc/img/MOCSet_write4.png)
 
-
 #### Mocset file after having added a new MOC
 
 ![](resources/doc/img/MOCSet_write5.png)
-
-
 
 #### Purge
 
@@ -633,10 +668,27 @@ in a temporary file, and then making a move replacing the previous `moc-set`
 by the new one.  
 The `purge` operation uses a write lock.
 
-
 ## Recall
 
 * Drop linux disk cache, in root mode: `sync; echo 3 > /proc/sys/vm/drop_caches`
 * Build for being compatible with a large range of systems, avoiding the GLIBC version error
   (see [this post](https://stackoverflow.com/questions/63724484/build-and-bind-against-older-libc-version)):
+
 > cargo build --target x86_64-unknown-linux-musl
+
+## License
+
+Like most projects in Rust, this project is licensed under either of
+
+* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
+  http://www.apache.org/licenses/LICENSE-2.0)
+* MIT license ([LICENSE-MIT](LICENSE-MIT) or
+  http://opensource.org/licenses/MIT)
+
+at your option.
+
+## Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this project by you, as defined in the Apache-2.0 license,
+shall be dual licensed as above, without any additional terms or conditions.

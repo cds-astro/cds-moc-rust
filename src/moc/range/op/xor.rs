@@ -116,7 +116,7 @@ where
     loop {
       // We can probably simplify this, check again another day!!
       match (&mut self.left, &mut self.right) {
-        (Some(ref mut l), Some(ref mut r)) => {
+        (Some(l), Some(r)) => {
           if l.end == r.start {
             // L--LR--R => return R----R; next L
             r.start = l.start;

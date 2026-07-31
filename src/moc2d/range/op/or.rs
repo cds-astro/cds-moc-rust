@@ -1252,9 +1252,7 @@ fn perform_union_till_first_end<T, Q, U, R, I1, I2>(
   I1: RangeMOCIterator<T, Qty = Q>,
   I2: RangeMOCIterator<T, Qty = Q>,
 {
-  while let (Some(ref mut l), Some(ref mut r)) =
-    (&mut moc2_elem_l.moc_1_head, &mut moc2_elem_r.moc_1_head)
-  {
+  while let (Some(l), Some(r)) = (&mut moc2_elem_l.moc_1_head, &mut moc2_elem_r.moc_1_head) {
     if l.end < r.start {
       // L--L R--R
       moc_1_ranges_collector.push(moc2_elem_l.next_1().unwrap());
@@ -1291,9 +1289,7 @@ fn perform_union_while_left_included_in_right<T, Q, U, R, I1, I2>(
   I1: RangeMOCIterator<T, Qty = Q>,
   I2: RangeMOCIterator<T, Qty = Q>,
 {
-  while let (Some(ref mut l), Some(ref mut r)) =
-    (&mut moc2_elem_l.moc_1_head, &mut moc2_elem_r.moc_1_head)
-  {
+  while let (Some(l), Some(r)) = (&mut moc2_elem_l.moc_1_head, &mut moc2_elem_r.moc_1_head) {
     if l.start < r.start {
       // L--xx
       break;
@@ -1342,9 +1338,7 @@ fn perform_union_while_equal_ranges<T, Q, U, R, I1, I2>(
   I1: RangeMOCIterator<T, Qty = Q>,
   I2: RangeMOCIterator<T, Qty = Q>,
 {
-  while let (Some(ref mut l), Some(ref mut r)) =
-    (&mut moc2_elem_l.moc_1_head, &mut moc2_elem_r.moc_1_head)
-  {
+  while let (Some(l), Some(r)) = (&mut moc2_elem_l.moc_1_head, &mut moc2_elem_r.moc_1_head) {
     if l.start == r.start {
       match l.end.cmp(&r.end) {
         Ordering::Less => {

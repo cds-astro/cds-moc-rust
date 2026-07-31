@@ -117,7 +117,7 @@ where
   fn next(&mut self) -> Option<Self::Item> {
     loop {
       match (&mut self.left, &mut self.right) {
-        (Some(ref mut l), Some(ref mut r)) => {
+        (Some(l), Some(r)) => {
           if l.end <= r.start {
             // L--L R--R, return L and next L
             return std::mem::replace(&mut self.left, self.left_it.next());

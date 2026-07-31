@@ -642,7 +642,7 @@ impl<'a, T: Idx> SNORanges<'a, T> for BorrowedRanges<'a, T> {
 
     loop {
       match (&mut left, &mut right) {
-        (Some(ref mut l), Some(ref mut r)) => {
+        (Some(l), Some(r)) => {
           if l.end < r.start {
             // L--L R--R
             res.push(mem::replace(&mut left, left_it.next().cloned()).unwrap());
@@ -665,14 +665,14 @@ impl<'a, T: Idx> SNORanges<'a, T> for BorrowedRanges<'a, T> {
             right = consume_while_end_lower_than(&mut right_it, l.end).cloned();
           }
         }
-        (Some(ref l), None) => {
+        (Some(l), None) => {
           res.push(l.clone());
           for l in left_it {
             res.push(l.clone());
           }
           break;
         }
-        (None, Some(ref r)) => {
+        (None, Some(r)) => {
           res.push(r.clone());
           for r in right_it {
             res.push(r.clone());

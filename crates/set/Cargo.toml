@@ -10,7 +10,7 @@ keywords = ["healpix", "moc"]
 documentation = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set"
 homepage = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set"
 repository = "https://github.com/cds-astro/cds-moc-rust/tree/main/crates/set"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
