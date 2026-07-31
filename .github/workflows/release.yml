@@ -196,8 +196,8 @@ jobs:
           asset_path: "mocset-${{ needs.create-github-release.outputs.version }}-${{ matrix.config.target }}.zip"
           asset_name: "mocset-${{ needs.create-github-release.outputs.version }}-${{ matrix.config.target }}.zip"
           asset_content_type: application/gzip
-          
-build-pp-releases:
+
+  build-pp-releases:
     name: Release STMOC-PP assets
     needs: create-github-release
     runs-on: ${{ matrix.config.os }}
