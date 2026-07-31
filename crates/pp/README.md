@@ -1,7 +1,8 @@
 # stmoc-pp
 
 A command-line tool to build and query a **persistent** set of Time range and
-spatial Multi-Order Coverage map (MOC, see [this IVOA standard](https://ivoa.net/documents/MOC)) tuples.
+spatial Multi-Order Coverage map (MOC, see [this IVOA standard](https://ivoa.net/documents/MOC)) tuples, i.e.
+ST-MOC progenitors.
 
 ## About
 
@@ -13,14 +14,67 @@ In other words, given a sub-ST-MOC, it is no longer possible to determine which 
 As a result, a ST-MOC cannot directly support the following use case:
 > Given a ST-MOC, return all image identifiers whose (time range, S-MOC) pair intersects it.
 
-The ST-MOC Persistent Precursor/Projenitors (STMOC-PP) is designed to address this limitation.
+The ST-MOC Persistent Precursor/Progenitors (STMOC-PP) is designed to address this limitation.
 STMOC-PP is not itself a ST-MOC; rather, it stores the information required to efficiently construct a ST-MOC,
-which explains the term "precursor/projectiro".
+which explains the term "precursor/progenitor".
 In addition, STMOC-PP is intended to be built once from a potentially very large dataset -- possibly larger
 than the available RAM -- and then queried directly from disk.
 This persistence property explains the term "persistent".
 
+This tool has been built from discussions with the [PADC](https://padc.obspm.fr/)
+and [VESPA](https://insu.hal.science/insu-01916553v1) members,
+for use cases such that the one
+in [this tutorial](https://github.com/epn-vespa/tutorials/blob/master/misc/searching_archives/stmoc-jupiter.ipynb)
+by [Stéphane Erard](https://lira.obspm.fr/perso/stephane-erard/se/CV.html)
+and [Baptiste Cecconi](https://lira.obspm.fr/perso/baptiste-cecconi/cursus.php).
+
 ## Installation
+
+### From pypi for python users
+
+The STMOC-PP CLI is available in [pypi](https://pypi.org/project/stmoc-pp),
+you can thus install the `stmocpp` executable using `pip`:
+
+```bash
+pip install -U stmoc-pp
+stmocpp --help
+```
+
+### Debian package
+
+Download the last `stmoc-pp_xxx.deb` corresponding to your architecture
+(`x86_64_musl` has the most chances to fit your needs)
+from the [github release page](https://github.com/cds-astro/cds-moc-rust/releases).
+
+Install the `.deb` by clicking on it or using the command line:
+
+```bash
+sudo dpkg -i stmoc-pp_xxx.deb
+sudo apt-get install -f
+```
+
+Then you can use the tool:
+
+```bash
+stmocpp
+man stmocpp
+```
+
+You can uninstall using, e.g.:
+
+```bash
+sudo dpkg -r $(dpkg -f stmoc-pp_xxx.deb Package)
+```
+
+### Pre-compile binaries for MacOS, Linux and Windows
+
+Download the last `stmocpp-vxx_yyy.tar.gz` corresponding to your architecture
+from the [github release page](https://github.com/cds-astro/cds-moc-rust/releases).
+You probably want ot use:
+
+* Linux: `stmocpp-vxx-x86_64-unknown-linux-musl.tar.gz`
+* MacOS: `stmocpp-vxx-x86_64-apple-darwin.tar.gz`
+* Windows: `stmocpp-vxx-pc-windows-gnu.zip`
 
 ### Compile from source code
 
@@ -163,6 +217,14 @@ lt: 7]
           Print help
 ```
 
+**WARNING:** so far, you can build a valid file only if the number of entries if higher than
+the number of entries in a single leaf page, i.e.:
+
+* 32 for 1 kB,
+* 64 for 2 kB,
+* 96 for 3 kB, and
+* 128 for 4 kB.
+
 ### Check the STMOC-PP file content
 
 For general information on the structure of a STMOC-PP file, run:
@@ -199,9 +261,9 @@ id,tmin,tmax,smoc
 
 ### Query the STMOC-PP file
 
-So far, the tool allow for 2 query modes:
+So far, the tool allows for 2 query modes:
 
-    1. by single time range and S-MOC: returns all identifiers intersecting the input (time range, S-MOC) couple,
+    1. query by single time range and S-MOC: returns all identifiers intersecting the input (time range, S-MOC) couple,
        and possibly print the result of the intersection:
 
 ```bash
@@ -228,7 +290,7 @@ id,tmin,tmax,smoc
 ...
 ```
 
-    2. by ST-MOCs: returns all identifiers intersecting the ST-MOC (may contains duplicates),
+    2. query by ST-MOC: returns all identifiers intersecting the ST-MOC (may contain duplicates),
        and possibly print the result of the intersection for each entry:
 
 ```bash
@@ -237,8 +299,16 @@ id,tmin,tmax,smoc
 
 ## Example / Bench
 
-Test on HST obscore table. 3 millions entries, ...
-TBW!
+Test with the HST OBSCORE table:
+
+* 3 millions entries
+* input CSV of 695 MB (mode STC-S, chosen depth=13)
+* stmopp file of 306 MB built in 1m43,056s
+* query by XMM Observation centers ST-MOC (14000 entries)
+    + query time: 0m4,063s (average of 0.3ms/xmm (time-range, SMOC) tuple)
+    + output size: 6000 rows
+
+TBW we more details, put the scripts, ...!
 
 ## Data structure and algorithm
 
