@@ -1,5 +1,11 @@
 # `moc-set` Change Log
 
+## 0.12.0
+
+Released 2026-07-31
+
+* Bump to follow `stmocpp` and `moccli` version.
+
 ## 0.11.0
 
 Released 2025-09-26

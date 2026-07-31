@@ -1,5 +1,12 @@
 # `moc-cli` Change Log
 
+## 0.12.0
+
+Released 2026-07-31
+
+* Add multithreading option for `moc from multiregion`
+* Add TTYPE1 keyword in 2D-MOCs FITS serialization
+
 ## 0.11.0
 
 Released 2025-09-26

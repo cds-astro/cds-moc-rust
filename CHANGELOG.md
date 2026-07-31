@@ -1,8 +1,15 @@
 # `moc` Change Log
 
+## 0.19.3
+
+Released 2026-07-31
+
+* Add `TTYPE1` keyword in 2D-MOCs FITS serialization
+* Add the STMOC-PP command line tool in the project
+
 ## 0.19.2
 
-Released 20256-03-09
+Released 2026-03-09
 
 ### Changed
 
@@ -12,8 +19,7 @@ Released 20256-03-09
 
 ### Fixed
 
-* Bug in `make_consistent` affecting the construction of (some) 2D MOCs 
-
+* Bug in `make_consistent` affecting the construction of (some) 2D MOCs
 
 ## 0.19.1
 
