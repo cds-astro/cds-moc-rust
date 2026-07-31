@@ -5,6 +5,7 @@
 Released 2026-07-31
 
 * Bump to follow `stmocpp` and `moccli` version.
+* Fox warnings (and now errors) replacing previous static HasMap lazy instantiation implementation by 'LazyLock'
 * Add `TTYPE1` keyword in 2D-MOCs FITS serialization
 
 ## 0.11.0

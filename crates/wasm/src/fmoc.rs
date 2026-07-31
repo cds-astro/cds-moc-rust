@@ -1,35 +1,24 @@
 use std::{
   collections::HashMap,
   str::from_utf8,
-  sync::{Once, RwLock},
+  sync::{LazyLock, Once, RwLock},
 };
 
 use js_sys::Array;
-use wasm_bindgen::{prelude::*, JsValue};
+use wasm_bindgen::{JsValue, prelude::*};
 
 use moclib::storage::u64idx::U64MocStore;
 
-use crate::{from_url, IsMOC, IsOneDimMOC, MocQType};
+use crate::{IsMOC, IsOneDimMOC, MocQType, from_url};
 
-/// Function used only once to init the store.
-static MOC_STORE_INIT: Once = Once::new();
 /// The MOC store (a simple hashmap), protected from concurrent access by a RwLock.
-static mut MOC_STORE: Option<RwLock<HashMap<String, FMOC>>> = None;
+static MOC_STORE: RwLock<LazyLock<HashMap<String, FMOC>>> =
+  RwLock::new(LazyLock::new(|| HashMap::new()));
 
 /// Get (or create and get) the read/write protected MOC store
 /// All read/write  operations on the store have to call this method.
-pub(crate) fn get_store() -> &'static RwLock<HashMap<String, FMOC>> {
-  unsafe {
-    // Inspired from the Option get_or_insert_with method, modified to ensure thread safety with
-    // https://doc.rust-lang.org/std/sync/struct.Once.html
-    // This implements a double-checked lock.
-    if let None = MOC_STORE {
-      MOC_STORE_INIT.call_once(|| {
-        MOC_STORE = Some(RwLock::new(HashMap::new()));
-      });
-    }
-    MOC_STORE.as_ref().unwrap()
-  }
+pub(crate) fn get_store() -> &'static RwLock<LazyLock<HashMap<String, FMOC>>> {
+  &MOC_STORE
 }
 
 #[wasm_bindgen]
