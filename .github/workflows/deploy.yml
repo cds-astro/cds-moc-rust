@@ -28,17 +28,17 @@ jobs:
        run: |
          source $HOME/.cargo/env
          cd crates/set
-         for PYBIN in /opt/python/cp38*/bin; do
+         for PYBIN in /opt/python/cp314*/bin; do
            "${PYBIN}/pip" install maturin
            "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux_2_28
          done
          cd ../pp
-         for PYBIN in /opt/python/cp38*/bin; do
+         for PYBIN in /opt/python/cp314*/bin; do
            "${PYBIN}/pip" install maturin
            "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux_2_28
          done
          cd ../cli
-         for PYBIN in /opt/python/cp38*/bin; do
+         for PYBIN in /opt/python/cp314*/bin; do
            "${PYBIN}/pip" install maturin
            "${PYBIN}/maturin" publish -i "${PYBIN}/python" --no-sdist --skip-existing --compatibility manylinux_2_28
          done
@@ -89,7 +89,7 @@ jobs:
       fail-fast: false      
       matrix:
         os: [windows-latest]
-        python-version: ['3.8']
+        python-version: ['3.14']
     steps:
      - uses: actions/checkout@v2
      - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
@@ -120,7 +120,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macOS-latest]
-        python-version: ['3.8']
+        python-version: ['3.14']
     steps:
      - uses: actions/checkout@v2
      - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
