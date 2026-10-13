@@ -11,12 +11,13 @@ use std::{
 
 use memmap::{Mmap, MmapOptions};
 
+use crate::{slice_u8_to_u64data, time::TimeType};
+
 use moclib::{
+  moc::range::RangeMOC,
   qty::{Hpx, MocQty},
   ranges::{BorrowedRanges, Ranges, SNORanges},
 };
-
-use crate::{slice_u8_to_u64data, time::TimeType};
 
 /// Number of bytes in the header of the file.
 pub const HEADER_BYTE_SIZE: u64 = 32;
@@ -820,6 +821,50 @@ impl<'a> STMocPPFileReader<'a> {
         ranges.intersects(&(smoc_u64).into())
       };
       if intersects {
+        Some((leaf, smoc_bytes))
+      } else {
+        None
+      }
+    })
+  }
+
+  /// Filter returning only entries having SMOCs whose intersection with the given SMOC covers
+  /// the minimum given area (in sky fraction).
+  /// (Returns the SMOC bytes)
+  pub fn smoc_filter_with_minimum_area<I>(
+    &self,
+    it: I,
+    smoc_u32_depth: u8,
+    smoc_u32_ranges: &Ranges<u32>,
+    smoc_u64_depth: u8,
+    smoc_u64_ranges: &Ranges<u64>,
+    minimum_sky_fraction: f64,
+  ) -> impl Iterator<Item = (LeafEntry<'_>, &'_ [u8])>
+  where
+    I: Iterator<Item = LeafEntry<'a>>,
+  {
+    let first_smoc_byte_offset = self.layout.first_smoc_byte_offset() as usize;
+    it.filter_map(move |leaf| {
+      let depth = leaf.smoc_depth();
+      let bstart = leaf.smoc_starting_byte_offset() as usize - first_smoc_byte_offset;
+      let bend = bstart + leaf.smoc_byte_length() as usize;
+      let smoc_bytes = &self.smocs_bytes[bstart..bend];
+      let intersection_sky_fraction = if depth <= Hpx::<u32>::MAX_DEPTH {
+        let ranges: BorrowedRanges<'_, u32> = BorrowedRanges::from(smoc_bytes);
+        let intersection_depth = smoc_u32_depth.max(depth);
+        let intersection_ranges = ranges.intersection(&(smoc_u32_ranges).into());
+        let intersection_moc =
+          RangeMOC::<u32, Hpx<u32>>::new(intersection_depth, intersection_ranges.into());
+        intersection_moc.coverage_percentage()
+      } else {
+        let ranges: BorrowedRanges<'_, u64> = BorrowedRanges::from(smoc_bytes);
+        let intersection_depth = smoc_u64_depth.max(depth);
+        let intersection_ranges = ranges.intersection(&(smoc_u64_ranges).into());
+        let intersection_moc =
+          RangeMOC::<u64, Hpx<u64>>::new(intersection_depth, intersection_ranges.into());
+        intersection_moc.coverage_percentage()
+      };
+      if intersection_sky_fraction > 0.0 && intersection_sky_fraction >= minimum_sky_fraction {
         Some((leaf, smoc_bytes))
       } else {
         None

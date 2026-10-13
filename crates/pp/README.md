@@ -310,6 +310,35 @@ Test with the HST OBSCORE table:
 
 TBW we more details, put the scripts, ...!
 
+## CGI mode
+
+You can compile the executable with the `cgi` feature:
+```bash
+cd crate/pp
+cargo build --features cgi --release
+```
+The executable built in `target/release` can then be used as a `CGI`.
+E.g. if you are using the Apache http server,
+copy `stmocpp` in `/var/www/cgi-bin/stmocpp.cgi`.
+Put smocpp data file(s) in the reposiory `/var/www/cgi-bin/stmocppdata`, e.g.:
+```bash
+/var/www/cgi-bin/stmocppdata/hst.bin
+```
+
+One can then perform http queries such as:
+```bash
+# Simple query using GET
+wget https://SERVER/cgi-bin/stmocpp.cgi?dataset=hst&tfmt=mjd&tstart=60230.55&tend=60243.273&skyfrac_min=1.0e-6&smoc=0/4-8
+
+# Query by ST-MOC using POST
+curl -X POST 'https://SERVER/cgi-bin/stmocpp.cgi?dataset=hst&skyfrac_min=1.0e-6' -H "Content-Type: application/fits" --data-binary @stmoc.fits
+```
+
+In which:
+* `hst`: is a product name and correspond to a file (without the `.bin` extension) in `stmocppdata`;
+* `frac_min`: is the minimum size of the MOC intersection to fulfil a query
+
+
 ## Data structure and algorithm
 
 The global structure, in the file, is an implicit one dimensional R-Tree.
