@@ -4,6 +4,7 @@
 
 Released 2026-07-31
 
+* Bump cdshealpix version
 * Add `TTYPE1` keyword in 2D-MOCs FITS serialization
 * Add the STMOC-PP command line tool in the project
 
