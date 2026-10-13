@@ -622,7 +622,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   /// * We start with the first cell, mark it, look for its neighbour.
   /// * For each neighbour we find (or we find a super-cel containing it),
   ///   we mark the cell as visited and push it into the stack of cells we want to check the neighbours
-  /// * When the stackis empty, we visited all neighbours of neighbours of neighbours of ...
+  /// * When the stack is empty, we visited all neighbours of neighbours of neighbours of ...
   /// * We form a new MOC from all marked cells that we put in a list,
   /// * and we remove them from the original MOC.
   /// * We continue the process with the updated original MOC
@@ -938,7 +938,7 @@ impl<T: Idx> RangeMOC<T, Hpx<T>> {
   /// Algo:
   /// * for each cell (all at max depth) of the external border
   ///     + for each of the 4 border, we look if the neighbour cell is in the original MOC
-  ///     + if yes, add the vertex tuples in output
+  ///     + if no, add the vertex tuples in output
   pub fn border_elementary_edges(&self) -> impl Iterator<Item = CellAndEdges<T>> + '_ {
     let hp = healpix::nested::get(self.depth_max);
     self

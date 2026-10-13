@@ -810,7 +810,13 @@ impl From {
                 .line_it
                 .by_ref()
                 .take(50_000)
-                .filter_map(|l| l.ok()) // Else emit a warning on stderr (decorate with Enumerate)?
+                .filter_map(|res| match res {
+                  Ok(line) => Some(line),
+                  Err(e) => {
+                    error!("Error reading line: {:?}. Line ignored.", e);
+                    None
+                  }
+                }) // Else emit a warning on stderr (decorate with Enumerate)?
                 .collect();
               if v.is_empty() {
                 None
@@ -825,7 +831,7 @@ impl From {
             Chunk::new(reader.lines())
               .par_bridge()
               .flatten()
-              .filter_map(move |line| line2m(depth, separator, line).ok()) // Else emit a warning on stderr (decorate with Enumerate)?
+              .filter_map(move |line| line2m(depth, separator, line).ok()) // TODO:  Else emit a warning on stderr (decorate with Enumerate)?
               .reduce(
                 || RangeMOC::<u64, Hpx<u64>>::new_empty(depth),
                 |l, r| l.or(&r),
@@ -836,7 +842,7 @@ impl From {
             Chunk::new(reader.lines())
               .par_bridge()
               .flatten()
-              .filter_map(move |line| line2m(depth, separator, line).ok()) // Else emit a warning on stderr (decorate with Enumerate)?
+              .filter_map(move |line| line2m(depth, separator, line).ok()) // TODO: Else emit a warning on stderr (decorate with Enumerate)?
               .reduce(
                 || RangeMOC::<u64, Hpx<u64>>::new_empty(depth),
                 |l, r| l.or(&r),
